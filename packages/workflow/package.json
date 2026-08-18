@@ -1,0 +1,20 @@
+{
+  "name": "@vendra/workflow",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Pure vendor-compliance engines: document catalog, extraction schemas, validators, requirement mapping, activation-gate math. Zero AI/provider/network imports by contract.",
+  "type": "module",
+  "exports": {
+    "./vendor": "./src/vendor/index.ts"
+  },
+  "scripts": {
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^7.0.2"
+  }
+}

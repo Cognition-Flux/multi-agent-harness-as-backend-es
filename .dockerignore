@@ -1,0 +1,9 @@
+node_modules
+**/node_modules
+**/.next
+.git
+.env
+.env.*
+!.env.docker.example
+.harness-logs
+**/*.tsbuildinfo

@@ -1,0 +1,28 @@
+{
+  "name": "@vendra/db-vendor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Vendra's own Drizzle package: schema source of truth, generated migrations, client, and the programmatic migrator (SPEC §6.10, §9.5).",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./migrate": "./src/migrate.ts",
+    "./schema": "./drizzle/schema.ts"
+  },
+  "scripts": {
+    "generate": "drizzle-kit generate",
+    "migrate": "tsx src/migrate-cli.ts",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.2",
+    "pg": "8.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/pg": "^8.23.1",
+    "drizzle-kit": "0.31.10",
+    "tsx": "^4.20.6",
+    "typescript": "^7.0.2"
+  }
+}

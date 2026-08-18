@@ -1,0 +1,135 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Vendra palette: warm white ground, graphite ink for interactive
+       elements, burnt orange for the brand + live agent activity, warm greys
+       for structure. Status hues (success/warning/destructive/info) are
+       functional and stay put. */
+    --background: 30 25% 99%;
+    --foreground: 24 10% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 24 10% 10%;
+    --primary: 24 9% 15%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 30 15% 96%;
+    --secondary-foreground: 24 10% 10%;
+    --muted: 30 15% 96%;
+    /* Dark enough to clear AA even on the 10%-alpha tinted panels. */
+    --muted-foreground: 25 8% 38%;
+    --accent: 30 18% 93%;
+    --accent-foreground: 24 10% 10%;
+    --destructive: 0 72% 45%;
+    --destructive-foreground: 0 0% 100%;
+    /* Warning/success are darkened past their hue's usual register so badge
+       text on the 10%-alpha tinted grounds clears WCAG AA (≥4.5:1). */
+    --warning: 35 90% 30%;
+    --warning-foreground: 0 0% 100%;
+    --success: 152 64% 26%;
+    --success-foreground: 0 0% 100%;
+    /* Info clears AA only on ≤10%-alpha tints (4.91:1) — never raise its
+       tint alpha above /10. */
+    --info: 202 90% 34%;
+    --info-foreground: 0 0% 100%;
+    /* Burnt orange — the brand accent, reserved for live AI/harness activity
+       (and focus rings), so "the agent is working" stays legible at a glance.
+       AA-verified: 5.68:1 on white, 4.89:1 on its own 10% tint. */
+    --agent: 22 92% 36%;
+    --agent-foreground: 0 0% 100%;
+    --border: 28 15% 90%;
+    --input: 28 15% 88%;
+    --ring: 22 92% 36%;
+    --radius: 0.75rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    /* Light-only app: keep native form controls/scrollbars on the light UA
+       palette even when the OS prefers dark. */
+    color-scheme: light;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    /* Explicit system stack — never depend on preflight defaults for the
+       app's entire typography (rule 1: no external font hosts). */
+    font-family:
+      ui-sans-serif,
+      system-ui,
+      -apple-system,
+      "Segoe UI",
+      Roboto,
+      "Helvetica Neue",
+      Arial,
+      "Noto Sans",
+      sans-serif,
+      "Apple Color Emoji",
+      "Segoe UI Emoji";
+  }
+
+  ::selection {
+    background: hsl(var(--agent) / 0.18);
+  }
+}
+
+@layer utilities {
+  /* Ambient page ground: soft radial washes in the brand oranges plus a
+     faint warm-grey counterweight. Pure CSS gradients — no external assets
+     (rule 1). */
+  .bg-aurora {
+    background-image:
+      radial-gradient(38rem 26rem at 12% -6%, hsl(var(--agent) / 0.07), transparent 60%),
+      radial-gradient(32rem 22rem at 88% -4%, hsl(30 90% 50% / 0.06), transparent 60%),
+      radial-gradient(44rem 30rem at 50% 112%, hsl(var(--foreground) / 0.04), transparent 60%);
+  }
+
+  /* Subtle dot grid for hero/empty surfaces. */
+  .bg-dots {
+    background-image: radial-gradient(hsl(var(--foreground) / 0.05) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  /* Frosted panel — floating surfaces (drawers, sticky bars, dialogs). */
+  .glass {
+    @apply border border-border/60 bg-card/70 backdrop-blur-xl;
+  }
+
+  /* Brand gradient text (wordmark, hero numerals). Orange tones only — no
+     ink stops — and periodic (first stop == last) so the pan loops with no
+     visible seam. Pair with animate-gradient-pan + bg-[length:200%_auto].
+     Every stop clears 4.5:1 on white, so the animated text stays AA at any
+     phase of the sweep. */
+  .text-gradient-brand {
+    background-image: linear-gradient(
+      100deg,
+      hsl(18 90% 38%),
+      hsl(25 94% 39%) 33%,
+      hsl(var(--agent)) 66%,
+      hsl(18 90% 38%)
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+/* Collapse decorative motion for reduced-motion users. Spinners are exempt —
+   a frozen mid-rotation arc reads as a hang, and WCAG treats progress
+   indication as essential motion. */
+@media (prefers-reduced-motion: reduce) {
+  *:not(.animate-spin),
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  html {
+    scroll-behavior: auto !important;
+  }
+}

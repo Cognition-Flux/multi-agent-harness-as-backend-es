@@ -1,0 +1,9 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# pnpm 10 blocks dependency build scripts by default; these are the ones we
+# rely on (esbuild backs tsx + drizzle-kit, sharp backs Next image opt).
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
