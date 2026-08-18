@@ -147,12 +147,12 @@ export function useDocumentsController(options: {
         if (!(ACCEPTED_MIME_TYPES as readonly string[]).includes(file.type)) {
           rejected.push({
             fileName: file.name,
-            reason: "Unsupported type — upload a PNG, JPEG, WebP, or PDF.",
+            reason: "Tipo no compatible — suba un PNG, JPEG, WebP o PDF.",
           });
           continue;
         }
         if (file.size > MAX_UPLOAD_BYTES) {
-          rejected.push({ fileName: file.name, reason: "File is over the 10 MB limit." });
+          rejected.push({ fileName: file.name, reason: "El archivo supera el límite de 10 MB." });
           continue;
         }
         if (file.size === 0) {
@@ -160,7 +160,7 @@ export function useDocumentsController(options: {
           // never process — reject it here with the real cause.
           rejected.push({
             fileName: file.name,
-            reason: "The file is empty — re-export it and upload it again.",
+            reason: "El archivo está vacío — expórtelo de nuevo y vuelva a subirlo.",
           });
           continue;
         }
@@ -170,13 +170,13 @@ export function useDocumentsController(options: {
         try {
           bytes = await file.arrayBuffer();
         } catch {
-          rejected.push({ fileName: file.name, reason: "The file could not be read." });
+          rejected.push({ fileName: file.name, reason: "No se pudo leer el archivo." });
           continue;
         }
         if (bytes.byteLength !== file.size) {
           rejected.push({
             fileName: file.name,
-            reason: "The file changed on disk after selection — re-select it.",
+            reason: "El archivo cambió en el disco después de seleccionarlo — selecciónelo de nuevo.",
           });
           continue;
         }
@@ -221,7 +221,7 @@ export function useDocumentsController(options: {
         for (const { pointer } of staged) {
           update(pointer, {
             status: "UPLOAD_FAILED",
-            uploadError: "The upload could not be prepared — check your connection.",
+            uploadError: "No se pudo preparar la carga — verifique su conexión.",
           });
         }
         return;
@@ -231,7 +231,7 @@ export function useDocumentsController(options: {
         for (const { pointer } of staged) {
           update(pointer, {
             status: "UPLOAD_FAILED",
-            uploadError: body?.error ?? "The upload could not be prepared.",
+            uploadError: body?.error ?? "No se pudo preparar la carga.",
           });
         }
         return;
@@ -262,14 +262,14 @@ export function useDocumentsController(options: {
               headers: { "Content-Type": doc.file.type },
               body: bytes,
             });
-            if (!put.ok) throw new Error(`Upload failed (${put.status})`);
+            if (!put.ok) throw new Error(`Error al subir (${put.status})`);
             update(target.pointer, { status: "UPLOADED" });
             filesByPointer.current.delete(target.pointer);
           } catch (err) {
             update(target.pointer, {
               status: "UPLOAD_FAILED",
               uploadError:
-                err instanceof Error ? err.message : "The upload failed.",
+                err instanceof Error ? err.message : "La carga falló.",
             });
           } finally {
             bytesByPointer.current.delete(target.pointer);
@@ -327,7 +327,7 @@ export function useDocumentsController(options: {
       const file = filesByPointer.current.get(pointer);
       if (!file) {
         update(pointer, {
-          actionError: "The original file is no longer in memory — re-select it to retry.",
+          actionError: "El archivo original ya no está en memoria — selecciónelo de nuevo para reintentar.",
         });
         return;
       }
@@ -367,12 +367,12 @@ export function useDocumentsController(options: {
         } else {
           const body = (await res.json().catch(() => null)) as { error?: string } | null;
           update(pointer, {
-            actionError: body?.error ?? "The document could not be deleted — try again.",
+            actionError: body?.error ?? "No se pudo eliminar el documento — intente de nuevo.",
           });
         }
       } catch {
         update(pointer, {
-          actionError: "The document could not be deleted — check your connection and try again.",
+          actionError: "No se pudo eliminar el documento — verifique su conexión e intente de nuevo.",
         });
       }
     },

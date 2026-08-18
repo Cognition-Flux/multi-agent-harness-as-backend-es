@@ -40,11 +40,11 @@ export function confirmationQuestion(
 ): string {
   switch (kind) {
     case "PARENT_POLICY_COVERS_SUBSIDIARY":
-      return `This policy names ${entityName ? `"${entityName}"` : "another company"} as the insured. Is that your parent company, and does its coverage extend to your business?`;
+      return `Esta póliza nombra a ${entityName ? `"${entityName}"` : "otra empresa"} como asegurado. ¿Es esa su empresa matriz y la cobertura de dicha empresa se extiende a su negocio?`;
     case "DBA_SAME_ENTITY":
-      return `This document names ${entityName ? `"${entityName}"` : "a different business name"}. Is that the same business as your registered legal name (a DBA or trade name)?`;
+      return `Este documento muestra ${entityName ? `el nombre "${entityName}"` : "otro nombre comercial"}. ¿Se trata de la misma empresa registrada bajo su razón social (es decir, un DBA o nombre comercial)?`;
     case "BLANKET_ENDORSEMENT_APPLIES":
-      return "The certificate doesn't state additional-insured status. Does a blanket additional-insured endorsement on the policy apply to this relationship?";
+      return "El certificado no indica la condición de asegurado adicional. ¿Aplica a esta relación un endoso general (blanket) de asegurado adicional en la póliza?";
   }
 }
 

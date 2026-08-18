@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     .where(eq(schema.vendor.uuid, parsed.data.vendorUuid))
     .limit(1);
   if (!vendorRow || vendorRow.organizationId !== auth.ctx.organization.id) {
-    return Response.json({ error: "Vendor not found" }, { status: 404 });
+    return Response.json({ error: "Proveedor no encontrado" }, { status: 404 });
   }
 
   vendraLog("coverage.determination.kicked", {

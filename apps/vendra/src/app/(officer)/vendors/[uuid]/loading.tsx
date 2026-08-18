@@ -8,7 +8,7 @@ import { Shimmer } from "@/components/ui/primitives";
 export default function VendorDetailLoading() {
   return (
     <main role="status" className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-4 p-4 md:p-6">
-      <span className="sr-only">Loading vendor…</span>
+      <span className="sr-only">Cargando proveedor…</span>
       <div aria-hidden className="flex animate-fade-in flex-col gap-4">
         <div className="flex items-center gap-3">
           <Shimmer className="h-12 w-12 rounded-full" />

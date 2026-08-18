@@ -35,24 +35,24 @@ import { HitlPrompt } from "./hitl-prompt";
 function StatusPill({ doc }: { doc: ClientDoc }) {
   const server = doc.server;
   const live = doc.liveVM;
-  if (doc.status === "QUEUED") return <Badge variant="muted">Queued</Badge>;
-  if (doc.status === "UPLOADING") return <Badge variant="muted">Uploading…</Badge>;
+  if (doc.status === "QUEUED") return <Badge variant="muted">En cola</Badge>;
+  if (doc.status === "UPLOADING") return <Badge variant="muted">Subiendo…</Badge>;
   if (doc.status === "UPLOAD_FAILED")
-    return <Badge variant="destructive">Upload failed</Badge>;
-  if (doc.status === "UPLOADED") return <Badge variant="muted">Uploaded</Badge>;
+    return <Badge variant="destructive">Carga fallida</Badge>;
+  if (doc.status === "UPLOADED") return <Badge variant="muted">Subido</Badge>;
   if (doc.status === "PROCESSING") {
-    if (live?.status === "PROCESSED") return <Badge variant="success">Verified</Badge>;
+    if (live?.status === "PROCESSED") return <Badge variant="success">Verificado</Badge>;
     if (live?.status === "FAILED") {
       return (live.terminal?.scopedCategories?.length ?? 0) > 0 ? (
-        <Badge variant="warning">Counted · coverage</Badge>
+        <Badge variant="warning">Contado · cobertura</Badge>
       ) : (
-        <Badge variant="destructive">Failed</Badge>
+        <Badge variant="destructive">Fallido</Badge>
       );
     }
-    if (live?.status === "ERROR") return <Badge variant="destructive">Interrupted</Badge>;
+    if (live?.status === "ERROR") return <Badge variant="destructive">Interrumpido</Badge>;
     return (
       <Badge variant="agent">
-        <Loader className="h-3 w-3 text-agent" /> Processing
+        <Loader className="h-3 w-3 text-agent" /> Procesando
       </Badge>
     );
   }
@@ -60,34 +60,34 @@ function StatusPill({ doc }: { doc: ClientDoc }) {
   // (a just-settled stream's terminal, until the next snapshot refresh).
   if (!server && live?.terminal) {
     if (live.terminal.status === "COMPLETED") {
-      return <Badge variant="success">Verified</Badge>;
+      return <Badge variant="success">Verificado</Badge>;
     }
     return (live.terminal.scopedCategories?.length ?? 0) > 0 ? (
-      <Badge variant="warning">Counted · coverage</Badge>
+      <Badge variant="warning">Contado · cobertura</Badge>
     ) : (
-      <Badge variant="destructive">Failed</Badge>
+      <Badge variant="destructive">Fallido</Badge>
     );
   }
   switch (server?.uploadStatus) {
     case "PROCESSED":
-      return <Badge variant="success">Verified</Badge>;
+      return <Badge variant="success">Verificado</Badge>;
     case "FAILED":
     case "ERROR":
       return (server.scopedCategories?.length ?? 0) > 0 ? (
-        <Badge variant="warning">Counted · coverage</Badge>
+        <Badge variant="warning">Contado · cobertura</Badge>
       ) : (
-        <Badge variant="destructive">Failed</Badge>
+        <Badge variant="destructive">Fallido</Badge>
       );
     case "PROCESSING":
     case "UPLOADED":
     case "PENDING":
       return (
         <Badge variant="secondary">
-          <Loader className="h-3 w-3" /> Processing
+          <Loader className="h-3 w-3" /> Procesando
         </Badge>
       );
     default:
-      return <Badge variant="muted">Uploaded</Badge>;
+      return <Badge variant="muted">Subido</Badge>;
   }
 }
 
@@ -142,7 +142,7 @@ function StageProgress({ stage }: { stage: ProcessingStage }) {
           />
         </div>
         <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
-          Stage {index} of {TOTAL_STAGES}
+          Etapa {index} de {TOTAL_STAGES}
         </span>
       </div>
       <Task defaultOpen={false}>
@@ -198,7 +198,7 @@ function ExtractionTable({ data }: { data: Record<string, unknown> }) {
           className="w-full border-t px-2 py-1.5 text-left text-[11px] text-muted-foreground transition-colors hover:bg-muted/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40"
           onClick={() => setExpanded((v) => !v)}
         >
-          {expanded ? "Show less" : `+${hidden} more field${hidden === 1 ? "" : "s"}`}
+          {expanded ? "Mostrar menos" : `+${hidden} campo${hidden === 1 ? "" : "s"} más`}
         </button>
       ) : null}
     </div>
@@ -210,9 +210,9 @@ function validationSummary(rules: ValidationRule[]): string {
   const passed = rules.filter((r) => !r.informational && r.passed).length;
   const failed = rules.filter((r) => !r.informational && !r.passed).length;
   const informational = rules.filter((r) => r.informational).length;
-  const parts = [`${passed} passed`];
-  if (failed > 0) parts.push(`${failed} failed`);
-  if (informational > 0) parts.push(`${informational} informational`);
+  const parts = [`${passed} aprobadas`];
+  if (failed > 0) parts.push(`${failed} fallidas`);
+  if (informational > 0) parts.push(`${informational} informativas`);
   return parts.join(" · ");
 }
 
@@ -319,7 +319,7 @@ export function DocCard({
           ) : null}
           {!isLive && server?.extractedExpirationDate ? (
             <p className="text-xs text-muted-foreground">
-              Expires {formatDate(server.extractedExpirationDate)}
+              Vence el {formatDate(server.extractedExpirationDate)}
             </p>
           ) : null}
         </div>
@@ -355,7 +355,7 @@ export function DocCard({
                   <ToolContent>
                     <ToolInput input={tool.input} />
                     {tool.state === "output-error" ? (
-                      <ToolOutput errorText={tool.errorText ?? "The tool call failed."} />
+                      <ToolOutput errorText={tool.errorText ?? "La llamada a la herramienta falló."} />
                     ) : null}
                     {tool.state === "input-streaming" ? (
                       <Shimmer className="h-3 w-1/2" />
@@ -380,8 +380,8 @@ export function DocCard({
 
       {scoped.length > 0 ? (
         <p className="text-xs text-warning">
-          Still counts toward: {scoped.map((c) => requirementCategoryLabel(c)).join(", ")} — the
-          coverage review decides the final limits.
+          Aún cuenta para: {scoped.map((c) => requirementCategoryLabel(c)).join(", ")} — la
+          revisión de cobertura decide los límites finales.
         </p>
       ) : null}
 
@@ -399,7 +399,7 @@ export function DocCard({
         <div className="flex animate-fade-in-up flex-wrap gap-1">
           {doc.server.manualGrants.map((grant) => (
             <Badge key={grant.category} variant="success" className="text-[11px]">
-              {requirementCategoryLabel(grant.category)} (manually granted)
+              {requirementCategoryLabel(grant.category)} (otorgado manualmente)
             </Badge>
           ))}
         </div>
@@ -407,15 +407,15 @@ export function DocCard({
 
       {doc.server?.waiverActive ? (
         <Badge variant="success" className="w-fit animate-fade-in-up text-[11px]">
-          Waived by your compliance officer
-          {doc.server.waiverExpiresAt ? ` until ${formatDate(doc.server.waiverExpiresAt)}` : ""}
+          Eximido por su oficial de cumplimiento
+          {doc.server.waiverExpiresAt ? ` hasta el ${formatDate(doc.server.waiverExpiresAt)}` : ""}
         </Badge>
       ) : null}
 
       {doc.server?.additionalEntityNames?.length ? (
         <p className="text-xs text-warning">
-          This file also contains documents for: {doc.server.additionalEntityNames.join(", ")} —
-          upload each business's documents separately.
+          Este archivo también contiene documentos de: {doc.server.additionalEntityNames.join(", ")} —
+          suba los documentos de cada empresa por separado.
         </p>
       ) : null}
 
@@ -423,7 +423,7 @@ export function DocCard({
           trigger summaries keep the card informative without the wall of
           text; each section opens independently. */}
       {!isLive && server?.extraction?.classificationReasoning ? (
-        <CollapsibleSection label="Why this classification">
+        <CollapsibleSection label="Por qué esta clasificación">
           <p className="text-muted-foreground">
             {server.extraction.classificationReasoning}
           </p>
@@ -431,17 +431,17 @@ export function DocCard({
       ) : null}
       {extraction && (settledFailed || granted.length > 0 || !isLive) ? (
         <CollapsibleSection
-          label="Extracted fields"
+          label="Campos extraídos"
           summary={`${
             Object.values(extraction).filter((v) => v !== null && v !== "").length
-          } fields`}
+          } campos`}
         >
           <ExtractionTable data={extraction} />
         </CollapsibleSection>
       ) : null}
       {rules && rules.length > 0 ? (
         <CollapsibleSection
-          label="Validation results"
+          label="Resultados de validación"
           summary={validationSummary(rules)}
         >
           <ValidationChecklist rules={rules} />
@@ -457,22 +457,22 @@ export function DocCard({
       <div className="flex items-center gap-2">
         {doc.status === "UPLOAD_FAILED" ? (
           <Button size="sm" variant="outline" onClick={() => onRetryUpload(doc.pointer)}>
-            Try again
+            Reintentar
           </Button>
         ) : settledFailed && doc.documentUuid ? (
           <Button size="sm" variant="outline" onClick={() => onTryAgain(doc.pointer)}>
-            Try again
+            Reintentar
           </Button>
         ) : null}
         {doc.status === "SETTLED" || settledFailed || doc.status === "UPLOAD_FAILED" ? (
           confirmDelete && grantsCategories ? (
             <span className="flex flex-wrap items-center gap-1 text-xs">
-              Removes {granted.length > 0 ? granted.map((c) => requirementCategoryLabel(c)).join(", ") : "its evidence"} —
+              Esto eliminará {granted.length > 0 ? granted.map((c) => requirementCategoryLabel(c)).join(", ") : "la evidencia que aporta"} —
               <Button size="sm" variant="destructive" onClick={() => void onDelete(doc.pointer)}>
-                Delete anyway
+                Eliminar de todos modos
               </Button>
               <Button size="sm" variant="ghost" onClick={() => setConfirmDelete(false)}>
-                Keep
+                Conservar
               </Button>
             </span>
           ) : (
@@ -485,7 +485,7 @@ export function DocCard({
                 else void onDelete(doc.pointer);
               }}
             >
-              Delete
+              Eliminar
             </Button>
           )
         ) : null}

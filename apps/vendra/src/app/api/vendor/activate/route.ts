@@ -45,7 +45,7 @@ export async function POST() {
     return Response.json(
       {
         error:
-          "Your account was rejected by the compliance team — contact them to proceed.",
+          "Su cuenta fue rechazada por el equipo de cumplimiento — contáctelo para continuar.",
       },
       { status: 403 },
     );
@@ -57,7 +57,7 @@ export async function POST() {
     return Response.json(
       {
         error:
-          "We're still verifying your insurance coverage — try again in a moment.",
+          "Aún estamos verificando su cobertura de seguro — intente de nuevo en un momento.",
       },
       { status: 412 },
     );
@@ -73,7 +73,7 @@ export async function POST() {
         missing: gate.missingMandatory.join(","),
       });
       return Response.json(
-        { error: `${labels} must be verified before you can activate.` },
+        { error: `${labels} deben verificarse antes de poder activar la cuenta.` },
         { status: 400 },
       );
     }
@@ -84,7 +84,7 @@ export async function POST() {
     });
     return Response.json(
       {
-        error: `${gate.blocking.length} requirement ${gate.blocking.length === 1 ? "category" : "categories"} still need documents before you can activate.`,
+        error: `${gate.blocking.length} categoría${gate.blocking.length === 1 ? "" : "s"} de requisitos todavía necesita${gate.blocking.length === 1 ? "" : "n"} documentos antes de poder activar la cuenta.`,
         blocking: gate.blocking,
       },
       { status: 400 },

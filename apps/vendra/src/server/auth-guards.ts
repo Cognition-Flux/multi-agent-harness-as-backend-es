@@ -50,7 +50,7 @@ export async function requireVendorContact(): Promise<VendorContactAuthResult> {
   if (user.role !== VENDOR_CONTACT_ROLE || !user.vendorId || !user.organizationId) {
     return {
       ok: false,
-      failure: { kind: "not_found", message: "Vendor not found" },
+      failure: { kind: "not_found", message: "Proveedor no encontrado" },
     };
   }
   const db = getDb();
@@ -67,7 +67,7 @@ export async function requireVendorContact(): Promise<VendorContactAuthResult> {
   if (!row || row.vendor.organizationId !== user.organizationId) {
     return {
       ok: false,
-      failure: { kind: "not_found", message: "Vendor not found" },
+      failure: { kind: "not_found", message: "Proveedor no encontrado" },
     };
   }
   return {
@@ -98,7 +98,7 @@ export async function requireComplianceOfficer(): Promise<ComplianceOfficerAuthR
   const user = await getSessionUser(await headers());
   if (!user) return { ok: false, failure: { kind: "unauthorized" } };
   if (!OFFICER_ROLES.has(user.role) || !user.organizationId) {
-    return { ok: false, failure: { kind: "not_found", message: "Not found" } };
+    return { ok: false, failure: { kind: "not_found", message: "No encontrado" } };
   }
   const [org] = await getDb()
     .select()
@@ -106,7 +106,7 @@ export async function requireComplianceOfficer(): Promise<ComplianceOfficerAuthR
     .where(eq(organization.id, user.organizationId))
     .limit(1);
   if (!org) {
-    return { ok: false, failure: { kind: "not_found", message: "Not found" } };
+    return { ok: false, failure: { kind: "not_found", message: "No encontrado" } };
   }
   return { ok: true, ctx: { user, organization: org } };
 }
@@ -129,7 +129,7 @@ export async function requireOwnedDocument(
   if (!run) {
     return {
       ok: false,
-      failure: { kind: "not_found", message: "Document not found" },
+      failure: { kind: "not_found", message: "Documento no encontrado" },
     };
   }
   if (user.role === VENDOR_CONTACT_ROLE) {
@@ -137,7 +137,7 @@ export async function requireOwnedDocument(
       // Not the caller's document — indistinguishable from missing.
       return {
         ok: false,
-        failure: { kind: "not_found", message: "Document not found" },
+        failure: { kind: "not_found", message: "Documento no encontrado" },
       };
     }
     return { ok: true, run, user };
@@ -148,6 +148,6 @@ export async function requireOwnedDocument(
   }
   return {
     ok: false,
-    failure: { kind: "not_found", message: "Document not found" },
+    failure: { kind: "not_found", message: "Documento no encontrado" },
   };
 }

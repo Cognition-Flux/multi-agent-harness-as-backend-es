@@ -28,7 +28,7 @@ export default function RegisterPage() {
       });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        setError(body?.error ?? "Registration failed.");
+        setError(body?.error ?? "No se pudo completar el registro.");
         setSubmitting(false);
         return;
       }
@@ -42,7 +42,7 @@ export default function RegisterPage() {
       router.push("/portal");
       router.refresh();
     } catch {
-      setError("Something went wrong — check your connection and try again.");
+      setError("Algo salió mal — verifique su conexión e intente de nuevo.");
       setSubmitting(false);
     }
   }
@@ -55,27 +55,27 @@ export default function RegisterPage() {
         </p>
         <Card className="glass w-full shadow-lift">
           <CardHeader>
-            <CardTitle className="text-lg">Register your business</CardTitle>
+            <CardTitle className="text-lg">Registre su empresa</CardTitle>
             <p className="text-sm text-muted-foreground">
-              Create a vendor account to start your compliance onboarding.
+              Cree una cuenta de proveedor para comenzar su proceso de incorporación y cumplimiento.
             </p>
           </CardHeader>
           <CardContent>
             <form onSubmit={onSubmit} className="flex flex-col gap-3 sm:gap-4">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="legalName">Business legal name</Label>
+                <Label htmlFor="legalName">Razón social de la empresa</Label>
                 <Input id="legalName" value={legalName} onChange={(e) => setLegalName(e.target.value)} required />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="contactName">Your name</Label>
+                <Label htmlFor="contactName">Su nombre</Label>
                 <Input id="contactName" value={contactName} onChange={(e) => setContactName(e.target.value)} required />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Correo electrónico</Label>
                 <Input id="email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Contraseña</Label>
                 <Input
                   id="password"
                   type="password"
@@ -87,7 +87,7 @@ export default function RegisterPage() {
                   required
                 />
                 <p id="password-hint" className="text-xs text-muted-foreground">
-                  At least 8 characters.
+                  Al menos 8 caracteres.
                 </p>
               </div>
               {error ? (
@@ -102,20 +102,20 @@ export default function RegisterPage() {
                 {submitting ? (
                   <>
                     <Loader className="h-4 w-4 text-primary-foreground" />
-                    Creating account…
+                    Creando cuenta…
                   </>
                 ) : (
-                  "Create account"
+                  "Crear cuenta"
                 )}
               </Button>
             </form>
             <p className="mt-4 text-sm text-muted-foreground">
-              Already registered?{" "}
+              ¿Ya está registrado?{" "}
               <Link
                 href="/login"
                 className="rounded-sm font-medium text-primary underline decoration-primary/30 underline-offset-4 transition-colors hover:decoration-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
-                Sign in
+                Iniciar sesión
               </Link>
             </p>
           </CardContent>

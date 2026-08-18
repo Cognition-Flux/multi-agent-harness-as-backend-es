@@ -10,7 +10,7 @@ const ROSTER_ROWS = [0, 1, 2, 3, 4];
 export default function VendorsLoading() {
   return (
     <main role="status" className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-4 p-4 md:p-6">
-      <span className="sr-only">Loading vendors…</span>
+      <span className="sr-only">Cargando proveedores…</span>
       <div aria-hidden className="flex animate-fade-in flex-col gap-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Shimmer className="h-7 w-40" />

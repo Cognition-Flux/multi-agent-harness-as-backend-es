@@ -17,8 +17,8 @@ export default function LoginPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.has("created")) setNotice("Account created — sign in with your new credentials.");
-    if (params.has("expired")) setNotice("Your session expired — sign in again.");
+    if (params.has("created")) setNotice("Cuenta creada — inicie sesión con sus nuevas credenciales.");
+    if (params.has("expired")) setNotice("Su sesión expiró — inicie sesión de nuevo.");
   }, []);
 
   async function onSubmit(e: React.FormEvent) {
@@ -28,7 +28,15 @@ export default function LoginPage() {
     try {
       const result = await authClient.signIn.email({ email, password });
       if (result.error) {
-        setError(result.error.message ?? "Sign-in failed.");
+        // Localize better-auth's English error copy: invalid credentials get
+        // a specific Spanish message, everything else the generic fallback.
+        setError(
+          result.error.status === 401 || result.error.code === "INVALID_EMAIL_OR_PASSWORD"
+            ? "Correo electrónico o contraseña incorrectos."
+            : result.error.status === 429
+              ? "Demasiados intentos — espere un momento e intente de nuevo."
+              : "No se pudo iniciar sesión.",
+        );
         setSubmitting(false);
         return;
       }
@@ -36,7 +44,7 @@ export default function LoginPage() {
       router.push("/");
       router.refresh();
     } catch {
-      setError("Something went wrong — check your connection and try again.");
+      setError("Algo salió mal — verifique su conexión e intente de nuevo.");
       setSubmitting(false);
     }
   }
@@ -49,13 +57,13 @@ export default function LoginPage() {
             Vendra
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Sign in to the vendor portal or the compliance-officer dashboard.
+            Inicie sesión en el portal de proveedores o en el panel del oficial de cumplimiento.
           </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={onSubmit} className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">Correo electrónico</Label>
               <Input
                 id="email"
                 type="email"
@@ -66,7 +74,7 @@ export default function LoginPage() {
               />
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Contraseña</Label>
               <Input
                 id="password"
                 type="password"
@@ -96,20 +104,20 @@ export default function LoginPage() {
               {submitting ? (
                 <>
                   <Loader className="h-4 w-4 text-primary-foreground" />
-                  Signing in…
+                  Iniciando sesión…
                 </>
               ) : (
-                "Sign in"
+                "Iniciar sesión"
               )}
             </Button>
           </form>
           <p className="mt-4 text-sm text-muted-foreground">
-            New vendor?{" "}
+            ¿Es un proveedor nuevo?{" "}
             <Link
               href="/register"
               className="rounded-sm font-medium text-primary underline decoration-primary/30 underline-offset-4 transition-colors hover:decoration-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
             >
-              Register your business
+              Registre su empresa
             </Link>
           </p>
         </CardContent>

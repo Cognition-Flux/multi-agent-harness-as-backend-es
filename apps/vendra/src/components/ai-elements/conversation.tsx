@@ -68,7 +68,7 @@ export type ConversationEmptyStateProps = ComponentProps<"div"> & {
 
 export const ConversationEmptyState = ({
   className,
-  title = "No messages yet",
+  title = "Aún no hay mensajes",
   description,
   icon,
   children,
@@ -115,7 +115,7 @@ export const ConversationScrollButton = ({
 
   return (
     <Button
-      aria-label="Scroll to latest message"
+      aria-label="Desplazarse al mensaje más reciente"
       aria-hidden={isAtBottom || undefined}
       className={cn(
         "absolute bottom-4 left-1/2 z-20 h-9 w-9 -translate-x-1/2 rounded-full border-border/60 bg-background/80 p-0 shadow-lift backdrop-blur-md transition-all duration-300 hover:bg-background",

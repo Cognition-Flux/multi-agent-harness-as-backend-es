@@ -30,14 +30,14 @@ export default function AppError({
           >
             <TriangleAlertIcon className="h-5 w-5" />
           </div>
-          <CardTitle className="mt-1 text-lg">Something went wrong</CardTitle>
+          <CardTitle className="mt-1 text-lg">Algo salió mal</CardTitle>
           <p className="text-sm text-muted-foreground">
-            The page hit an unexpected error. Your data is safe — try again, and contact your
-            compliance team if it keeps happening.
+            La página encontró un error inesperado. Sus datos están seguros — intente de nuevo y
+            contacte a su equipo de cumplimiento si el problema persiste.
           </p>
           {error.digest ? (
             <p className="mt-1 text-xs text-muted-foreground">
-              Reference code:{" "}
+              Código de referencia:{" "}
               <code className="select-all rounded bg-muted px-2 py-1 font-mono text-xs text-foreground">
                 {error.digest}
               </code>
@@ -45,9 +45,9 @@ export default function AppError({
           ) : null}
         </CardHeader>
         <CardContent className="flex gap-2">
-          <Button onClick={() => reset()}>Try again</Button>
+          <Button onClick={() => reset()}>Intentar de nuevo</Button>
           <Button variant="ghost" onClick={() => (window.location.href = "/")}>
-            Go home
+            Ir al inicio
           </Button>
         </CardContent>
       </Card>

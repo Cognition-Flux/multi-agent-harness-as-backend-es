@@ -8,7 +8,7 @@ import { Shimmer } from "@/components/ui/primitives";
 export default function PortalLoading() {
   return (
     <main role="status" className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-4 p-4 md:p-6">
-      <span className="sr-only">Loading your portal…</span>
+      <span className="sr-only">Cargando su portal…</span>
       <div aria-hidden className="flex animate-fade-in flex-col gap-4">
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-col gap-2">

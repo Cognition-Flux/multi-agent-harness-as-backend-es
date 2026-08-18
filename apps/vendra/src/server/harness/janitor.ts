@@ -71,7 +71,7 @@ export async function failStaleProcessingDocs(vendorId: number): Promise<void> {
     vendorId,
     "PROCESSING",
     STALE_PROCESSING_MS,
-    "Processing was interrupted. Please try again.",
+    "El procesamiento fue interrumpido. Intente de nuevo.",
   );
 }
 
@@ -80,7 +80,7 @@ export async function failStalePendingDocs(vendorId: number): Promise<void> {
     vendorId,
     "PENDING",
     STALE_PENDING_MS,
-    "The upload never completed. Please upload the file again.",
+    "La carga nunca se completó. Vuelva a subir el archivo.",
   );
 }
 
@@ -89,7 +89,7 @@ export async function failStaleUploadedDocs(vendorId: number): Promise<void> {
     vendorId,
     "UPLOADED",
     STALE_UPLOADED_MS,
-    "Reprocessing did not start. Please try again.",
+    "El reprocesamiento no se inició. Intente de nuevo.",
   );
 }
 

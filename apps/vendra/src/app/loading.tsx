@@ -9,7 +9,7 @@ import { Shimmer } from "@/components/ui/primitives";
 export default function AppLoading() {
   return (
     <main role="status" className="mx-auto flex min-h-screen w-full max-w-6xl flex-col gap-4 p-4 md:p-6">
-      <span className="sr-only">Loading…</span>
+      <span className="sr-only">Cargando…</span>
       <div aria-hidden className="flex animate-fade-in flex-col gap-4">
         <div className="flex items-center justify-between gap-3">
           <p className="animate-gradient-pan bg-[length:200%_auto] text-lg font-semibold tracking-tight text-gradient-brand">

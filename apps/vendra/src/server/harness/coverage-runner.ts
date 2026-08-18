@@ -251,12 +251,12 @@ async function runOnce(vendorId: number): Promise<void> {
               effectiveAggregateLimitUsd: null,
               contributions: [],
               verdict: "UNDETERMINED" as const,
-              reasoning: "The coverage review could not complete.",
+              reasoning: "La revisión de cobertura no pudo completarse.",
             }),
           ),
           conflicts: [],
           narrative:
-            "The automated coverage review could not complete — a compliance officer can grant these requirements manually.",
+            "La revisión automática de cobertura no pudo completarse — un oficial de cumplimiento puede otorgar estos requisitos manualmente.",
         },
         signature: loaded.signature,
         model: env.HARNESS_MODEL,
@@ -347,7 +347,9 @@ Output contract — the save tool ENFORCES every rule below and bounces violatio
 - Every contributions[].documentUuid MUST be one of the input document UUIDs above.
 - A "rejected" contribution MUST carry amountAppliedUsd 0.
 
-Write ONE short status sentence (max ~15 words, plain second-person language) before the tool call — e.g. "Checking whether your umbrella policy stacks over your general liability coverage." Then call saveCoverageDetermination EXACTLY ONCE with your complete determination. If the tool returns an error, correct the payload and call it again.`;
+All vendor-facing prose — the per-line reasoning fields, conflicts, the narrative, and the status sentence — must be written in Latin-American Spanish (español latinoamericano, trato de usted).
+
+Write ONE short status sentence (max ~15 words, plain second-person language) before the tool call — e.g. "Verificando si su póliza umbrella se acumula sobre su cobertura de responsabilidad civil general." Then call saveCoverageDetermination EXACTLY ONCE with your complete determination. If the tool returns an error, correct the payload and call it again.`;
 }
 
 /** One attempt: session → prompt → save tool → validate → persist. */

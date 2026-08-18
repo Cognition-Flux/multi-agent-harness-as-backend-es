@@ -94,37 +94,37 @@ export function DocumentViewerDialog({
               mime?.startsWith("image/") ? (
                 <img
                   src={links.previewUrl}
-                  alt={`Preview of ${doc.fileName}`}
+                  alt={`Vista previa de ${doc.fileName}`}
                   className="h-full w-full object-contain"
                 />
               ) : mime === "application/pdf" ? (
                 <iframe
                   src={links.previewUrl}
-                  title={`Preview of ${doc.fileName}`}
+                  title={`Vista previa de ${doc.fileName}`}
                   className="h-full w-full"
                 />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-1.5 p-6 text-center">
-                  <p className="text-sm font-medium">No inline preview for this file type</p>
+                  <p className="text-sm font-medium">No hay vista previa integrada para este tipo de archivo</p>
                   <p className="text-xs text-muted-foreground">
-                    Download the original below to open it locally.
+                    Descargue el original a continuación para abrirlo localmente.
                   </p>
                 </div>
               )
             ) : downloadQuery.isError ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
                 <p role="alert" className="text-sm text-destructive">
-                  The document preview could not be loaded.
+                  No se pudo cargar la vista previa del documento.
                 </p>
                 <Button size="sm" variant="outline" onClick={() => void downloadQuery.refetch()}>
-                  Try again
+                  Reintentar
                 </Button>
               </div>
             ) : (
               <div className="flex h-full flex-col items-center justify-center gap-2 p-6">
                 <Shimmer className="h-4/5 w-11/12 rounded-md" />
                 <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader className="h-3.5 w-3.5" /> Loading the document…
+                  <Loader className="h-3.5 w-3.5" /> Cargando el documento…
                 </p>
               </div>
             )}
@@ -139,7 +139,7 @@ export function DocumentViewerDialog({
               )}
               aria-disabled={!links}
             >
-              Download file
+              Descargar archivo
             </a>
             <a
               href={links?.previewUrl}
@@ -151,7 +151,7 @@ export function DocumentViewerDialog({
               )}
               aria-disabled={!links}
             >
-              Open in new tab
+              Abrir en una pestaña nueva
             </a>
             <span className="text-xs text-muted-foreground">
               {[mime, fileSize].filter(Boolean).join(" · ")}
@@ -162,12 +162,12 @@ export function DocumentViewerDialog({
         {/* ── Processing record pane ────────────────────────────────── */}
         <div className="flex flex-col gap-4 lg:max-h-[66vh] lg:overflow-y-auto lg:pr-1">
           <section className="flex flex-col gap-2">
-            <SectionTitle>Status</SectionTitle>
+            <SectionTitle>Estado</SectionTitle>
             <div className="flex flex-wrap items-center gap-2">
               <DocPill pill={pill} />
               {doc.extractedExpirationDate ? (
                 <span className="text-xs text-muted-foreground">
-                  Expires {formatDate(doc.extractedExpirationDate)}
+                  Vence el {formatDate(doc.extractedExpirationDate)}
                 </span>
               ) : null}
             </div>
@@ -178,7 +178,7 @@ export function DocumentViewerDialog({
             ) : null}
             {(doc.additionalEntityNames ?? []).length > 0 ? (
               <p className="rounded-md border border-warning/30 bg-warning/10 p-2.5 text-xs text-warning">
-                This file also contains documents for:{" "}
+                Este archivo también contiene documentos de:{" "}
                 {doc.additionalEntityNames!.join(", ")}.
               </p>
             ) : null}
@@ -186,7 +186,7 @@ export function DocumentViewerDialog({
 
           {extraction ? (
             <section className="flex flex-col gap-1.5">
-              <SectionTitle>Classification</SectionTitle>
+              <SectionTitle>Clasificación</SectionTitle>
               <p className="text-sm font-medium">
                 {vendorDocumentTypeTitle(extraction.documentType)}
                 {extraction.documentSubtype ? (
@@ -197,7 +197,7 @@ export function DocumentViewerDialog({
                   // screen readers concatenate "IRS Form W-9" + "99%…" into
                   // "W-999% confidence".
                   <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                    · {Math.round(extraction.classificationConfidence * 100)}% confidence
+                    · {Math.round(extraction.classificationConfidence * 100)}% de confianza
                   </span>
                 ) : null}
               </p>
@@ -209,15 +209,15 @@ export function DocumentViewerDialog({
             </section>
           ) : (
             <section className="flex flex-col gap-1.5">
-              <SectionTitle>Classification</SectionTitle>
+              <SectionTitle>Clasificación</SectionTitle>
               <p className="text-sm text-muted-foreground">
-                Not classified yet — the document has no extraction.
+                Aún sin clasificar — el documento no tiene extracción.
               </p>
             </section>
           )}
 
           <section className="flex flex-col gap-2">
-            <SectionTitle>Requirements</SectionTitle>
+            <SectionTitle>Requisitos</SectionTitle>
             {(extraction?.requirementsGranted ?? []).length > 0 ||
             (doc.manualGrants ?? []).length > 0 ||
             (doc.scopedCategories ?? []).length > 0 ||
@@ -235,7 +235,7 @@ export function DocumentViewerDialog({
                 {(doc.manualGrants ?? []).map((grant) => (
                   <div key={grant.category} className="flex flex-wrap items-center gap-1.5">
                     <Badge variant="success" className="text-[11px]">
-                      {requirementCategoryLabel(grant.category)} (manually granted)
+                      {requirementCategoryLabel(grant.category)} (otorgado manualmente)
                     </Badge>
                     {grant.grantedAt ? (
                       <span className="text-[11px] text-muted-foreground">
@@ -246,29 +246,29 @@ export function DocumentViewerDialog({
                 ))}
                 {(doc.scopedCategories ?? []).length > 0 ? (
                   <p className="text-xs text-muted-foreground">
-                    Counted toward coverage despite the failure:{" "}
+                    Contabilizado para la cobertura a pesar de la falla:{" "}
                     {doc.scopedCategories!.map((c) => requirementCategoryLabel(c)).join(", ")}.
                   </p>
                 ) : null}
                 {doc.waiverActive ? (
                   <p className="text-xs text-success">
-                    Waived for{" "}
+                    Eximido para{" "}
                     {(doc.waiverScopedCategories ?? [])
                       .map((c) => requirementCategoryLabel(c))
                       .join(", ")}
-                    {doc.waiverExpiresAt ? ` until ${formatDate(doc.waiverExpiresAt)}` : ""}
+                    {doc.waiverExpiresAt ? ` hasta el ${formatDate(doc.waiverExpiresAt)}` : ""}
                   </p>
                 ) : null}
               </div>
             ) : (
               <p className="text-xs text-muted-foreground">
-                No requirements are granted by this document.
+                Este documento no otorga ningún requisito.
               </p>
             )}
           </section>
 
           <section className="flex flex-col gap-2">
-            <SectionTitle>Extracted fields</SectionTitle>
+            <SectionTitle>Campos extraídos</SectionTitle>
             {extraction && Object.keys(extraction.extractedData).length > 0 ? (
               <div className="overflow-x-auto rounded-md border">
                 <table className="w-full text-xs">
@@ -301,16 +301,16 @@ export function DocumentViewerDialog({
                 </table>
               </div>
             ) : (
-              <p className="text-xs text-muted-foreground">No extracted fields yet.</p>
+              <p className="text-xs text-muted-foreground">Aún no hay campos extraídos.</p>
             )}
           </section>
 
           <section className="flex flex-col gap-2">
-            <SectionTitle>Validation</SectionTitle>
+            <SectionTitle>Validación</SectionTitle>
             {rules.length > 0 ? (
               <>
                 <p className="text-xs text-muted-foreground">
-                  {passed} passed · {failed} failed · {informational} informational
+                  {passed} aprobadas · {failed} fallidas · {informational} informativas
                 </p>
                 <ul className="flex flex-col gap-1">
                   {rules.map((rule) => (
@@ -327,10 +327,10 @@ export function DocumentViewerDialog({
                     >
                       <span className="sr-only">
                         {rule.informational
-                          ? "Informational: "
+                          ? "Informativa: "
                           : rule.passed
-                            ? "Passed: "
-                            : "Failed: "}
+                            ? "Aprobada: "
+                            : "Fallida: "}
                       </span>
                       <span aria-hidden>
                         {rule.informational ? "⚠" : rule.passed ? "✓" : "✕"}
@@ -341,7 +341,7 @@ export function DocumentViewerDialog({
                 </ul>
               </>
             ) : (
-              <p className="text-xs text-muted-foreground">No validation results yet.</p>
+              <p className="text-xs text-muted-foreground">Aún no hay resultados de validación.</p>
             )}
           </section>
         </div>

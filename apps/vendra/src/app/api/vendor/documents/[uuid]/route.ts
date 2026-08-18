@@ -36,7 +36,7 @@ export async function DELETE(
       status: run.document.uploadStatus,
     });
     return Response.json(
-      { error: "Document is processing — try again once it finishes." },
+      { error: "El documento se está procesando — intente de nuevo cuando termine." },
       { status: 409 },
     );
   }

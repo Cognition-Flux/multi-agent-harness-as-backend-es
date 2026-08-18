@@ -44,9 +44,56 @@ import { DocumentViewerDialog } from "./document-viewer";
 
 /** Coverage-verdict chip mapping (MEETS / BELOW / UNDETERMINED) — literal record. */
 const VERDICT_BADGES: Record<string, { label: string; variant: "success" | "destructive" | "muted" }> = {
-  MEETS: { label: "Meets", variant: "success" },
-  BELOW: { label: "Below", variant: "destructive" },
-  UNDETERMINED: { label: "Undetermined", variant: "muted" },
+  MEETS: { label: "Cumple", variant: "success" },
+  BELOW: { label: "Por debajo", variant: "destructive" },
+  UNDETERMINED: { label: "Sin determinar", variant: "muted" },
+};
+
+/** Spanish labels for coverage-line categories (fallback: humanized token). */
+const LINE_LABELS: Record<string, string> = {
+  GENERAL_LIABILITY: "Responsabilidad civil general",
+  WORKERS_COMP: "Compensación laboral",
+  AUTO: "Auto comercial",
+  CYBER: "Responsabilidad cibernética",
+};
+
+/** Spanish labels for the vendor_activity_type enum (fallback: humanized token). */
+const ACTIVITY_LABELS: Record<string, string> = {
+  DOCUMENT_UPLOADED: "documento subido",
+  DOCUMENT_VERIFIED: "documento verificado",
+  DOCUMENT_REJECTED: "documento rechazado",
+  DOCUMENT_WAIVED: "documento eximido",
+  DOCUMENT_RECLASSIFIED: "documento recategorizado",
+  DOCUMENT_DELETED: "documento eliminado",
+  MANUAL_REQUIREMENT_GRANTED: "requisito otorgado manualmente",
+  MANUAL_REQUIREMENT_REVOKED: "concesión manual revocada",
+  RETRY_REQUESTED: "reintento solicitado",
+  STATUS_CHANGED: "estado actualizado",
+  WAIVER_EXPIRED: "exención vencida",
+  SWEEP_EXPIRED: "vencimiento detectado por el sistema",
+  API_CHECK_RUN: "verificación por API ejecutada",
+  VENDOR_REGISTERED: "proveedor registrado",
+  ACTIVATION_SUBMITTED: "activación enviada",
+};
+
+/** Spanish labels for grant-source kinds (fallback: humanized token). */
+const GRANT_SOURCE_LABELS: Record<string, string> = {
+  document: "EXTRACCIÓN",
+  manual_grant: "CONCESIÓN MANUAL",
+  waiver: "EXENCIÓN",
+  determination: "DETERMINACIÓN DE COBERTURA",
+  api_check: "VERIFICACIÓN POR API",
+};
+
+/** Spanish labels for status-transition sources (fallback: raw token). */
+const TRANSITION_SOURCE_LABELS: Record<string, string> = {
+  gate: "sistema",
+  sweep: "barrido automático",
+  officer_decision: "decisión del oficial",
+  officer_reclassify: "recategorización del oficial",
+  officer: "oficial",
+  vendor: "proveedor",
+  system: "sistema",
 };
 
 // ── Doc actions (shared by Documents + Traceability tabs) ────────────────────
@@ -77,9 +124,9 @@ function DocRow({
           <p className="text-xs text-muted-foreground">
             {doc.extraction
               ? vendorDocumentTypeTitle(doc.extraction.documentType)
-              : "Unclassified"}
+              : "Sin clasificar"}
             {doc.extractedExpirationDate
-              ? ` · expires ${formatDate(doc.extractedExpirationDate)}`
+              ? ` · vence el ${formatDate(doc.extractedExpirationDate)}`
               : ""}
           </p>
         </div>
@@ -104,17 +151,17 @@ function DocRow({
       {(doc.manualGrants ?? []).map((grant) => (
         <div key={grant.category} className="flex items-center gap-2">
           <Badge variant="success" className="text-[11px]">
-            {requirementCategoryLabel(grant.category)} (manually granted)
+            {requirementCategoryLabel(grant.category)} (otorgado manualmente)
           </Badge>
           <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => setRevokeCategory(grant.category)}>
-            Revoke
+            Revocar
           </Button>
         </div>
       ))}
       {doc.waiverActive ? (
         <p className="text-xs text-success">
-          Waived for {(doc.waiverScopedCategories ?? []).map((c) => requirementCategoryLabel(c)).join(", ")}
-          {doc.waiverExpiresAt ? ` until ${formatDate(doc.waiverExpiresAt)}` : ""}
+          Eximido para {(doc.waiverScopedCategories ?? []).map((c) => requirementCategoryLabel(c)).join(", ")}
+          {doc.waiverExpiresAt ? ` hasta el ${formatDate(doc.waiverExpiresAt)}` : ""}
         </p>
       ) : null}
 
@@ -125,23 +172,23 @@ function DocRow({
           size="sm"
           variant="outline"
           onClick={() => setViewerOpen(true)}
-          aria-label={`View ${doc.fileName}`}
-          title="View document"
+          aria-label={`Ver ${doc.fileName}`}
+          title="Ver documento"
         >
           <EyeIcon className="h-3.5 w-3.5" />
         </Button>
         {doc.extraction ? (
           <>
             <Button size="sm" variant="outline" onClick={() => setDialog("waive")}>
-              {doc.waiverActive ? "Waiver…" : "Waive…"}
+              {doc.waiverActive ? "Exención…" : "Eximir…"}
             </Button>
             <Button size="sm" variant="outline" onClick={() => setDialog("reclassify")}>
-              Re-categorize…
+              Recategorizar…
             </Button>
           </>
         ) : null}
         <Button size="sm" variant="outline" onClick={() => setDialog("grant")}>
-          Grant manually…
+          Otorgar manualmente…
         </Button>
         {doc.uploadStatus === "FAILED" || doc.uploadStatus === "ERROR" ? (
           <Button
@@ -151,7 +198,7 @@ function DocRow({
             onClick={() => retryMutation.mutate({ vendorDocumentUuid: doc.documentUuid })}
           >
             {retryMutation.isPending ? <Loader className="h-3 w-3 text-current" /> : null}
-            Retry processing
+            Reintentar procesamiento
           </Button>
         ) : null}
       </div>
@@ -183,6 +230,13 @@ function DocRow({
 
 const TABS = ["overview", "documents", "traceability"] as const;
 type Tab = (typeof TABS)[number];
+
+/** Typed tab labels — an added tab fails type-check instead of mislabeling. */
+const TAB_LABELS: Record<Tab, string> = {
+  overview: "Resumen",
+  documents: "Documentos",
+  traceability: "Trazabilidad de requisitos",
+};
 
 export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
   const trpc = useTRPC();
@@ -237,14 +291,14 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
     return (
       <div className="mx-auto flex min-h-screen w-full max-w-5xl flex-col gap-4 p-4 md:p-6">
         <Link href="/vendors" className="text-sm text-muted-foreground hover:text-foreground">
-          ← Roster
+          ← Directorio
         </Link>
         <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6">
           <p role="alert" className="text-sm font-medium text-destructive">
-            This vendor could not be loaded.
+            No se pudo cargar este proveedor.
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            The link may be stale, or the vendor belongs to another organization.
+            Es posible que el enlace esté desactualizado o que el proveedor pertenezca a otra organización.
           </p>
         </div>
       </div>
@@ -269,7 +323,7 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
         <Shimmer className="h-36 w-full rounded-lg" />
         <Shimmer className="h-56 w-full rounded-lg" />
         <p role="status" className="sr-only">
-          Loading vendor…
+          Cargando proveedor…
         </p>
       </div>
     );
@@ -284,12 +338,12 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
             href="/vendors"
             className="text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline"
           >
-            ← Roster
+            ← Directorio
           </Link>
           <h1 className="text-lg font-semibold tracking-tight">{vendor.legalName}</h1>
           <p className="text-sm text-muted-foreground">
             {vendor.dbaName ? `dba ${vendor.dbaName} · ` : ""}
-            Profile {vendorQuery.data.profileName}
+            Perfil {vendorQuery.data.profileName}
             {vendor.tinLast4 ? ` · TIN ••-•••${vendor.tinLast4}` : ""}
           </p>
         </div>
@@ -298,7 +352,7 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
           {determining ? (
             <Badge variant="agent" className="animate-fade-in text-[11px]">
               <span aria-hidden className="h-1.5 w-1.5 animate-pulse rounded-full bg-current" />
-              Coverage review
+              Revisión de cobertura
             </Badge>
           ) : null}
         </div>
@@ -307,7 +361,7 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
       <nav
         className="flex gap-1 overflow-x-auto border-b"
         role="tablist"
-        aria-label="Vendor tabs"
+        aria-label="Pestañas del proveedor"
         onKeyDown={(e) => {
           // Tab semantics obligate the ARIA tabs keyboard model: arrows move
           // selection (roving tabindex), Home/End jump to the ends.
@@ -339,14 +393,14 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
             // Panels mount conditionally — only the selected tab's IDREF exists.
             aria-controls={tab === t ? `vendor-panel-${t}` : undefined}
             className={cn(
-              "relative shrink-0 whitespace-nowrap rounded-t-md px-3 py-2 text-sm capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+              "relative shrink-0 whitespace-nowrap rounded-t-md px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               tab === t
                 ? "font-medium text-primary"
                 : "text-muted-foreground hover:text-foreground",
             )}
             onClick={() => setTab(t)}
           >
-            {t === "traceability" ? "Requirement traceability" : t}
+            {TAB_LABELS[t]}
             <span
               aria-hidden
               className={cn(
@@ -367,9 +421,9 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
         >
           <Card className="lg:col-span-2">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Finalize compliance status</CardTitle>
+              <CardTitle className="text-sm">Finalizar estado de cumplimiento</CardTitle>
               <p className="text-xs text-muted-foreground">
-                APPROVED enables the ERP-sync action (explicit, never automatic).
+                APROBADO habilita la acción de sincronización con el ERP (explícita, nunca automática).
               </p>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-2">
@@ -405,7 +459,7 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Activity</CardTitle>
+              <CardTitle className="text-sm">Actividad</CardTitle>
             </CardHeader>
             <CardContent>
               <ul className="flex flex-col gap-1.5">
@@ -414,11 +468,13 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
                     <span className="whitespace-nowrap tabular-nums text-muted-foreground">
                       {formatDate(entry.createdAt)}
                     </span>
-                    <span className="font-medium">{entry.type.replaceAll("_", " ").toLowerCase()}</span>
+                    <span className="font-medium">
+                      {ACTIVITY_LABELS[entry.type] ?? entry.type.replaceAll("_", " ").toLowerCase()}
+                    </span>
                   </li>
                 ))}
                 {vendorQuery.data.activity.length === 0 ? (
-                  <li className="text-xs text-muted-foreground">No activity yet.</li>
+                  <li className="text-xs text-muted-foreground">Aún no hay actividad.</li>
                 ) : null}
               </ul>
             </CardContent>
@@ -426,18 +482,18 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
 
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Status transitions</CardTitle>
+              <CardTitle className="text-sm">Transiciones de estado</CardTitle>
             </CardHeader>
             <CardContent>
               <ul className="flex flex-col gap-1.5">
                 {vendorQuery.data.transitions.map((t) => (
                   <li key={t.id} className="text-xs text-muted-foreground">
                     <span className="tabular-nums">{formatDate(t.createdAt)}</span>:{" "}
-                    {vendorStatusLabel(t.fromStatus)} → {vendorStatusLabel(t.toStatus)} ({t.source})
+                    {vendorStatusLabel(t.fromStatus)} → {vendorStatusLabel(t.toStatus)} ({TRANSITION_SOURCE_LABELS[t.source] ?? t.source})
                   </li>
                 ))}
                 {vendorQuery.data.transitions.length === 0 ? (
-                  <li className="text-xs text-muted-foreground">No status transitions yet.</li>
+                  <li className="text-xs text-muted-foreground">Aún no hay transiciones de estado.</li>
                 ) : null}
               </ul>
             </CardContent>
@@ -454,7 +510,7 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
         >
           {documents.length === 0 ? (
             <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-              No documents uploaded yet.
+              Aún no se han subido documentos.
             </p>
           ) : (
             documents.map((doc) => (
@@ -484,27 +540,27 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
             >
               <CardHeader className="pb-2">
                 <CardTitle className="flex flex-wrap items-center gap-2 text-sm">
-                  Coverage determination
+                  Determinación de cobertura
                   {summary.coverage.determining ? (
                     <Badge variant="agent" className="animate-fade-in text-[11px]">
                       <span
                         aria-hidden
                         className="h-1.5 w-1.5 animate-pulse rounded-full bg-current"
                       />
-                      Live
+                      En vivo
                     </Badge>
                   ) : null}
                   <Badge variant={summary.coverage.summarySource === "fresh" ? "success" : "muted"} className="text-[11px]">
                     {summary.coverage.summarySource === "fresh"
-                      ? "Current"
+                      ? "Actual"
                       : summary.coverage.summarySource === "stale"
-                        ? "Updating"
-                        : "Pending"}
+                        ? "Actualizando"
+                        : "Pendiente"}
                   </Badge>
                 </CardTitle>
                 {summary.coverage.determining ? (
                   <TextShimmer className="text-xs">
-                    Agent reviewing stacked policy limits…
+                    El agente está revisando los límites de póliza acumulados…
                   </TextShimmer>
                 ) : null}
               </CardHeader>
@@ -512,8 +568,12 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
                 {(summary.coverage.lines ?? []).map((line) => (
                   <div key={line.category} className="flex flex-col gap-0.5 text-xs">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="font-medium capitalize">
-                        {line.category.replaceAll("_", " ").toLowerCase()}
+                      <span className="font-medium">
+                        {LINE_LABELS[line.category] ??
+                          line.category
+                            .replaceAll("_", " ")
+                            .toLowerCase()
+                            .replace(/^./, (c) => c.toUpperCase())}
                       </span>
                       <Badge
                         variant={(VERDICT_BADGES[line.verdict] ?? VERDICT_BADGES.UNDETERMINED).variant}
@@ -522,8 +582,8 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
                         {(VERDICT_BADGES[line.verdict] ?? VERDICT_BADGES.UNDETERMINED).label}
                       </Badge>
                       <span className="tabular-nums text-muted-foreground">
-                        {formatUsd(line.effectiveOccurrenceLimitUsd)} of{" "}
-                        {formatUsd(summary.coverage.requiredLimits[line.category] ?? null)} required
+                        {formatUsd(line.effectiveOccurrenceLimitUsd)} de{" "}
+                        {formatUsd(summary.coverage.requiredLimits[line.category] ?? null)} requeridos
                       </span>
                     </div>
                     <p className="text-muted-foreground">{line.reasoning}</p>
@@ -584,29 +644,29 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
                       </span>
                       {category.label}
                       {category.mandatory ? (
-                        <span className="text-[11px] uppercase text-muted-foreground">required</span>
+                        <span className="text-[11px] uppercase text-muted-foreground">Requisito obligatorio</span>
                       ) : null}
                     </CardTitle>
                     <div className="flex flex-wrap items-center gap-1.5">
                       {category.grantSources.map((source, i) => (
                         <Badge key={`${source.kind}-${i}`} variant="outline" className="text-[11px]">
-                          {source.kind.replaceAll("_", " ")}
+                          {GRANT_SOURCE_LABELS[source.kind] ?? source.kind.replaceAll("_", " ")}
                         </Badge>
                       ))}
                       {category.dismissed ? (
                         <Badge variant="muted" className="text-[11px]">
-                          Not applicable
+                          No aplica
                         </Badge>
                       ) : null}
                     </div>
                   </div>
                   {category.expiresAt ? (
                     <p className="text-xs tabular-nums text-muted-foreground">
-                      Lapses {formatDate(category.expiresAt)}
+                      Vence el {formatDate(category.expiresAt)}
                     </p>
                   ) : null}
                   {category.determining ? (
-                    <TextShimmer className="text-xs">Coverage review in progress…</TextShimmer>
+                    <TextShimmer className="text-xs">Revisión de cobertura en curso…</TextShimmer>
                   ) : null}
                 </CardHeader>
                 {rows.length > 0 ? (

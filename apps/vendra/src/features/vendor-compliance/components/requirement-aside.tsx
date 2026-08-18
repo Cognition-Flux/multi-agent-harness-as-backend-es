@@ -20,15 +20,15 @@ import { CollapsibleSection } from "./collapsible-section";
 
 /** Friendly copy for the live determination stages (§6.6 lifecycle). */
 const COVERAGE_STAGE_COPY: Record<CoverageProgressStage, string> = {
-  queued: "Queued for coverage review…",
-  starting: "Starting the coverage review…",
-  reviewing: "Reviewing your policies…",
-  checking: "Checking limits and umbrella stacking…",
-  saving: "Saving the coverage determination…",
-  "waiting-for-documents": "Waiting for your other documents to finish…",
-  retrying: "Taking another look…",
-  converged: "Coverage review complete.",
-  unavailable: "The coverage review could not complete.",
+  queued: "En cola para la revisión de cobertura…",
+  starting: "Iniciando la revisión de cobertura…",
+  reviewing: "Revisando sus pólizas…",
+  checking: "Verificando límites y acumulación de pólizas umbrella…",
+  saving: "Guardando la determinación de cobertura…",
+  "waiting-for-documents": "Esperando a que terminen sus otros documentos…",
+  retrying: "Revisando nuevamente…",
+  converged: "Revisión de cobertura completada.",
+  unavailable: "La revisión de cobertura no pudo completarse.",
 };
 
 function CategoryRow({
@@ -83,17 +83,17 @@ function CategoryRow({
             {category.label}
             {category.mandatory ? (
               <span className="ml-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                required
+                Requisito obligatorio
               </span>
             ) : null}
           </p>
           {category.state === "DETERMINING" ? (
-            <p className="text-xs text-muted-foreground">Reviewing coverage…</p>
+            <p className="text-xs text-muted-foreground">Revisando cobertura…</p>
           ) : null}
-          {expired ? <p className="text-xs text-warning">A granting document expired</p> : null}
+          {expired ? <p className="text-xs text-warning">Venció un documento que otorgaba este requisito</p> : null}
           {category.granted && category.expiresAt ? (
             <p className="text-xs text-muted-foreground">
-              Valid until {formatDate(category.expiresAt)}
+              Válido hasta el {formatDate(category.expiresAt)}
             </p>
           ) : null}
         </div>
@@ -103,7 +103,7 @@ function CategoryRow({
         // would be a dead control (flip "Remote-only" off to restore it).
         // Wraps below the label on narrow screens instead of squeezing it.
         <span className="pl-6 text-[11px] text-muted-foreground sm:shrink-0 sm:pl-0 sm:pt-1 sm:text-right">
-          Not required for remote-only vendors
+          No se requiere para proveedores exclusivamente remotos
         </span>
       ) : category.dismissible && (category.dismissed || !category.granted) ? (
         // A DISMISSED row always offers "Applies to us" even once granted
@@ -117,12 +117,27 @@ function CategoryRow({
           disabled={togglePending || (!category.dismissed && atCap)}
           onClick={() => onToggleDismiss(category.category, !category.dismissed)}
         >
-          {category.dismissed ? "Applies to us" : "Not applicable"}
+          {category.dismissed ? "Nos aplica" : "No aplica"}
         </Button>
       ) : null}
     </li>
   );
 }
+
+/** Spanish labels for coverage-line categories (fallback: humanized token). */
+const LINE_LABELS: Record<string, string> = {
+  GENERAL_LIABILITY: "Responsabilidad civil general",
+  WORKERS_COMP: "Compensación laboral",
+  AUTO: "Auto comercial",
+  CYBER: "Responsabilidad cibernética",
+};
+
+/** Spanish labels for policy-contribution roles (fallback: raw token). */
+const ROLE_LABELS: Record<string, string> = {
+  primary: "primaria",
+  umbrella: "umbrella",
+  excess: "de exceso",
+};
 
 function CoverageReadout({
   coverage,
@@ -143,7 +158,7 @@ function CoverageReadout({
     <Card className={coverage.determining ? "animate-glow-pulse" : "animate-fade-in-up"}>
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-sm">
-          Insurance coverage review
+          Revisión de cobertura de seguro
           {updating ? <Loader className="h-3 w-3 text-agent" /> : null}
         </CardTitle>
         {/* Live progress from the attach-only stream (transient data parts). */}
@@ -155,7 +170,7 @@ function CoverageReadout({
             >
               {liveLine}
               {progress.stage?.attempt && progress.stage.attempt > 1
-                ? ` (attempt ${progress.stage.attempt})`
+                ? ` (intento ${progress.stage.attempt})`
                 : ""}
             </p>
             {progress.narration ? (
@@ -175,7 +190,7 @@ function CoverageReadout({
             <Shimmer className="h-4 w-full" />
             <Shimmer className="h-4 w-3/4" />
             <p className="text-xs text-muted-foreground">
-              {liveLine ?? "Reviewing your policies…"}
+              {liveLine ?? "Revisando sus pólizas…"}
             </p>
           </div>
         ) : (
@@ -197,8 +212,12 @@ function CoverageReadout({
                       )}
                     >
                       <div className="flex flex-wrap items-center justify-between gap-1">
-                        <p className="text-xs font-medium capitalize">
-                          {line.category.replaceAll("_", " ").toLowerCase()}
+                        <p className="text-xs font-medium">
+                          {LINE_LABELS[line.category] ??
+                            line.category
+                              .replaceAll("_", " ")
+                              .toLowerCase()
+                              .replace(/^./, (c) => c.toUpperCase())}
                         </p>
                         <Badge
                           variant={
@@ -211,15 +230,15 @@ function CoverageReadout({
                           className="text-[11px]"
                         >
                           {line.verdict === "MEETS"
-                            ? "Meets requirement"
+                            ? "Cumple el requisito"
                             : line.verdict === "BELOW"
-                              ? "Below requirement"
-                              : "Undetermined"}
+                              ? "Por debajo del requisito"
+                              : "Sin determinar"}
                         </Badge>
                       </div>
                       <p className="text-xs tabular-nums text-muted-foreground">
-                        Effective {formatUsd(line.effectiveOccurrenceLimitUsd)} of{" "}
-                        {formatUsd(coverage.requiredLimits[line.category] ?? null)} required
+                        Límite efectivo: {formatUsd(line.effectiveOccurrenceLimitUsd)} de{" "}
+                        {formatUsd(coverage.requiredLimits[line.category] ?? null)} requeridos
                       </p>
                       {contributions.length > 0 ? (
                         <div className="mt-1 flex flex-col gap-0.5 border-l border-border pl-2">
@@ -228,7 +247,7 @@ function CoverageReadout({
                               key={`${c.documentUuid}-${c.role}`}
                               className="text-[11px] tabular-nums text-muted-foreground"
                             >
-                              {c.role} policy contributes {formatUsd(c.amountAppliedUsd)}
+                              La póliza {ROLE_LABELS[c.role] ?? c.role} aporta {formatUsd(c.amountAppliedUsd)}
                             </p>
                           ))}
                         </div>
@@ -240,8 +259,8 @@ function CoverageReadout({
                   // Long-form agent notes collapse by default (SPEC §17 C8);
                   // the count in the trigger keeps the signal visible.
                   <CollapsibleSection
-                    label="Coverage review notes"
-                    summary={`${coverage.conflicts.length} note${coverage.conflicts.length === 1 ? "" : "s"}`}
+                    label="Notas de la revisión de cobertura"
+                    summary={`${coverage.conflicts.length} nota${coverage.conflicts.length === 1 ? "" : "s"}`}
                     tone="warning"
                   >
                     <div className="flex flex-col gap-1">
@@ -265,7 +284,7 @@ function CoverageReadout({
             </div>
             {updating ? (
               <p className="text-xs text-muted-foreground animate-fade-in">
-                Updating with your latest documents…
+                Actualizando con sus documentos más recientes…
               </p>
             ) : null}
           </div>
@@ -322,22 +341,22 @@ export function RequirementAside({
     activated || rejected || activating
       ? null
       : hasDocumentsProcessing
-        ? "Waiting for documents to finish processing…"
+        ? "Esperando a que los documentos terminen de procesarse…"
         : summary.coverage.determining
-          ? "Waiting for the coverage review to finish…"
+          ? "Esperando a que finalice la revisión de cobertura…"
           : !summary.gate.cleared
-            ? "Upload documents covering the remaining requirements to activate."
+            ? "Suba documentos que cubran los requisitos restantes para activar."
             : null;
 
   return (
     <aside className="grid w-full grid-cols-1 gap-3 md:grid-cols-2 md:items-start lg:flex lg:max-w-sm lg:flex-col xl:max-w-md">
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Compliance requirements</CardTitle>
+          <CardTitle className="text-sm">Requisitos de cumplimiento</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Profile: {summary.profile.name} — upload whatever you have; the system decides which
-            requirements each document satisfies. Live alone on general liability? An umbrella policy can stack
-            on top of a lower-limit policy to meet the requirement.
+            Perfil: {summary.profile.name} — suba lo que tenga; el sistema decide qué
+            requisitos satisface cada documento. ¿Su póliza de responsabilidad civil general no alcanza por sí sola? Una póliza umbrella puede acumularse
+            sobre una póliza de límite menor para cumplir el requisito.
           </p>
           {/* Slim gate meter — the visual reason the activate CTA is gated. */}
           <div className="mt-1 flex items-center gap-2">
@@ -348,7 +367,7 @@ export function RequirementAside({
               />
             </div>
             <span className="text-[11px] tabular-nums text-muted-foreground">
-              {satisfiedCategories} of {totalCategories} met
+              {satisfiedCategories} de {totalCategories} cumplidos
             </span>
           </div>
         </CardHeader>
@@ -366,9 +385,9 @@ export function RequirementAside({
           </ul>
           {dismissalCap > 0 ? (
             <p className="mt-2 border-t border-border/60 pt-2 text-[11px] tabular-nums text-muted-foreground">
-              {manualDismissalsUsed} of {dismissalCap}{" "}
-              &ldquo;not applicable&rdquo; dismissals used
-              {atDismissalCap ? " — un-dismiss one to free a slot." : "."}
+              {manualDismissalsUsed} de {dismissalCap}{" "}
+              descartes de &ldquo;no aplica&rdquo; utilizados
+              {atDismissalCap ? " — revierta un descarte para liberar un cupo." : "."}
             </p>
           ) : null}
           {toggleError ? (
@@ -386,19 +405,19 @@ export function RequirementAside({
           {rejected ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 animate-fade-in">
               <p className="text-sm font-medium text-destructive">
-                Your account was rejected
+                Su cuenta fue rechazada
               </p>
               <p className="text-xs text-muted-foreground">
-                Contact the compliance team to proceed — activation is disabled.
+                Contacte al equipo de cumplimiento para continuar — la activación está deshabilitada.
               </p>
             </div>
           ) : activated ? (
             <div className="rounded-md border border-primary/30 bg-primary/10 p-3 animate-fade-in">
               <p className="text-sm font-medium text-primary">
-                Your onboarding is being reviewed
+                Su incorporación está en revisión
               </p>
               <p className="text-xs text-muted-foreground">
-                A compliance officer will finalize your activation.
+                Un oficial de cumplimiento finalizará su activación.
               </p>
             </div>
           ) : (
@@ -416,10 +435,10 @@ export function RequirementAside({
                 )}
               >
                 {activating
-                  ? "Submitting…"
+                  ? "Enviando…"
                   : summary.gate.cleared
-                    ? "Activate vendor account"
-                    : `${remaining} requirement ${remaining === 1 ? "category" : "categories"} remaining`}
+                    ? "Activar cuenta de proveedor"
+                    : `${remaining} ${remaining === 1 ? "categoría de requisitos restante" : "categorías de requisitos restantes"}`}
               </Button>
               {activateError ? (
                 <p role="alert" className="text-xs text-destructive animate-fade-in">

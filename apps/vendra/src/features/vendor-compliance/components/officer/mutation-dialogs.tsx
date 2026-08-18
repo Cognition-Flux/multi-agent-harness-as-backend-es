@@ -42,7 +42,7 @@ export function useInvalidateVendorData() {
 export function ErrorLine({ error }: { error: unknown }) {
   if (!error) return null;
   const message =
-    error instanceof Error ? error.message : "The action failed — try again.";
+    error instanceof Error ? error.message : "La acción falló — reintente.";
   return (
     <p
       role="alert"
@@ -71,8 +71,9 @@ function JustificationHint({ value }: { value: string }) {
         />
       </div>
       <p className="text-xs text-muted-foreground">
-        <span className="tabular-nums">{remaining}</span> more character
-        {remaining === 1 ? "" : "s"} needed — the justification lands in the audit trail.
+        Se necesita{remaining === 1 ? "" : "n"}{" "}
+        <span className="tabular-nums">{remaining}</span>{" "}
+        {remaining === 1 ? "carácter" : "caracteres"} más — la justificación queda en el registro de auditoría.
       </p>
     </div>
   );
@@ -123,13 +124,13 @@ export function WaiveDialog({
   }, [open, reset]);
 
   return (
-    <Dialog open={open} onClose={onClose} title={waiverActive ? "Remove waiver" : "Waive validation"}>
+    <Dialog open={open} onClose={onClose} title={waiverActive ? "Quitar exención" : "Eximir de la validación"}>
       <div className="flex flex-col gap-3">
         {!waiverActive ? (
           <>
             <p className="rounded-md bg-muted/50 p-2.5 text-sm text-muted-foreground">
-              Grant ONLY the categories this failure legitimately blocks — the server narrows the
-              scope again (a name mismatch can never waive into tax identity).
+              Otorgue SOLO las categorías que esta falla bloquea legítimamente — el servidor vuelve
+              a acotar el alcance (una discrepancia de nombre nunca puede extender la exención a la identidad fiscal).
             </p>
             <div className="flex flex-col gap-1.5 rounded-md border border-border/60 p-2.5">
               {potential.map((category) => (
@@ -151,7 +152,7 @@ export function WaiveDialog({
               ))}
             </div>
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="waive-expiry">Waiver expires</Label>
+              <Label htmlFor="waive-expiry">Vencimiento de la exención</Label>
               <Input
                 id="waive-expiry"
                 type="date"
@@ -162,16 +163,16 @@ export function WaiveDialog({
           </>
         ) : (
           <p className="rounded-md bg-muted/50 p-2.5 text-sm text-muted-foreground">
-            Removing the waiver clears every category it granted.
+            Quitar la exención elimina todas las categorías que otorgó.
           </p>
         )}
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="waive-justification">Justification (10–1000 chars)</Label>
+          <Label htmlFor="waive-justification">Justificación (10–1000 caracteres)</Label>
           <Textarea
             id="waive-justification"
             value={justification}
             onChange={(e) => setJustification(e.target.value)}
-            placeholder="Why is this acceptable? This lands in the audit trail."
+            placeholder="¿Por qué es aceptable? Esto queda en el registro de auditoría."
           />
           <JustificationHint value={justification} />
         </div>
@@ -194,7 +195,7 @@ export function WaiveDialog({
           }
         >
           {mutation.isPending ? <Loader className="h-3.5 w-3.5 text-current" /> : null}
-          {mutation.isPending ? "Applying…" : waiverActive ? "Remove waiver" : "Apply waiver"}
+          {mutation.isPending ? "Aplicando…" : waiverActive ? "Quitar exención" : "Aplicar exención"}
         </Button>
       </div>
     </Dialog>
@@ -235,19 +236,19 @@ export function ReclassifyDialog({
   }, [open, reset]);
 
   return (
-    <Dialog open={open} onClose={onClose} title="Re-categorize document">
+    <Dialog open={open} onClose={onClose} title="Recategorizar documento">
       <div className="flex flex-col gap-3">
         <p className="rounded-md bg-muted/50 p-2.5 text-sm text-muted-foreground">
-          Re-runs validation and requirement mapping on the carried-forward extraction under the
-          new type; inserts a fresh extraction version (waiver state resets).
+          Vuelve a ejecutar la validación y el mapeo de requisitos sobre la extracción trasladada
+          bajo el nuevo tipo; inserta una nueva versión de extracción (el estado de la exención se restablece).
         </p>
         <select
-          aria-label="New document type"
+          aria-label="Nuevo tipo de documento"
           className={SELECT_CLASS}
           value={target}
           onChange={(e) => setTarget(e.target.value)}
         >
-          <option value="">Choose a type…</option>
+          <option value="">Elija un tipo…</option>
           {VENDOR_DOCUMENT_TYPE_VALUES.filter((t) => t !== "UNKNOWN").map((type) => (
             <option key={type} value={type}>
               {vendorDocumentTypeTitle(type)}
@@ -255,7 +256,7 @@ export function ReclassifyDialog({
           ))}
         </select>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="reclass-justification">Justification (10–500 chars)</Label>
+          <Label htmlFor="reclass-justification">Justificación (10–500 caracteres)</Label>
           <Textarea
             id="reclass-justification"
             value={justification}
@@ -275,7 +276,7 @@ export function ReclassifyDialog({
           }
         >
           {mutation.isPending ? <Loader className="h-3.5 w-3.5 text-current" /> : null}
-          {mutation.isPending ? "Reclassifying…" : "Reclassify"}
+          {mutation.isPending ? "Recategorizando…" : "Recategorizar"}
         </Button>
       </div>
     </Dialog>
@@ -319,19 +320,19 @@ export function GrantDialog({
   }, [open, reset]);
 
   return (
-    <Dialog open={open} onClose={onClose} title="Grant requirement manually">
+    <Dialog open={open} onClose={onClose} title="Otorgar requisito manualmente">
       <div className="flex flex-col gap-3">
         <p className="rounded-md bg-muted/50 p-2.5 text-sm text-muted-foreground">
-          For evidence you verified out-of-band (e.g. you called the carrier). Scoped per
-          category — the "(manually granted)" label is per row, never per document.
+          Para evidencia que usted verificó por otros medios (p. ej., llamó a la aseguradora).
+          Acotado por categoría — la etiqueta "(otorgado manualmente)" es por fila, nunca por documento.
         </p>
         <select
-          aria-label="Category"
+          aria-label="Categoría"
           className={SELECT_CLASS}
           value={category}
           onChange={(e) => setCategory(e.target.value)}
         >
-          <option value="">Choose a category…</option>
+          <option value="">Elija una categoría…</option>
           {REQUIREMENT_CATEGORY_VALUES.map((c) => (
             <option key={c} value={c}>
               {requirementCategoryLabel(c)}
@@ -347,12 +348,12 @@ export function GrantDialog({
               onChange={(e) => setAcknowledged(e.target.checked)}
             />
             <span>
-              I acknowledge this document FAILED validation and I am granting against it anyway.
+              Reconozco que este documento NO SUPERÓ la validación y aun así otorgo con base en él.
             </span>
           </label>
         ) : null}
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="grant-justification">Justification (10–1000 chars)</Label>
+          <Label htmlFor="grant-justification">Justificación (10–1000 caracteres)</Label>
           <Textarea
             id="grant-justification"
             value={justification}
@@ -378,7 +379,7 @@ export function GrantDialog({
           }
         >
           {mutation.isPending ? <Loader className="h-3.5 w-3.5 text-current" /> : null}
-          {mutation.isPending ? "Granting…" : "Grant"}
+          {mutation.isPending ? "Otorgando…" : "Otorgar"}
         </Button>
       </div>
     </Dialog>
@@ -412,15 +413,15 @@ export function RevokeDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title={`Revoke ${requirementCategoryLabel(category)}`}
+      title={`Revocar ${requirementCategoryLabel(category)}`}
       className="border-destructive/30"
     >
       <div className="flex flex-col gap-3">
         <p className="rounded-md border border-destructive/30 bg-destructive/10 p-2.5 text-xs text-destructive">
-          Revoking removes this manually granted category — coverage recomputes immediately.
+          Revocar elimina esta categoría otorgada manualmente — la cobertura se recalcula de inmediato.
         </p>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="revoke-justification">Justification (10–1000 chars)</Label>
+          <Label htmlFor="revoke-justification">Justificación (10–1000 caracteres)</Label>
           <Textarea
             id="revoke-justification"
             value={justification}
@@ -441,7 +442,7 @@ export function RevokeDialog({
           }
         >
           {mutation.isPending ? <Loader className="h-3.5 w-3.5 text-current" /> : null}
-          {mutation.isPending ? "Revoking…" : "Revoke grant"}
+          {mutation.isPending ? "Revocando…" : "Revocar concesión"}
         </Button>
       </div>
     </Dialog>

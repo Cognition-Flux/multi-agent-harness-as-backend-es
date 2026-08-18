@@ -24,14 +24,14 @@ function PanelHeader({ onClose }: { onClose: () => void }) {
           <BotIcon className="h-4 w-4" />
         </span>
         <div className="leading-tight">
-          <p className="text-sm font-semibold text-foreground">Assistant</p>
+          <p className="text-sm font-semibold text-foreground">Asistente</p>
           <p className="text-xs text-muted-foreground">
-            Knows your compliance record
+            Conoce su registro de cumplimiento
           </p>
         </div>
       </div>
       <Button
-        aria-label="Collapse assistant"
+        aria-label="Contraer el asistente"
         className="h-8 w-8 p-0"
         onClick={onClose}
         size="sm"
@@ -72,7 +72,7 @@ export function AssistantPanel() {
           pointer-events + tabIndex keep the hidden state inert. */}
       <Button
         aria-hidden={open || undefined}
-        aria-label="Open the compliance assistant"
+        aria-label="Abrir el asistente de cumplimiento"
         className={cn(
           "fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] right-4 z-30 gap-2 rounded-full shadow-glow transition-all duration-300 lg:right-6",
           open ? "pointer-events-none scale-90 opacity-0" : "scale-100 opacity-100",
@@ -82,7 +82,7 @@ export function AssistantPanel() {
         type="button"
       >
         <MessageCircleIcon className="h-4 w-4" />
-        <span className="hidden sm:inline">Assistant</span>
+        <span className="hidden sm:inline">Asistente</span>
       </Button>
 
       {/* NO backdrop (SPEC §17 C12): the assistant is a NON-modal panel —
@@ -95,7 +95,7 @@ export function AssistantPanel() {
           opened, so the live stream survives collapse/reopen. */}
       <aside
         ref={panelRef}
-        aria-label="Compliance assistant"
+        aria-label="Asistente de cumplimiento"
         tabIndex={-1}
         className={cn(
           "fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l border-border/60 bg-background/95 shadow-lift outline-none backdrop-blur-xl transition-transform duration-300 ease-in-out xl:max-w-lg",

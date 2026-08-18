@@ -66,9 +66,9 @@ export function VendorsRoster() {
       <div className="glass sticky top-0 z-10 -mx-4 flex flex-col gap-3 rounded-b-lg px-4 py-3 md:-mx-6 md:px-6">
         <header className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
           <div>
-            <h1 className="text-lg font-semibold tracking-tight">Vendor compliance</h1>
+            <h1 className="text-lg font-semibold tracking-tight">Cumplimiento de proveedores</h1>
             <p className="text-sm text-muted-foreground">
-              The officer roster — expiring vendors first.
+              El directorio del oficial — primero los proveedores por vencer.
             </p>
           </div>
           <Button
@@ -85,26 +85,26 @@ export function VendorsRoster() {
                 })
             }
           >
-            Sign out
+            Cerrar sesión
           </Button>
         </header>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
           <Input
-            placeholder="Search vendors…"
+            placeholder="Buscar proveedores…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full sm:max-w-xs"
           />
           <select
-            aria-label="Filter by status"
+            aria-label="Filtrar por estado"
             className={SELECT_CLASS}
             value={status}
             onChange={(e) => setStatus(e.target.value)}
           >
             {STATUS_OPTIONS.map((option) => (
               <option key={option} value={option}>
-                {option === "" ? "All statuses" : vendorStatusLabel(option)}
+                {option === "" ? "Todos los estados" : vendorStatusLabel(option)}
               </option>
             ))}
           </select>
@@ -115,7 +115,7 @@ export function VendorsRoster() {
               checked={expiringOnly}
               onChange={(e) => setExpiringOnly(e.target.checked)}
             />
-            Expiring within 30 days
+            Por vencer dentro de 30 días
           </label>
           {vendorsQuery.isFetching ? (
             <span className="animate-fade-in">
@@ -127,18 +127,18 @@ export function VendorsRoster() {
 
       <Card>
         <CardHeader className="pb-2">
-          <CardTitle className="text-sm">Roster</CardTitle>
+          <CardTitle className="text-sm">Directorio</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b text-left text-xs uppercase text-muted-foreground">
-                  <th className="px-2 py-2">Vendor</th>
-                  <th className="px-2 py-2">Status</th>
-                  <th className="hidden px-2 py-2 sm:table-cell">Granted</th>
-                  <th className="px-2 py-2">Next expiry</th>
-                  <th className="hidden px-2 py-2 md:table-cell">Tags</th>
+                  <th className="px-2 py-2">Proveedor</th>
+                  <th className="px-2 py-2">Estado</th>
+                  <th className="hidden px-2 py-2 sm:table-cell">Otorgadas</th>
+                  <th className="px-2 py-2">Próximo vencimiento</th>
+                  <th className="hidden px-2 py-2 md:table-cell">Etiquetas</th>
                   <th className="px-2 py-2" />
                 </tr>
               </thead>
@@ -188,7 +188,7 @@ export function VendorsRoster() {
                       </div>
                     </td>
                     <td className="hidden px-2 py-2 tabular-nums sm:table-cell">
-                      {vendor.grantedCount} categories
+                      {vendor.grantedCount} categorías
                     </td>
                     <td className="px-2 py-2 tabular-nums">
                       {vendor.nextExpiryAt ? formatDate(vendor.nextExpiryAt) : "—"}
@@ -207,7 +207,7 @@ export function VendorsRoster() {
                         href={`/vendors/${vendor.uuid}`}
                         className="inline-flex items-center gap-0.5 whitespace-nowrap rounded-md px-2 py-1 text-sm font-medium text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                       >
-                        Open
+                        Abrir
                         <ChevronRightIcon
                           aria-hidden
                           className="h-3.5 w-3.5 transition-transform duration-200 group-hover:translate-x-0.5"
@@ -220,7 +220,7 @@ export function VendorsRoster() {
                   <tr>
                     <td colSpan={6} className="px-2 py-6 text-center">
                       <p role="alert" className="text-destructive">
-                        The roster could not be loaded.
+                        No se pudo cargar el directorio.
                       </p>
                       <Button
                         size="sm"
@@ -228,7 +228,7 @@ export function VendorsRoster() {
                         className="mt-2"
                         onClick={() => void vendorsQuery.refetch()}
                       >
-                        Try again
+                        Reintentar
                       </Button>
                     </td>
                   </tr>
@@ -237,7 +237,7 @@ export function VendorsRoster() {
                     <td colSpan={6} className="px-2 py-10 text-center">
                       <div className="animate-fade-in flex flex-col items-center gap-2">
                         <SearchXIcon aria-hidden className="h-8 w-8 text-muted-foreground/50" />
-                        <p className="text-sm text-muted-foreground">No vendors match.</p>
+                        <p className="text-sm text-muted-foreground">Ningún proveedor coincide.</p>
                       </div>
                     </td>
                   </tr>

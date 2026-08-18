@@ -52,14 +52,14 @@ export const STAGE_INDEX: Record<ProcessingStage, number> = {
 export const TOTAL_STAGES = 8;
 
 export const STAGE_MESSAGES: Record<ProcessingStage, string> = {
-  reading: "Uploading and preparing your document...",
-  analyzing: "Analyzing document content and structure...",
-  classifying: "Identifying the type of document...",
-  extracting: "Reading and extracting key information...",
-  saving: "Saving extracted data...",
-  validating: "Checking that all required information is present...",
-  mapping: "Mapping this document to your compliance requirements...",
-  finalizing: "Completing processing and updating your requirements...",
+  reading: "Subiendo y preparando su documento...",
+  analyzing: "Analizando el contenido y la estructura del documento...",
+  classifying: "Identificando el tipo de documento...",
+  extracting: "Leyendo y extrayendo la información clave...",
+  saving: "Guardando los datos extraídos...",
+  validating: "Verificando que toda la información requerida esté presente...",
+  mapping: "Vinculando este documento con sus requisitos de cumplimiento...",
+  finalizing: "Completando el procesamiento y actualizando sus requisitos...",
 };
 
 // =============================================================================
@@ -399,7 +399,7 @@ export const assistantChatRequestSchema = z.object({
         (parts) =>
           parts.reduce((sum, part) => sum + part.text.length, 0) <=
           ASSISTANT_MAX_MESSAGE_CHARS,
-        { message: "Message exceeds the maximum length." },
+        { message: "El mensaje supera la longitud máxima." },
       ),
   }),
 });

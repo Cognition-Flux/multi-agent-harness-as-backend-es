@@ -28,17 +28,17 @@ export const REQUIREMENT_CATEGORY_LABELS: Record<
   RequirementCategoryType,
   string
 > = {
-  TAX_IDENTITY: "Tax identity",
-  INSURANCE_GENERAL_LIABILITY: "General liability insurance",
-  INSURANCE_WORKERS_COMP: "Workers' compensation insurance",
-  INSURANCE_AUTO: "Commercial auto insurance",
-  BUSINESS_LICENSE: "Business license",
-  DIVERSITY_CERTIFICATION: "Diversity certification",
-  SAFETY_RECORD: "Safety record",
-  BANKING_VERIFICATION: "Banking verification",
-  DATA_SECURITY: "Data security attestation",
-  SIGNED_AGREEMENTS: "Signed agreements",
-  SANCTIONS_SCREENING: "Sanctions screening",
+  TAX_IDENTITY: "Identidad fiscal",
+  INSURANCE_GENERAL_LIABILITY: "Seguro de responsabilidad civil general",
+  INSURANCE_WORKERS_COMP: "Seguro de compensación laboral",
+  INSURANCE_AUTO: "Seguro de auto comercial",
+  BUSINESS_LICENSE: "Licencia comercial",
+  DIVERSITY_CERTIFICATION: "Certificación de diversidad",
+  SAFETY_RECORD: "Historial de seguridad",
+  BANKING_VERIFICATION: "Verificación bancaria",
+  DATA_SECURITY: "Atestación de seguridad de datos",
+  SIGNED_AGREEMENTS: "Acuerdos firmados",
+  SANCTIONS_SCREENING: "Verificación de sanciones",
 };
 
 export function requirementCategoryLabel(category: string): string {

@@ -41,7 +41,7 @@ export async function POST(req: Request) {
     .where(eq(schema.organization.slug, input.organizationSlug))
     .limit(1);
   if (!org) {
-    return Response.json({ error: "Unknown organization" }, { status: 404 });
+    return Response.json({ error: "Organización desconocida." }, { status: 404 });
   }
   const [profile] = await db
     .select()
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
     .limit(1);
   if (!profile) {
     return Response.json(
-      { error: "Organization has no requirement profile configured" },
+      { error: "La organización no tiene un perfil de requisitos configurado." },
       { status: 409 },
     );
   }
@@ -66,7 +66,7 @@ export async function POST(req: Request) {
     })
     .returning();
   if (!vendorRow) {
-    return Response.json({ error: "Vendor could not be created" }, { status: 500 });
+    return Response.json({ error: "No se pudo crear el proveedor." }, { status: 500 });
   }
 
   try {
@@ -94,8 +94,8 @@ export async function POST(req: Request) {
     }
     const message =
       err instanceof Error && /exists|taken|duplicate/i.test(err.message)
-        ? "An account with this email already exists."
-        : "The account could not be created.";
+        ? "Ya existe una cuenta con este correo electrónico."
+        : "No se pudo crear la cuenta.";
     return Response.json({ error: message }, { status: 409 });
   }
 

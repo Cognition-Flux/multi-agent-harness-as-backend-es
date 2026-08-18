@@ -49,19 +49,19 @@ import { ASSISTANT_MAX_MESSAGE_CHARS } from "@/features/vendor-compliance/lib/ve
 import { cn } from "@/lib/utils";
 
 const SUGGESTIONS = [
-  "What's left before I can activate my account?",
-  "Why did my document fail?",
-  "What documents can I upload?",
+  "¿Qué falta para poder activar mi cuenta?",
+  "¿Por qué falló mi documento?",
+  "¿Qué documentos puedo subir?",
 ];
 
 /** Per-tool activity-pill copy: [in-flight, done]. */
 const TOOL_LABELS: Record<string, [string, string]> = {
   getComplianceState: [
-    "Checking your compliance record…",
-    "Checked your compliance record",
+    "Consultando su registro de cumplimiento…",
+    "Se consultó su registro de cumplimiento",
   ],
-  getDocumentDetails: ["Reviewing a document…", "Reviewed a document"],
-  rememberFacts: ["Noting that down…", "Noted for next time"],
+  getDocumentDetails: ["Revisando un documento…", "Se revisó un documento"],
+  rememberFacts: ["Tomando nota…", "Anotado para la próxima vez"],
 };
 
 const TOOL_ICONS: Record<string, typeof ListChecksIcon> = {
@@ -84,8 +84,8 @@ function ToolPill({
   const errored = state === "output-error" || state === "output-denied";
   const inFlight = !done && !errored && live;
   const [pending, finished] = TOOL_LABELS[toolName] ?? [
-    `Running ${toolName}…`,
-    `Ran ${toolName}`,
+    `Ejecutando ${toolName}…`,
+    `Se ejecutó ${toolName}`,
   ];
   const Icon = TOOL_ICONS[toolName] ?? ListChecksIcon;
   return (
@@ -104,7 +104,7 @@ function ToolPill({
     >
       <Icon className="h-3.5 w-3.5" />
       {errored ? (
-        "That lookup failed"
+        "Esa consulta falló"
       ) : inFlight ? (
         <TextShimmer>{pending}</TextShimmer>
       ) : (
@@ -143,7 +143,7 @@ function errorCopy(error: Error): string {
   } catch {
     // Not a JSON error envelope — fall through to the generic copy.
   }
-  return "The assistant hit a problem answering this. Please try again.";
+  return "El asistente tuvo un problema al responder esto. Por favor, intente de nuevo.";
 }
 
 type HistoryState =
@@ -188,7 +188,7 @@ export function AssistantChat() {
         className="flex flex-1 flex-col gap-4 overflow-hidden p-4"
         role="status"
       >
-        <span className="sr-only">Loading your conversation…</span>
+        <span className="sr-only">Cargando su conversación…</span>
         <div aria-hidden className="flex w-full justify-end">
           <Shimmer className="h-9 w-3/5 rounded-2xl" />
         </div>
@@ -210,7 +210,7 @@ export function AssistantChat() {
           <CircleAlertIcon className="h-5 w-5" />
         </span>
         <p className="text-sm text-muted-foreground">
-          The conversation could not be loaded.
+          No se pudo cargar la conversación.
         </p>
         <Button
           onClick={() => setAttempt((n) => n + 1)}
@@ -218,7 +218,7 @@ export function AssistantChat() {
           type="button"
           variant="outline"
         >
-          Try again
+          Intentar de nuevo
         </Button>
       </div>
     );
@@ -293,11 +293,11 @@ function AssistantChatBody({
               </span>
               <div className="space-y-1">
                 <h3 className="text-sm font-medium text-foreground">
-                  Ask about your compliance record
+                  Pregunte sobre su registro de cumplimiento
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Questions about your documents, what&apos;s missing, or why
-                  something failed — I can see your record as it processes.
+                  Preguntas sobre sus documentos, qué falta o por qué algo
+                  falló — puedo ver su registro mientras se procesa.
                 </p>
               </div>
               <div className="flex flex-col gap-1.5 pt-1">
@@ -390,7 +390,7 @@ function AssistantChatBody({
                     aria-hidden
                     className="h-1.5 w-1.5 animate-pulse rounded-full bg-agent"
                   />
-                  <TextShimmer>Thinking…</TextShimmer>
+                  <TextShimmer>Pensando…</TextShimmer>
                 </div>
               )}
               {error && (
@@ -412,7 +412,7 @@ function AssistantChatBody({
                       type="button"
                       variant="outline"
                     >
-                      Retry
+                      Reintentar
                     </Button>
                     <Button
                       onClick={clearError}
@@ -420,7 +420,7 @@ function AssistantChatBody({
                       type="button"
                       variant="ghost"
                     >
-                      Dismiss
+                      Descartar
                     </Button>
                   </div>
                 </div>
@@ -434,11 +434,11 @@ function AssistantChatBody({
       <div className="border-t border-border/60 bg-background/80 p-3 backdrop-blur-md">
         <PromptInput onSubmit={() => submit()}>
           <PromptInputTextarea
-            aria-label="Message the assistant"
+            aria-label="Escribir al asistente"
             maxLength={ASSISTANT_MAX_MESSAGE_CHARS}
             onChange={(e) => setInput(e.currentTarget.value)}
             onEnterSubmit={() => submit()}
-            placeholder="Ask about your compliance record…"
+            placeholder="Pregunte sobre su registro de cumplimiento…"
             value={input}
           />
           <PromptInputSubmit

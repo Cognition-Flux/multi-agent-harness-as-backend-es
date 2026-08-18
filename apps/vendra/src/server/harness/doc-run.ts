@@ -149,7 +149,7 @@ export async function claimAndPrepareVendorDocRun(
     });
     await failVendorDocumentInternal(
       minimalDocRunFailContext(run, startedAt),
-      "The uploaded file could not be read.",
+      "No se pudo leer el archivo subido.",
     );
     return { ok: false, reason: "missing_bytes" };
   }
@@ -289,7 +289,7 @@ export async function executeClaimedVendorDocRun(
         continue;
       }
       vendraWarn("process.no_terminal", { doc: documentUuid, attempt });
-      await failVendorDocumentInternal(ctx, "Processing ended unexpectedly.");
+      await failVendorDocumentInternal(ctx, "El procesamiento terminó inesperadamente.");
       return;
     }
   } finally {

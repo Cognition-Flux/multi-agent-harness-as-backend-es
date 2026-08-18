@@ -7,14 +7,14 @@ export function cn(...inputs: ClassValue[]): string {
 
 export function formatUsd(amount: number | null | undefined): string {
   if (amount === null || amount === undefined) return "—";
-  return `$${amount.toLocaleString("en-US")}`;
+  return `$${amount.toLocaleString("es-419")}`;
 }
 
 export function formatDate(iso: string | Date | null | undefined): string {
   if (!iso) return "—";
   const date = typeof iso === "string" ? new Date(iso) : iso;
   if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleDateString("en-US", {
+  return date.toLocaleDateString("es-419", {
     year: "numeric",
     month: "short",
     day: "numeric",

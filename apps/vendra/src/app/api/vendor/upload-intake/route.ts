@@ -63,7 +63,7 @@ export async function POST(req: Request) {
 
   if (files.length > MAX_FILES) {
     return Response.json(
-      { error: `Too many files: ${files.length} — the limit is ${MAX_FILES} per request.` },
+      { error: `Demasiados archivos: ${files.length} — el límite es de ${MAX_FILES} por solicitud.` },
       { status: 400 },
     );
   }
@@ -85,7 +85,7 @@ export async function POST(req: Request) {
       failed.push({
         pointer: file.pointer,
         fileName: file.fileName,
-        reason: `Unsupported type "${file.mimeType}" — upload a PNG, JPEG, WebP, or PDF.`,
+        reason: `Tipo no admitido "${file.mimeType}" — suba un archivo PNG, JPEG, WebP o PDF.`,
       });
       continue;
     }
@@ -99,7 +99,7 @@ export async function POST(req: Request) {
       failed.push({
         pointer: file.pointer,
         fileName: file.fileName,
-        reason: `File is ${file.fileSizeBytes} bytes — the limit is 10 MB.`,
+        reason: `El archivo pesa ${file.fileSizeBytes} bytes — el límite es de 10 MB.`,
       });
       continue;
     }
@@ -112,7 +112,7 @@ export async function POST(req: Request) {
       failed.push({
         pointer: file.pointer,
         fileName: file.fileName,
-        reason: "The file is empty — re-export it and upload it again.",
+        reason: "El archivo está vacío — expórtelo de nuevo y vuelva a subirlo.",
       });
       continue;
     }
@@ -124,7 +124,7 @@ export async function POST(req: Request) {
       failed.push({
         pointer: file.pointer,
         fileName: file.fileName,
-        reason: "Invalid file key.",
+        reason: "Clave de archivo no válida.",
       });
       continue;
     }
@@ -155,12 +155,12 @@ export async function POST(req: Request) {
       });
       await failPendingUpload(
         row.uuid,
-        "The upload could not be prepared. Please try again.",
+        "No se pudo preparar la carga. Intente de nuevo.",
       ).catch(() => undefined);
       failed.push({
         pointer: file.pointer,
         fileName: file.fileName,
-        reason: "The upload could not be prepared. Please try again.",
+        reason: "No se pudo preparar la carga. Intente de nuevo.",
       });
       continue;
     }

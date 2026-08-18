@@ -6,7 +6,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Vendra",
   description:
-    "AI-adjudicated vendor onboarding & continuous compliance — powered by a Claude Code harness backend.",
+    "Incorporación de proveedores adjudicada por IA y cumplimiento continuo — con tecnología de un backend de harness de Claude Code.",
 };
 
 export const viewport: Viewport = {
@@ -16,7 +16,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="es">
       <body>
         {/* Shared ambient ground: soft aurora washes behind every page so
             routes stop painting their own competing flat grounds. */}

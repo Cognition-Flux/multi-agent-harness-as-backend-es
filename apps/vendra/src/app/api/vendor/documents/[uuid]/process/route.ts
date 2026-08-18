@@ -77,7 +77,7 @@ export async function POST(
       message: err instanceof Error ? err.message : String(err),
     });
     return Response.json(
-      { error: "Document could not be loaded for processing — try again shortly" },
+      { error: "No se pudo cargar el documento para procesarlo — intente de nuevo en breve" },
       { status: 503 },
     );
   }
@@ -98,16 +98,16 @@ export async function POST(
     switch (claim.reason) {
       case "no_media_type":
         return Response.json(
-          { error: "Document has no accepted media type on record" },
+          { error: "El documento no tiene registrado un tipo de archivo aceptado" },
           { status: 422 },
         );
       case "not_claimable":
         return Response.json(
-          { error: "Document is not in a processable state" },
+          { error: "El documento no está en un estado procesable" },
           { status: 409 },
         );
       case "missing_bytes":
-        return Response.json({ error: "Uploaded file missing" }, { status: 410 });
+        return Response.json({ error: "Falta el archivo subido" }, { status: 410 });
     }
   }
   const prepared = claim.prepared;
@@ -134,7 +134,7 @@ export async function POST(
             vendor: run.vendor.id,
             source: "run_settled_no_terminal",
           });
-          await failVendorDocumentInternal(ctx, "Processing was interrupted.").catch(
+          await failVendorDocumentInternal(ctx, "El procesamiento fue interrumpido.").catch(
             (err) =>
               vendraError("process.safety_net", {
                 doc: documentUuid,

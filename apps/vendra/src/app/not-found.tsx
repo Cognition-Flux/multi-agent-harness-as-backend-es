@@ -14,9 +14,9 @@ export default function NotFound() {
         </p>
         <Card className="glass -mt-6 w-full shadow-lift">
           <CardHeader>
-            <CardTitle className="text-lg">Page not found</CardTitle>
+            <CardTitle className="text-lg">Página no encontrada</CardTitle>
             <p className="text-sm text-muted-foreground">
-              The page you&apos;re looking for doesn&apos;t exist or may have moved.
+              La página que busca no existe o puede haber sido movida.
             </p>
           </CardHeader>
           <CardContent>
@@ -24,7 +24,7 @@ export default function NotFound() {
               href="/"
               className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm shadow-primary/25 transition-all duration-200 hover:bg-primary/90 hover:shadow-md hover:shadow-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:scale-[0.98]"
             >
-              Back to the app
+              Volver a la aplicación
             </Link>
           </CardContent>
         </Card>

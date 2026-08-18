@@ -69,10 +69,10 @@ export function HitlPrompt({
       if (res.ok || res.status === 404) {
         setAnswered(true);
       } else {
-        setAnswerError("Your answer could not be recorded — try again.");
+        setAnswerError("No se pudo registrar su respuesta — intente de nuevo.");
       }
     } catch {
-      setAnswerError("Your answer could not be recorded — check your connection and try again.");
+      setAnswerError("No se pudo registrar su respuesta — verifique su conexión e intente de nuevo.");
     } finally {
       setSubmitting(false);
       setPendingAnswer(null);
@@ -86,7 +86,7 @@ export function HitlPrompt({
         className="flex animate-fade-in items-center gap-2 rounded-md border border-success/30 bg-success/5 p-3 text-sm text-muted-foreground"
       >
         <CheckCircle2 aria-hidden className="h-4 w-4 shrink-0 text-success" />
-        Answer recorded — processing continues…
+        Respuesta registrada — el procesamiento continúa…
       </div>
     );
   }
@@ -100,7 +100,7 @@ export function HitlPrompt({
         className="flex animate-fade-in items-center gap-2 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground"
       >
         <Clock aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />
-        The confirmation window closed — processing continues automatically.
+        La ventana de confirmación se cerró — el procesamiento continúa automáticamente.
       </div>
     );
   }
@@ -128,7 +128,7 @@ export function HitlPrompt({
           disabled={submitting}
         >
           {pendingAnswer === true ? <Loader className="h-3 w-3 text-current" /> : null}
-          Yes
+          Sí
         </Button>
         <Button
           size="sm"
@@ -146,8 +146,8 @@ export function HitlPrompt({
         </p>
       ) : null}
       <p className="text-xs text-muted-foreground">
-        Respond within <span className="tabular-nums">{minutes}:{seconds}</span> — otherwise
-        processing continues automatically.
+        Responda en un plazo de <span className="tabular-nums">{minutes}:{seconds}</span> — de lo
+        contrario, el procesamiento continúa automáticamente.
       </p>
     </div>
   );

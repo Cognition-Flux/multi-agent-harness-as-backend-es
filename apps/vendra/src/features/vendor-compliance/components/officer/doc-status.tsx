@@ -55,20 +55,20 @@ export function deriveVendorDocumentStatus(
 export function DocPill({ pill }: { pill: VendorDocumentPill }) {
   switch (pill) {
     case "expired":
-      return <Badge variant="warning">Expired</Badge>;
+      return <Badge variant="warning">Vencido</Badge>;
     case "waived":
-      return <Badge variant="success">Waived</Badge>;
+      return <Badge variant="success">Eximido</Badge>;
     case "queued":
-      return <Badge variant="muted">Queued</Badge>;
+      return <Badge variant="muted">En cola</Badge>;
     case "scope_accepted":
-      return <Badge variant="warning">Counted · coverage</Badge>;
+      return <Badge variant="warning">Contado · cobertura</Badge>;
     case "failed":
-      return <Badge variant="destructive">Failed</Badge>;
+      return <Badge variant="destructive">Fallido</Badge>;
     case "processing":
-      return <Badge variant="agent">Processing</Badge>;
+      return <Badge variant="agent">Procesando</Badge>;
     case "verified":
-      return <Badge variant="success">Verified</Badge>;
+      return <Badge variant="success">Verificado</Badge>;
     default:
-      return <Badge variant="muted">Uploaded</Badge>;
+      return <Badge variant="muted">Subido</Badge>;
   }
 }

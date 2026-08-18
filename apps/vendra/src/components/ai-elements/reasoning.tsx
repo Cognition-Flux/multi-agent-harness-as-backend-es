@@ -107,9 +107,9 @@ export function ReasoningTrigger({ className, children, ...props }: ReasoningTri
         <Lightbulb className="h-3.5 w-3.5 shrink-0 text-agent" aria-hidden />
         {children ??
           (isStreaming ? (
-            <TextShimmer>Thinking…</TextShimmer>
+            <TextShimmer>Pensando…</TextShimmer>
           ) : (
-            <span>Thought process</span>
+            <span>Proceso de razonamiento</span>
           ))}
         <ChevronRight
           className={cn(

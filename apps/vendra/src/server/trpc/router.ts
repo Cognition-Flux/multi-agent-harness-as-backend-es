@@ -384,7 +384,7 @@ export const appRouter = router({
         if (!extraction) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "The document has no extraction to waive against.",
+            message: "El documento no tiene una extracción sobre la cual aplicar una exención.",
           });
         }
         const currentWaiver = (extraction.waiver ?? {}) as Record<string, unknown>;
@@ -395,7 +395,7 @@ export const appRouter = router({
         ) {
           throw new TRPCError({
             code: "CONFLICT",
-            message: "The waiver state changed underneath you — reload and retry.",
+            message: "El estado de la exención cambió mientras trabajaba — recargue e intente de nuevo.",
           });
         }
 
@@ -404,13 +404,13 @@ export const appRouter = router({
           if (!input.waiverExpiresAt) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: "A waiver requires an expiry date.",
+              message: "Una exención requiere una fecha de vencimiento.",
             });
           }
           if (input.scopedCategories.length === 0) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: "A waiver requires at least one scoped category.",
+              message: "Una exención requiere al menos una categoría en su alcance.",
             });
           }
           // B-1 cascade — server-enforced, never UI-trusted: narrow to what
@@ -426,7 +426,7 @@ export const appRouter = router({
             throw new TRPCError({
               code: "BAD_REQUEST",
               message:
-                "None of the requested categories can be waived off this document's failure.",
+                "Ninguna de las categorías solicitadas puede eximirse a partir de la falla de este documento.",
             });
           }
         }
@@ -496,7 +496,7 @@ export const appRouter = router({
       if (input.newDocumentType === VendorDocumentTypeEnum.UNKNOWN) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "UNKNOWN is not a valid reclassification target.",
+          message: "UNKNOWN no es un tipo de documento válido para la recategorización.",
         });
       }
       const txStartedAt = Date.now();
@@ -517,14 +517,14 @@ export const appRouter = router({
         if (!allowed.has(input.newDocumentType)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "This profile does not accept that document type.",
+            message: "Este perfil no acepta ese tipo de documento.",
           });
         }
         const extraction = await latestExtractionOnTx(tx, doc.id);
         if (!extraction) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "The document has no extraction to carry forward.",
+            message: "El documento no tiene una extracción que trasladar.",
           });
         }
         const fromType = extraction.documentType;
@@ -665,7 +665,7 @@ export const appRouter = router({
           throw new TRPCError({
             code: "BAD_REQUEST",
             message:
-              "This document failed validation — acknowledge the override to grant against it.",
+              "Este documento no pasó la validación — reconozca la anulación para otorgar el requisito con base en él.",
           });
         }
 
@@ -681,7 +681,7 @@ export const appRouter = router({
           if (alreadyProven) {
             throw new TRPCError({
               code: "BAD_REQUEST",
-              message: "This document already satisfies that category.",
+              message: "Este documento ya satisface esa categoría.",
             });
           }
         }
@@ -778,7 +778,7 @@ export const appRouter = router({
         if (revoked.length === 0) {
           throw new TRPCError({
             code: "CONFLICT",
-            message: "No active grant to revoke — it may already be revoked.",
+            message: "No hay una concesión activa que revocar — es posible que ya haya sido revocada.",
           });
         }
         await appendMetadataAudit(tx, vendorRow.id, "manual_requirement_overrides", {
@@ -850,7 +850,7 @@ export const appRouter = router({
         if (reset.length === 0) {
           throw new TRPCError({
             code: "BAD_REQUEST",
-            message: "The document is not in a retryable state.",
+            message: "El documento no está en un estado que permita reintentar.",
           });
         }
         await appendMetadataAudit(tx, row.vendorId, "retry_events", {

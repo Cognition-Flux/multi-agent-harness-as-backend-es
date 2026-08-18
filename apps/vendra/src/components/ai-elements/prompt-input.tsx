@@ -76,7 +76,7 @@ export const PromptInputSubmit = ({
   const busy = status === "submitted" || status === "streaming";
   return (
     <Button
-      aria-label={busy ? "Stop generating" : "Send message"}
+      aria-label={busy ? "Detener la generación" : "Enviar mensaje"}
       className={cn(
         "relative h-9 w-9 shrink-0 rounded-md p-0 transition-all duration-300",
         className,

@@ -22,23 +22,23 @@ const DESCRIPTORS: Record<
     clock?: boolean;
   }
 > = {
-  NOT_STARTED: { label: "Not started", variant: "muted" },
-  IN_PROGRESS: { label: "In progress", variant: "agent", pulse: true },
-  PRE_APPROVED: { label: "Likely compliant", variant: "default" },
-  NEED_REVIEW: { label: "Needs review", variant: "warning" },
-  APPROVED: { label: "Approved", variant: "success" },
-  REJECTED: { label: "Rejected", variant: "destructive" },
-  EXPIRED: { label: "Expired", variant: "warning", clock: true },
+  NOT_STARTED: { label: "No iniciado", variant: "muted" },
+  IN_PROGRESS: { label: "En progreso", variant: "agent", pulse: true },
+  PRE_APPROVED: { label: "Probablemente en cumplimiento", variant: "default" },
+  NEED_REVIEW: { label: "Requiere revisión", variant: "warning" },
+  APPROVED: { label: "Aprobado", variant: "success" },
+  REJECTED: { label: "Rechazado", variant: "destructive" },
+  EXPIRED: { label: "Vencido", variant: "warning", clock: true },
 };
 
 /** The badge's human label for a status token — one copy source everywhere. */
 export function vendorStatusLabel(status: string): string {
-  return DESCRIPTORS[status]?.label ?? "Unknown";
+  return DESCRIPTORS[status]?.label ?? "Desconocido";
 }
 
 export function VendorStatusBadge({ status }: { status: string }) {
   const descriptor = DESCRIPTORS[status] ?? {
-    label: "Unknown",
+    label: "Desconocido",
     variant: "muted" as const,
   };
   return (

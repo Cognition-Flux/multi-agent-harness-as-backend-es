@@ -65,11 +65,11 @@ import { vendraError, vendraLog, vendraWarn } from "./log";
 
 /** UNKNOWN early-exit copy. */
 export const UNRECOGNIZED_DOCUMENT_REASON =
-  "We could not recognize this document type. Please upload one of the accepted document types listed on the right.";
+  "No pudimos reconocer el tipo de este documento. Suba un documento de alguno de los tipos aceptados que se listan a la derecha.";
 
 /** Production lesson: name what was read when the profile doesn't accept it. */
 export function notAcceptedDocumentReason(documentType: string): string {
-  return `We read this document as "${vendorDocumentTypeTitle(documentType)}", but this compliance profile does not require that document type. Please upload one of the accepted document types listed on the right.`;
+  return `Leímos este documento como "${vendorDocumentTypeTitle(documentType)}", pero este perfil de cumplimiento no requiere ese tipo de documento. Suba un documento de alguno de los tipos aceptados que se listan a la derecha.`;
 }
 
 /** Accept an object as-is; parse a JSON-encoded object string; else null. */

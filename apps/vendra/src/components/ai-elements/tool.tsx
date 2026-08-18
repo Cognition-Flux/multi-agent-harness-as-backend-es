@@ -31,27 +31,27 @@ const STATUS_CONFIG: Record<
 > = {
   "input-streaming": {
     icon: <Loader2 className="h-3 w-3 animate-spin" />,
-    label: "Pending",
+    label: "Pendiente",
     className: "text-agent bg-agent/10",
   },
   "input-available": {
     icon: <CircleDot className="h-3 w-3" />,
-    label: "Running",
+    label: "En ejecución",
     className: "text-agent bg-agent/10",
   },
   "approval-requested": {
     icon: <ShieldAlert className="h-3 w-3" />,
-    label: "Awaiting approval",
+    label: "En espera de aprobación",
     className: "text-warning bg-warning/10",
   },
   "approval-responded": {
     icon: <CheckCircle2 className="h-3 w-3" />,
-    label: "Responded",
+    label: "Respondido",
     className: "text-muted-foreground bg-muted",
   },
   "output-available": {
     icon: <CheckCircle2 className="h-3 w-3" />,
-    label: "Completed",
+    label: "Completado",
     className: "text-success bg-success/10",
   },
   "output-error": {
@@ -61,7 +61,7 @@ const STATUS_CONFIG: Record<
   },
   "output-denied": {
     icon: <XCircle className="h-3 w-3" />,
-    label: "Denied",
+    label: "Denegado",
     className: "text-destructive bg-destructive/10",
   },
 };
@@ -189,7 +189,7 @@ export function ToolInput({ input, className, ...props }: ToolInputProps) {
   return (
     <div data-slot="tool-input" className={cn("mb-2", className)} {...props}>
       <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-        Input
+        Entrada
       </p>
       <pre className="max-h-48 overflow-auto rounded-md bg-muted/50 p-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
         {JSON.stringify(input, null, 2)}
@@ -214,7 +214,7 @@ export function ToolOutput({ output, errorText, className, ...props }: ToolOutpu
       ) : (
         <div>
           <p className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-            Result
+            Resultado
           </p>
           <div className="text-xs text-muted-foreground">{output}</div>
         </div>

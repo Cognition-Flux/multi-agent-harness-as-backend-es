@@ -102,7 +102,7 @@ export async function POST(req: Request) {
   // four harness keys the app must answer with clean copy, not a throw.
   if (missingHarnessCredentialNames().length > 0) {
     return errorResponse(
-      "The assistant is unavailable right now. Please try again.",
+      "El asistente no está disponible en este momento. Intente de nuevo.",
       503,
     );
   }
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
   if (!allowed) {
     vendraWarn("assistant.rate_limited", { vendor: vendorUuid });
     return errorResponse(
-      "Too many messages — please wait a moment and try again.",
+      "Demasiados mensajes — espere un momento e intente de nuevo.",
       429,
     );
   }
@@ -157,8 +157,8 @@ export async function POST(req: Request) {
     });
     return errorResponse(
       capacityContention
-        ? "The assistant is busy while your documents are processing — try again in a moment."
-        : "The assistant is unavailable right now. Please try again.",
+        ? "El asistente está ocupado mientras se procesan sus documentos — intente de nuevo en un momento."
+        : "El asistente no está disponible en este momento. Intente de nuevo.",
       503,
     );
   }
@@ -166,7 +166,7 @@ export async function POST(req: Request) {
     refundRateLimit(`chat:${vendorUuid}`, RATE_LIMIT_WINDOW_MS);
     vendraWarn("assistant.thread_busy", { vendor: vendorUuid });
     return errorResponse(
-      "The assistant is still answering — wait for the current reply.",
+      "El asistente todavía está respondiendo — espere a que termine la respuesta en curso.",
       409,
     );
   }
@@ -226,7 +226,7 @@ export async function POST(req: Request) {
     onError: (err) => {
       const msg = err instanceof Error ? err.message : String(err);
       vendraError("assistant.stream_error", { vendor: vendorUuid, err: msg });
-      return "The assistant hit a problem answering this. Please try again.";
+      return "El asistente tuvo un problema al responder. Intente de nuevo.";
     },
     onEnd: async ({ messages }) => {
       // event.isAborted only reflects an "abort" stream part, which harness
@@ -246,7 +246,7 @@ export async function POST(req: Request) {
                   ...m,
                   parts: [
                     ...m.parts,
-                    { type: "text" as const, text: "\n\n— *interrupted*" },
+                    { type: "text" as const, text: "\n\n— *interrumpido*" },
                   ],
                 }
               : m,

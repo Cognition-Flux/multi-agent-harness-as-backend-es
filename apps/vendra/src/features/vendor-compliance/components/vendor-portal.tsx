@@ -66,7 +66,7 @@ function RegistrationForm({
     ];
     const dropped = rawTokens.filter((s) => !/^[A-Za-z]{2}$/.test(s));
     setStatesHint(
-      dropped.length > 0 ? `Ignored: ${dropped.join(", ")} — use 2-letter state codes.` : null,
+      dropped.length > 0 ? `Ignorados: ${dropped.join(", ")} — use códigos de estado de 2 letras.` : null,
     );
     try {
       const res = await fetch("/api/vendor/registration", {
@@ -95,10 +95,10 @@ function RegistrationForm({
         onSaved();
       } else {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        setSaveError(body?.error ?? "Your details could not be saved — try again.");
+        setSaveError(body?.error ?? "No se pudieron guardar sus datos — intente de nuevo.");
       }
     } catch {
-      setSaveError("Your details could not be saved — check your connection and try again.");
+      setSaveError("No se pudieron guardar sus datos — verifique su conexión e intente de nuevo.");
     } finally {
       setSaving(false);
     }
@@ -107,36 +107,36 @@ function RegistrationForm({
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Business details</CardTitle>
+        <CardTitle className="text-sm">Datos de la empresa</CardTitle>
         <p className="text-xs text-muted-foreground">
-          These drive your requirement profile — remote-only vendors skip auto and workers'-comp
-          coverage. Your EIN is never typed here: it's verified from your W-9.
+          Estos datos determinan su perfil de requisitos — los proveedores exclusivamente remotos omiten la
+          cobertura de auto y de compensación laboral. Su EIN nunca se escribe aquí: se verifica a partir de su formulario W-9.
         </p>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="reg-legal">Legal name</Label>
+          <Label htmlFor="reg-legal">Razón social</Label>
           <Input id="reg-legal" value={legalName} onChange={(e) => edit(setLegalName)(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="reg-dba">DBA / trade name</Label>
+          <Label htmlFor="reg-dba">DBA / nombre comercial</Label>
           <Input id="reg-dba" value={dbaName} onChange={(e) => edit(setDbaName)(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="reg-entity">Entity type</Label>
+          <Label htmlFor="reg-entity">Tipo de entidad</Label>
           <Input
             id="reg-entity"
-            placeholder="LLC, S-Corp, sole proprietor…"
+            placeholder="LLC, S-Corp, propietario único…"
             value={entityType}
             onChange={(e) => edit(setEntityType)(e.target.value)}
           />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="reg-naics">NAICS code</Label>
+          <Label htmlFor="reg-naics">Código NAICS</Label>
           <Input id="reg-naics" value={naicsCode} onChange={(e) => edit(setNaicsCode)(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1.5">
-          <Label htmlFor="reg-states">Work states (2-letter, comma-separated)</Label>
+          <Label htmlFor="reg-states">Estados donde trabaja (2 letras, separados por comas)</Label>
           <Input
             id="reg-states"
             placeholder="VA, MD, DC"
@@ -153,16 +153,16 @@ function RegistrationForm({
             checked={remoteOnly}
             onChange={(e) => edit(setRemoteOnly)(e.target.checked)}
           />
-          <Label htmlFor="reg-remote">Remote-only (no on-site work)</Label>
+          <Label htmlFor="reg-remote">Solo remoto (sin trabajo presencial)</Label>
         </div>
         {summary.vendor.tinLast4 ? (
           <p className="text-xs text-muted-foreground sm:col-span-2">
-            Tax ID on file: ••-•••{summary.vendor.tinLast4} (from your verified W-9)
+            Identificación fiscal registrada: ••-•••{summary.vendor.tinLast4} (de su formulario W-9 verificado)
           </p>
         ) : null}
         <div className="sm:col-span-2">
           <Button size="sm" onClick={() => void save()} disabled={saving || legalName.trim() === ""}>
-            {saving ? "Saving…" : "Save details"}
+            {saving ? "Guardando…" : "Guardar datos"}
           </Button>
           {saved ? (
             <span
@@ -170,7 +170,7 @@ function RegistrationForm({
               className="ml-2 inline-flex items-center gap-1 text-xs font-medium text-success animate-fade-in"
             >
               <CheckIcon aria-hidden className="h-3.5 w-3.5" />
-              Saved
+              Guardado
             </span>
           ) : null}
           {saveError ? (
@@ -229,11 +229,11 @@ export function VendorPortal({
         });
         if (!res.ok) {
           const body = (await res.json().catch(() => null)) as { error?: string } | null;
-          setToggleError(body?.error ?? "The change could not be saved — try again.");
+          setToggleError(body?.error ?? "No se pudo guardar el cambio — intente de nuevo.");
         }
         await refreshSummary();
       } catch {
-        setToggleError("The change could not be saved — check your connection and try again.");
+        setToggleError("No se pudo guardar el cambio — verifique su conexión e intente de nuevo.");
       } finally {
         setTogglePending(false);
       }
@@ -248,11 +248,11 @@ export function VendorPortal({
       const res = await fetch("/api/vendor/activate", { method: "POST" });
       if (!res.ok) {
         const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        setActivateError(body?.error ?? "Activation failed — try again.");
+        setActivateError(body?.error ?? "La activación falló — intente de nuevo.");
       }
       await refreshSummary();
     } catch {
-      setActivateError("Activation failed — check your connection and try again.");
+      setActivateError("La activación falló — verifique su conexión e intente de nuevo.");
     } finally {
       setActivating(false);
     }
@@ -292,7 +292,7 @@ export function VendorPortal({
             {summary.vendor.legalName}
           </h1>
           <p className="text-xs text-muted-foreground sm:text-sm">
-            Vendor compliance onboarding
+            Incorporación y cumplimiento de proveedores
           </p>
         </div>
         <div className="flex items-center gap-2 sm:gap-3">
@@ -310,7 +310,7 @@ export function VendorPortal({
                 })
             }
           >
-            Sign out
+            Cerrar sesión
           </Button>
         </div>
       </header>
@@ -322,8 +322,8 @@ export function VendorPortal({
         >
           <ClockIcon aria-hidden className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
-            Your earliest credential lapses {formatDate(renewalDueDate)} — upload a renewal
-            before then to stay compliant.
+            Su credencial más próxima a vencer expira el {formatDate(renewalDueDate)} — suba una renovación
+            antes de esa fecha para mantener el cumplimiento.
           </p>
         </div>
       ) : null}
@@ -334,11 +334,11 @@ export function VendorPortal({
 
           <Card className="bg-gradient-to-b from-primary/[0.03] to-transparent">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm">Compliance documents</CardTitle>
+              <CardTitle className="text-sm">Documentos de cumplimiento</CardTitle>
               <p className="text-xs text-muted-foreground">
-                Upload your COI, W-9, licenses, and anything else — PNG, JPEG, WebP, or PDF, up
-                to 10 MB each. Each document streams live through classification, extraction, and
-                validation.
+                Suba su COI, formulario W-9, licencias y todo lo demás — PNG, JPEG, WebP o PDF, hasta
+                10 MB cada uno. Cada documento pasa en vivo por la clasificación, la extracción y la
+                validación.
               </p>
             </CardHeader>
             <CardContent className="flex flex-col gap-3">
@@ -373,9 +373,9 @@ export function VendorPortal({
                   className={cn("h-5 w-5", dragActive ? "animate-pulse" : "")}
                 />
                 <span className="font-medium">
-                  {dragActive ? "Release to upload" : "Drop files here or click to upload"}
+                  {dragActive ? "Suelte para subir" : "Arrastre los archivos aquí o haga clic para subirlos"}
                 </span>
-                <span className="text-xs">Certificates of insurance, W-9, licenses, agreements…</span>
+                <span className="text-xs">Certificados de seguro, formulario W-9, licencias, acuerdos…</span>
               </button>
               <input
                 ref={fileInputRef}
@@ -395,14 +395,14 @@ export function VendorPortal({
                   className="rounded-lg border border-destructive/40 bg-destructive/10 p-3 animate-fade-in-up"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-medium text-destructive">Invalid files</p>
+                    <p className="text-xs font-medium text-destructive">Archivos no válidos</p>
                     <Button
                       size="sm"
                       variant="ghost"
                       className="h-6 px-2 text-[11px] text-destructive hover:bg-destructive/10 hover:text-destructive"
                       onClick={controller.clearIntakeErrors}
                     >
-                      Dismiss
+                      Descartar
                     </Button>
                   </div>
                   <div className="mt-1 flex flex-col gap-0.5">
@@ -424,10 +424,10 @@ export function VendorPortal({
                     >
                       <FileTextIcon className="h-5 w-5" />
                     </span>
-                    <p className="text-sm font-medium">No documents yet</p>
+                    <p className="text-sm font-medium">Aún no hay documentos</p>
                     <p className="max-w-xs text-xs text-muted-foreground">
-                      Drop a COI or W-9 in the zone above to start a live review — each document
-                      gets its own AI agent session.
+                      Arrastre un COI o un formulario W-9 a la zona de arriba para iniciar una revisión en
+                      vivo — cada documento obtiene su propia sesión de agente de IA.
                     </p>
                   </div>
                 ) : (
@@ -461,7 +461,7 @@ export function VendorPortal({
 
               <div className="mt-1 flex flex-wrap items-center gap-2 border-t border-border/60 pt-3">
                 <Button size="sm" variant="ghost" onClick={() => void controller.refresh()}>
-                  Refresh
+                  Actualizar
                 </Button>
                 {hasDocumentsProcessing ? (
                   <span role="status" className="inline-flex">
@@ -470,7 +470,7 @@ export function VendorPortal({
                         aria-hidden
                         className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-current"
                       />
-                      Processing {processingCount === 1 ? "1 document" : `${processingCount} documents`}…
+                      Procesando {processingCount === 1 ? "1 documento" : `${processingCount} documentos`}…
                     </Badge>
                   </span>
                 ) : null}

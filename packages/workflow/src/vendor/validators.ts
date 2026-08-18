@@ -132,7 +132,79 @@ export function parseIsoDate(value: unknown): Date | null {
 }
 
 function usdFmt(n: number): string {
-  return `$${n.toLocaleString("en-US")}`;
+  return `$${n.toLocaleString("es-419")}`;
+}
+
+/**
+ * Spanish display forms (gender-correct article embedded) for the English
+ * document labels that rule-ID strings are keyed on. Rule IDs keep the raw
+ * English label bytes (persistence/e2e contract); only rendered messages go
+ * through this map.
+ */
+const DISPLAY_LABELS: Record<string, string> = {
+  certificate: "el certificado",
+  "declarations page": "la página de declaraciones",
+  "umbrella policy": "la póliza umbrella",
+  "cyber policy": "la póliza cibernética",
+  "W-9": "el formulario W-9",
+  "W-9 certification": "la certificación del W-9",
+  "W-8BEN-E": "el formulario W-8BEN-E",
+  "W-8BEN-E certification": "la certificación del W-8BEN-E",
+  license: "la licencia",
+  certification: "la certificación",
+  "EMR letter": "la carta de EMR",
+  "OSHA 300A": "el resumen OSHA 300A",
+  "300A certification": "la certificación del 300A",
+  "SOC 2 report": "el informe SOC 2",
+  "bank letter": "la carta bancaria",
+  check: "el cheque",
+  "master services agreement": "el contrato marco de servicios",
+  "non-disclosure agreement": "el acuerdo de confidencialidad",
+};
+
+/**
+ * Spanish names for CoverageLine enum members — used in messages only; rule
+ * IDs keep the raw enum value.
+ */
+const COVERAGE_LINE_LABELS: Record<string, string> = {
+  GENERAL_LIABILITY: "responsabilidad civil general",
+  WORKERS_COMP: "compensación laboral",
+  AUTO: "auto comercial",
+  UMBRELLA: "umbrella",
+  CYBER: "responsabilidad cibernética",
+  OTHER: "otra línea",
+};
+
+const VENDOR_SIGNATURE_SUFFIX = " (vendor signature)";
+const COVERAGE_LABEL_SUFFIX = " coverage";
+
+function coverageLineLabel(line: string): string {
+  return COVERAGE_LINE_LABELS[line] ?? line.replaceAll("_", " ").toLowerCase();
+}
+
+/** Resolve a rule-ID label to its Spanish display form; raw label fallback. */
+function displayLabel(label: string): string {
+  const direct = DISPLAY_LABELS[label];
+  if (direct) return direct;
+  if (label.endsWith(VENDOR_SIGNATURE_SUFFIX)) {
+    const base = label.slice(0, -VENDOR_SIGNATURE_SUFFIX.length);
+    return `${DISPLAY_LABELS[base] ?? base} (firma del proveedor)`;
+  }
+  if (label.endsWith(COVERAGE_LABEL_SUFFIX)) {
+    const base = label.slice(0, -COVERAGE_LABEL_SUFFIX.length);
+    return `la cobertura de ${coverageLineLabel(base.replaceAll(" ", "_").toUpperCase())}`;
+  }
+  return label;
+}
+
+/** Uppercases the first letter for sentence-initial use. */
+function cap(s: string): string {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+/** "de" contraction for a display label: "el X" → "del X"; else "de X". */
+function de(display: string): string {
+  return display.startsWith("el ") ? `del ${display.slice(3)}` : `de ${display}`;
 }
 
 interface RuleBuilder {
@@ -163,7 +235,7 @@ function pushEntityNameRule(
       rule: "entity_name_match:no_vendor_on_file",
       passed: true,
       informational: true,
-      message: "No registered vendor name on file — name verification was not performed.",
+      message: "No hay un nombre de proveedor registrado en el expediente — no se realizó la verificación del nombre.",
     });
     return;
   }
@@ -172,7 +244,7 @@ function pushEntityNameRule(
       validatorId: "entity_name_match",
       rule: "entity_name_match:confirmed",
       passed: true,
-      message: `The entity named on the ${documentLabel} was confirmed to be the same business.`,
+      message: `Se confirmó que la entidad nombrada en ${displayLabel(documentLabel)} es la misma empresa.`,
       nameMatchConfidence: "clearMatch",
     });
     return;
@@ -182,7 +254,7 @@ function pushEntityNameRule(
       validatorId: "entity_name_match",
       rule: "entity_name_match:missing",
       passed: false,
-      message: `The ${documentLabel} does not show a readable business name.`,
+      message: `${cap(displayLabel(documentLabel))} no muestra un nombre de empresa legible.`,
       nameMatchConfidence: "noMatch",
     });
     return;
@@ -196,7 +268,7 @@ function pushEntityNameRule(
       validatorId: "entity_name_match",
       rule: "entity_name_match:match",
       passed: true,
-      message: `The name on the ${documentLabel} matches the registered vendor${comparison.matchedAgainst === "dba" ? " (DBA name)" : ""}.`,
+      message: `El nombre en ${displayLabel(documentLabel)} coincide con el proveedor registrado${comparison.matchedAgainst === "dba" ? " (nombre DBA)" : ""}.`,
       nameMatchConfidence: comparison.confidence,
     });
     return;
@@ -205,7 +277,7 @@ function pushEntityNameRule(
     validatorId: "entity_name_match",
     rule: "entity_name_match:mismatch",
     passed: false,
-    message: `The name on the ${documentLabel} ("${extractedName}") does not match the registered vendor ("${vendor.legalName}").`,
+    message: `El nombre en ${displayLabel(documentLabel)} ("${extractedName}") no coincide con el proveedor registrado ("${vendor.legalName}").`,
     nameMatchConfidence: comparison.confidence,
   });
 }
@@ -225,7 +297,7 @@ function pushInForceRule(
       validatorId: "policy_in_force",
       rule: `policy_in_force:${label}:no_expiration`,
       passed: false,
-      message: `The ${label} shows no readable expiration date.`,
+      message: `${cap(displayLabel(label))} no muestra una fecha de vencimiento legible.`,
     });
     return;
   }
@@ -234,7 +306,7 @@ function pushInForceRule(
       validatorId: "policy_in_force",
       rule: `policy_in_force:${label}:expired`,
       passed: false,
-      message: `The ${label} expired on ${exp.toISOString().slice(0, 10)}.`,
+      message: `${cap(displayLabel(label))} venció el ${exp.toISOString().slice(0, 10)}.`,
     });
     return;
   }
@@ -243,7 +315,7 @@ function pushInForceRule(
       validatorId: "policy_in_force",
       rule: `policy_in_force:${label}:not_yet_effective`,
       passed: false,
-      message: `The ${label} is not effective until ${eff.toISOString().slice(0, 10)}.`,
+      message: `${cap(displayLabel(label))} no entra en vigor hasta el ${eff.toISOString().slice(0, 10)}.`,
     });
     return;
   }
@@ -251,7 +323,7 @@ function pushInForceRule(
     validatorId: "policy_in_force",
     rule: `policy_in_force:${label}`,
     passed: true,
-    message: `The ${label} is currently in force (expires ${exp.toISOString().slice(0, 10)}).`,
+    message: `${cap(displayLabel(label))} está actualmente en vigor (vence el ${exp.toISOString().slice(0, 10)}).`,
   });
 }
 
@@ -273,7 +345,7 @@ function pushLimitRule(
       rule: `limit_meets_threshold:${line}:unreadable`,
       passed: true,
       informational: true,
-      message: `No readable per-occurrence limit for ${line.replaceAll("_", " ").toLowerCase()} — the coverage review will decide.`,
+      message: `No hay un límite por ocurrencia legible para ${coverageLineLabel(line)} — la revisión de cobertura lo decidirá.`,
     });
     return;
   }
@@ -282,7 +354,7 @@ function pushLimitRule(
       validatorId: "limit_meets_threshold",
       rule: `limit_meets_threshold:${line}`,
       passed: true,
-      message: `${line.replaceAll("_", " ").toLowerCase()} limit ${usdFmt(occurrence)} meets the required ${usdFmt(requiredUsd)}.`,
+      message: `El límite de ${coverageLineLabel(line)} de ${usdFmt(occurrence)} cumple con el requerido de ${usdFmt(requiredUsd)}.`,
     });
     return;
   }
@@ -291,7 +363,7 @@ function pushLimitRule(
     rule: `limit_meets_threshold:${line}:below`,
     passed: true,
     informational: true,
-    message: `${line.replaceAll("_", " ").toLowerCase()} limit ${usdFmt(occurrence)} is below the required ${usdFmt(requiredUsd)} — stacked umbrella/excess coverage may still satisfy it.`,
+    message: `El límite de ${coverageLineLabel(line)} de ${usdFmt(occurrence)} está por debajo del requerido de ${usdFmt(requiredUsd)} — la cobertura acumulada de pólizas umbrella o de exceso aún podría satisfacerlo.`,
   });
 }
 
@@ -309,7 +381,7 @@ function pushSignedRule(
       validatorId: "is_signed",
       rule: `is_signed:${label}`,
       passed: true,
-      message: `The ${label} is signed.`,
+      message: `${cap(displayLabel(label))} cuenta con firma.`,
     });
     return;
   }
@@ -319,7 +391,7 @@ function pushSignedRule(
       rule: `is_signed:${label}:missing`,
       passed: true,
       informational: true,
-      message: `No signature is visible on the ${label}.`,
+      message: `No se observa una firma en ${displayLabel(label)}.`,
     });
     return;
   }
@@ -327,7 +399,7 @@ function pushSignedRule(
     validatorId: "is_signed",
     rule: `is_signed:${label}:missing`,
     passed: false,
-    message: `The ${label} is not signed. Please upload a signed copy.`,
+    message: `${cap(displayLabel(label))} no tiene firma. Por favor, suba una copia firmada.`,
   });
 }
 
@@ -406,7 +478,7 @@ function validateAcord25(
       validatorId: "field_present",
       rule: "field_present:coverage_lines",
       passed: false,
-      message: "No coverage lines could be read from the certificate.",
+      message: "No se pudieron leer líneas de cobertura del certificado.",
     });
   }
   for (const line of lines) {
@@ -427,7 +499,7 @@ function validateAcord25(
         validatorId: "endorsement_present",
         rule: "endorsement_present:additional_insured",
         passed: true,
-        message: "Additional-insured status is indicated on the certificate.",
+        message: "La condición de asegurado adicional está indicada en el certificado.",
       });
     } else if (ai === false) {
       b.push({
@@ -435,14 +507,14 @@ function validateAcord25(
         rule: "endorsement_present:additional_insured:absent",
         passed: false,
         message:
-          "The certificate indicates the certificate holder is NOT an additional insured — an additional-insured endorsement is required.",
+          "El certificado indica que el titular del certificado NO es un asegurado adicional — se requiere un endoso de asegurado adicional.",
       });
     } else if (vendor?.blanketEndorsementConfirmed) {
       b.push({
         validatorId: "endorsement_present",
         rule: "endorsement_present:additional_insured:confirmed",
         passed: true,
-        message: "A blanket additional-insured endorsement was confirmed to apply.",
+        message: "Se confirmó que aplica un endoso general (blanket) de asegurado adicional.",
       });
     } else if (vendor?.blanketEndorsementDenied) {
       b.push({
@@ -450,7 +522,7 @@ function validateAcord25(
         rule: "endorsement_present:additional_insured:denied",
         passed: false,
         message:
-          "You confirmed no blanket additional-insured endorsement applies — an additional-insured endorsement is required.",
+          "Usted confirmó que no aplica ningún endoso general (blanket) de asegurado adicional — se requiere un endoso de asegurado adicional.",
       });
     } else {
       b.push({
@@ -459,7 +531,7 @@ function validateAcord25(
         passed: true,
         informational: true,
         message:
-          "The certificate does not state additional-insured status — confirm whether a blanket endorsement applies.",
+          "El certificado no indica la condición de asegurado adicional — confirme si aplica un endoso general (blanket).",
       });
     }
   }
@@ -471,13 +543,13 @@ function validateAcord25(
             validatorId: "endorsement_present",
             rule: "endorsement_present:waiver_of_subrogation",
             passed: true,
-            message: "A waiver of subrogation is indicated.",
+            message: "Se indica una renuncia a la subrogación.",
           }
         : {
             validatorId: "endorsement_present",
             rule: "endorsement_present:waiver_of_subrogation:absent",
             passed: false,
-            message: "A waiver of subrogation is required but not indicated.",
+            message: "Se requiere una renuncia a la subrogación, pero no está indicada.",
           },
     );
   }
@@ -494,8 +566,8 @@ function validateAcord25(
       informational: match?.confidence === "clearMatch" ? undefined : true,
       message:
         match?.confidence === "clearMatch"
-          ? "The certificate holder names the buying organization."
-          : "The certificate holder does not clearly name the buying organization — request a reissued certificate if needed.",
+          ? "El titular del certificado nombra a la organización compradora."
+          : "El titular del certificado no nombra claramente a la organización compradora — solicite un certificado reemitido si es necesario.",
     });
   }
 
@@ -549,8 +621,8 @@ function validatePolicyDoc(
       informational: schedule.length === 0 ? true : undefined,
       message:
         schedule.length > 0
-          ? `The umbrella schedules ${schedule.length} underlying ${schedule.length === 1 ? "policy" : "policies"}.`
-          : "No schedule of underlying policies is visible — the coverage review will need to confirm the umbrella sits over the general-liability policy.",
+          ? `La póliza umbrella lista ${schedule.length} ${schedule.length === 1 ? "póliza subyacente" : "pólizas subyacentes"}.`
+          : "No se observa un listado de pólizas subyacentes — la revisión de cobertura deberá confirmar que la umbrella se apoya sobre la póliza de responsabilidad civil general.",
     });
   }
   if (kind === "cyber") {
@@ -573,13 +645,13 @@ function validateW9(
           validatorId: "tin_present_and_masked",
           rule: "tin_present_and_masked",
           passed: true,
-          message: "A taxpayer identification number is present.",
+          message: "El documento incluye un número de identificación del contribuyente.",
         }
       : {
           validatorId: "tin_present_and_masked",
           rule: "tin_present_and_masked:missing",
           passed: false,
-          message: "No readable taxpayer identification number — Part I must be completed.",
+          message: "No hay un número de identificación del contribuyente legible — la Parte I debe estar completa.",
         },
   );
   if (bool(data, "tin_fully_visible") === true) {
@@ -589,7 +661,7 @@ function validateW9(
       passed: true,
       informational: true,
       message:
-        "The document shows the full unmasked TIN — only the last four digits were recorded.",
+        "El documento muestra el TIN completo sin enmascarar — solo se registraron los últimos cuatro dígitos.",
     });
   }
   pushSignedRule(b, bool(data, "signature_present"), data.signature_date, "W-9 certification");
@@ -608,13 +680,13 @@ function validateW8(
           validatorId: "field_present",
           rule: "field_present:country_of_incorporation",
           passed: true,
-          message: "The country of incorporation is stated.",
+          message: "El país de constitución está indicado.",
         }
       : {
           validatorId: "field_present",
           rule: "field_present:country_of_incorporation:missing",
           passed: false,
-          message: "The country of incorporation could not be read.",
+          message: "No se pudo leer el país de constitución.",
         },
   );
   pushSignedRule(
@@ -646,13 +718,13 @@ function validateBusinessLicense(
             validatorId: "jurisdiction_match",
             rule: "jurisdiction_match",
             passed: true,
-            message: `The license jurisdiction (${state.toUpperCase()}) matches a registered work state.`,
+            message: `La jurisdicción de la licencia (${state.toUpperCase()}) coincide con un estado de trabajo registrado.`,
           }
         : {
             validatorId: "jurisdiction_match",
             rule: "jurisdiction_match:mismatch",
             passed: false,
-            message: `The license is issued in ${state.toUpperCase()}, which is not one of the registered work states (${workStates.join(", ")}).`,
+            message: `La licencia fue emitida en ${state.toUpperCase()}, que no es uno de los estados de trabajo registrados (${workStates.join(", ")}).`,
           },
     );
   } else {
@@ -661,7 +733,7 @@ function validateBusinessLicense(
       rule: "jurisdiction_match:unverified",
       passed: true,
       informational: true,
-      message: "Jurisdiction could not be verified against the registered work states.",
+      message: "No se pudo verificar la jurisdicción contra los estados de trabajo registrados.",
     });
   }
   return b.rules;
@@ -681,8 +753,8 @@ function validateDiversityCert(
     passed: true,
     informational: str(data, "certifying_body") ? undefined : true,
     message: str(data, "certifying_body")
-      ? `Issued by ${str(data, "certifying_body")}.`
-      : "The certifying body could not be read.",
+      ? `Emitida por ${str(data, "certifying_body")}.`
+      : "No se pudo leer el organismo certificador.",
   });
   return b.rules;
 }
@@ -701,21 +773,21 @@ function validateEmrLetter(
       validatorId: "emr_within_bound",
       rule: "emr_within_bound:unreadable",
       passed: false,
-      message: "The EMR value could not be read from the letter.",
+      message: "No se pudo leer el valor de EMR de la carta.",
     });
   } else if (emr <= thresholds.emrMax) {
     b.push({
       validatorId: "emr_within_bound",
       rule: "emr_within_bound",
       passed: true,
-      message: `EMR ${emr.toFixed(2)} is within the required maximum of ${thresholds.emrMax.toFixed(2)}.`,
+      message: `El EMR ${emr.toFixed(2)} está dentro del máximo requerido de ${thresholds.emrMax.toFixed(2)}.`,
     });
   } else {
     b.push({
       validatorId: "emr_within_bound",
       rule: "emr_within_bound:above",
       passed: false,
-      message: `EMR ${emr.toFixed(2)} exceeds the required maximum of ${thresholds.emrMax.toFixed(2)}.`,
+      message: `El EMR ${emr.toFixed(2)} excede el máximo requerido de ${thresholds.emrMax.toFixed(2)}.`,
     });
   }
   const letterDate = parseIsoDate(data.letter_date);
@@ -726,8 +798,8 @@ function validateEmrLetter(
       rule: recent ? "report_recent:emr_letter" : "report_recent:emr_letter:stale",
       passed: recent,
       message: recent
-        ? "The letter is less than 12 months old."
-        : "The letter is more than 12 months old — request a current-year EMR letter.",
+        ? "La carta tiene menos de 12 meses de antigüedad."
+        : "La carta tiene más de 12 meses de antigüedad — solicite una carta de EMR del año en curso.",
     });
   } else {
     b.push({
@@ -735,7 +807,7 @@ function validateEmrLetter(
       rule: "report_recent:emr_letter:undated",
       passed: true,
       informational: true,
-      message: "The letter date could not be read.",
+      message: "No se pudo leer la fecha de la carta.",
     });
   }
   return b.rules;
@@ -756,14 +828,14 @@ function validateOsha300a(
       validatorId: "report_recent",
       rule: "report_recent:osha_300a",
       passed: true,
-      message: `Covers calendar year ${parsedYear}.`,
+      message: `Cubre el año calendario ${parsedYear}.`,
     });
   } else {
     b.push({
       validatorId: "report_recent",
       rule: "report_recent:osha_300a:stale",
       passed: false,
-      message: `The summary covers ${year ?? "an unreadable year"} — the most recent year's summary is required.`,
+      message: `El resumen cubre ${year ?? "un año ilegible"} — se requiere el resumen del año más reciente.`,
     });
   }
   pushSignedRule(b, bool(data, "certified_by_signature"), null, "300A certification", {
@@ -786,21 +858,21 @@ function validateSoc2(
       validatorId: "report_recent",
       rule: "report_recent:soc2:undated",
       passed: false,
-      message: "The report period could not be read.",
+      message: "No se pudo leer el período del informe.",
     });
   } else if (monthsBetween(anchor, now) <= thresholds.soc2MaxAgeMonths) {
     b.push({
       validatorId: "report_recent",
       rule: "report_recent:soc2",
       passed: true,
-      message: `The report period ends within the last ${thresholds.soc2MaxAgeMonths} months.`,
+      message: `El período del informe termina dentro de los últimos ${thresholds.soc2MaxAgeMonths} meses.`,
     });
   } else {
     b.push({
       validatorId: "report_recent",
       rule: "report_recent:soc2:stale",
       passed: false,
-      message: `The report is older than ${thresholds.soc2MaxAgeMonths} months — a current report (or bridge letter) is required.`,
+      message: `El informe tiene más de ${thresholds.soc2MaxAgeMonths} meses de antigüedad — se requiere un informe vigente (o una carta puente).`,
     });
   }
   const opinion = str(data, "opinion")?.toLowerCase() ?? null;
@@ -809,7 +881,13 @@ function validateSoc2(
       validatorId: "field_present",
       rule: "field_present:opinion:adverse",
       passed: false,
-      message: `The auditor issued a ${opinion} opinion.`,
+      message: `El auditor emitió ${
+        opinion === "adverse"
+          ? "una opinión adversa"
+          : opinion === "disclaimer"
+            ? "una abstención de opinión"
+            : `una opinión de tipo "${opinion}"`
+      }.`,
     });
   } else if (opinion === "qualified") {
     b.push({
@@ -817,7 +895,7 @@ function validateSoc2(
       rule: "field_present:opinion:qualified",
       passed: true,
       informational: true,
-      message: "The auditor issued a qualified opinion — review the exceptions.",
+      message: "El auditor emitió una opinión con salvedades — revise las excepciones.",
     });
   }
   return b.rules;
@@ -847,13 +925,13 @@ function validateBankLetter(
           validatorId: "field_present",
           rule: "field_present:account_last4",
           passed: true,
-          message: "An account reference is present (last four digits recorded).",
+          message: "Hay una referencia de cuenta (se registraron los últimos cuatro dígitos).",
         }
       : {
           validatorId: "field_present",
           rule: "field_present:account_last4:missing",
           passed: false,
-          message: "No readable account reference on the letter.",
+          message: "No hay una referencia de cuenta legible en la carta.",
         },
   );
   pushSignedRule(b, bool(data, "signature_present"), null, "bank letter");
@@ -865,8 +943,8 @@ function validateBankLetter(
     informational: letterDate && monthsBetween(letterDate, now) <= 12 ? undefined : true,
     message:
       letterDate && monthsBetween(letterDate, now) <= 12
-        ? "The letter is less than 12 months old."
-        : "The letter is undated or more than 12 months old.",
+        ? "La carta tiene menos de 12 meses de antigüedad."
+        : "La carta no tiene fecha o tiene más de 12 meses de antigüedad.",
   });
   return b.rules;
 }
@@ -883,13 +961,13 @@ function validateVoidCheck(
           validatorId: "field_present",
           rule: "field_present:account_last4",
           passed: true,
-          message: "An account reference is present (last four digits recorded).",
+          message: "Hay una referencia de cuenta (se registraron los últimos cuatro dígitos).",
         }
       : {
           validatorId: "field_present",
           rule: "field_present:account_last4:missing",
           passed: false,
-          message: "The account number could not be read.",
+          message: "No se pudo leer el número de cuenta.",
         },
   );
   if (bool(data, "marked_void") !== true) {
@@ -898,7 +976,7 @@ function validateVoidCheck(
       rule: "field_present:marked_void",
       passed: true,
       informational: true,
-      message: "The check is not clearly marked VOID.",
+      message: "El cheque no está claramente marcado como VOID (anulado).",
     });
   }
   return b.rules;
@@ -927,13 +1005,13 @@ function validateAgreement(
             validatorId: "entity_name_match",
             rule: "entity_name_match:party",
             passed: true,
-            message: `The vendor is named as a party to the ${label}.`,
+            message: `El proveedor está nombrado como parte ${de(displayLabel(label))}.`,
           }
         : {
             validatorId: "entity_name_match",
             rule: "entity_name_match:party:mismatch",
             passed: false,
-            message: `The registered vendor is not named as a party to the ${label}.`,
+            message: `El proveedor registrado no está nombrado como parte ${de(displayLabel(label))}.`,
             nameMatchConfidence: "noMatch",
           },
     );
@@ -954,8 +1032,8 @@ function validateAgreement(
     informational: counterSigned === true ? undefined : true,
     message:
       counterSigned === true
-        ? `The ${label} is countersigned.`
-        : `The buying organization's countersignature is not visible on the ${label}.`,
+        ? `${cap(displayLabel(label))} cuenta con contrafirma.`
+        : `La contrafirma de la organización compradora no se observa en ${displayLabel(label)}.`,
   });
   return b.rules;
 }
