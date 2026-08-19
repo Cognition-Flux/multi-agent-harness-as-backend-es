@@ -401,22 +401,80 @@ Los números que da el asistente **son los mismos** que renderiza la página: am
 
 Sus instrucciones lo dicen explícitamente: **"usted nunca decide el cumplimiento"**. Puede explicar por qué un documento falló, qué falta para activar o qué significa una dispensa, pero tiene prohibido pasar por encima de una decisión del oficial, prometer un resultado o inventar un estado. Es un traductor del expediente, no un adjudicador — el complemento natural de los dos puntos HITL, no un tercero.
 
-### Memoria de largo plazo: el "sándwich de memoria"
+### Memoria de largo plazo: cómo está implementada
+
+El asistente recuerda cosas entre sesiones — no solo dentro de una conversación. Así funciona, en concreto.
+
+#### Dónde vive
+
+Una sola tabla genérica de turnos, `assistant_chat_turn`, con la forma `{ thread_id, vendor_id, message_id, role, parts, metadata, created_at }` y `UNIQUE(thread_id, message_id)`. Sobre esa misma tabla conviven **tres espacios de nombres** por proveedor, separados por el prefijo del `thread_id`:
+
+| `thread_id` | Contenido | Forma de las filas |
+|---|---|---|
+| `vendor-chat:<uuid>` | La transcripción visible del chat | Una fila por mensaje |
+| `vendor-session:<uuid>` | El estado de reanudación del harness | **Una** fila, `message_id` fijo `harness-resume-state`, escrita con *upsert* |
+| `vendor-memory:<uuid>` | **Los hechos recordados** | Una fila por hecho, `role: "memory"`, `parts: [{ type: "text", text: <hecho> }]` |
+
+La memoria está **acotada al proveedor**, no al usuario, ni a la sesión, ni al hilo de chat: sobrevive a cerrar sesión, a que se destruya la sesión del harness y a que se pode la transcripción. Solo desaparece si se borra el proveedor (`ON DELETE CASCADE`). El `id` serial de la tabla es el desempate monotónico para ordenar y podar cuando dos filas caen en el mismo instante.
+
+#### El ciclo completo — el "sándwich de memoria"
 
 ```
-antes del turno │ recallMemory()  → hechos recordados se inyectan en <long_term_memory>
-    el turno    │ el agente responde y, si corresponde, llama rememberFacts()
-después        │ los hechos se redactan (PII), se deduplican, se guardan y se podan
+ANTES del turno  │ ¿sesión fresca? → recallMemory() → bloque <long_term_memory> en el prompt
+DURANTE el turno │ el agente conversa y, si el proveedor le contó algo duradero,
+                 │ llama a la herramienta rememberFacts(...)
+                 │   host: redactar → deduplicar → insertar → podar
+DESPUÉS          │ nada que hacer: los hechos ya están en la base para la próxima sesión
 ```
 
-- Tope: **40 hechos** por proveedor; al recordar, máximo **20 hechos y 2.000 caracteres** (lo que se agote primero), seleccionados del más nuevo al más viejo y re-emitidos en orden cronológico.
-- **Redacción de PII al escribir**: primero se quita el marcado (`<…>` es el vector de escape de la cerca XML del prompt), luego RUT/SSN, EIN, teléfonos y correos.
-- **Defensa contra inyección de prompt**: las instrucciones declaran explícitamente que los hechos recordados y el contenido de los documentos son *contexto, no instrucciones*, y el texto se sanitiza otra vez al inyectarlo.
-- **Falla suave**: si la memoria no se puede leer, el chat funciona igual (devuelve `[]` y deja una línea de log — el log *es* la alarma).
+#### 1. Escritura — qué pasa exactamente al llamar `rememberFacts`
 
-### Persistencia y límites
+1. **Validación en el borde:** el esquema zod acepta entre **1 y 5 hechos por llamada**, cada uno de **1 a 300 caracteres**.
+2. **Redacción de PII**, en este orden exacto — y el orden importa:
+   1. marcado `<…>` y después cualquier `<` o `>` suelto → espacio. *(Un hecho guardado vuelve a entrar al prompt dentro de una cerca XML: los ángulos son el vector de escape.)*
+   2. dígitos con forma de identificador personal → `[redacted-ssn]`. *(Antes que el detector de teléfonos alcance a comérselos.)*
+   3. EIN en forma con guion → `[redacted-ein]`. *(La forma de nueve dígitos corridos se deja pasar a propósito: es indistinguible de cualquier otro identificador.)*
+   4. teléfonos → `[redacted-phone]`
+   5. correos → `[redacted-email]`
+   6. colapso de espacios múltiples y recorte.
+3. **Deduplicación:** se cargan los hechos ya almacenados, se normalizan a minúsculas sin espacios extremos y se descarta todo lo que ya esté. Es una comparación **literal**, no semántica: la regla es predecible y auditable.
+4. **Inserción** con `onConflictDoNothing` sobre `(thread_id, message_id)`, donde el `message_id` es un uuid generado en el host — un reintento del turno no puede duplicar un hecho.
+5. **Poda:** se borran las filas más viejas fuera de las **40 más recientes** por `(created_at DESC, id DESC)`.
+6. La herramienta le devuelve `{ stored: n }` al agente: sabe cuántos quedaron realmente guardados en vez de suponerlo.
 
-Transcripción, estado de reanudación y hechos viven en la tabla `assistant_chat_turn` de esta misma base, en tres espacios de nombres por `thread_id` (`vendor-chat:` / `vendor-session:` / `vendor-memory:`), con `UNIQUE(thread_id, message_id)` como frontera de idempotencia. La identidad se implica por cookie: la sesión de better-auth nombra al proveedor — **el cuerpo del request nunca**. Límite: 20 turnos por proveedor cada 5 minutos, con devolución del cupo si el turno se rechaza. A diferencia del carril de documentos, aquí el abort **sí** compone `req.signal`: un turno de chat solo le importa a quien lo está mirando. La pregunta del usuario se pre-persiste de forma optimista, así un turno abandonado nunca pierde lo que se escribió.
+#### 2. Recuperación — cuándo se inyecta, y cuánto
+
+- **Solo cuando la sesión arranca fresca.** Si el turno reanudó una sesión estacionada, los hechos ya viven en el historial de esa sesión; reinyectarlos sería duplicarlos y gastar contexto. La ruta consulta `isFreshSession` y solo entonces llama a `recallMemory()`.
+- **La selección tiene dos topes y gana el que se agote primero:** se leen hasta 40 hechos en orden cronológico, se toman los **20 más recientes**, y de esos se acumulan **del más nuevo al más viejo** hasta llegar a **2.000 caracteres**. En la práctica manda el tope de caracteres.
+- Lo seleccionado se **re-emite en orden cronológico**, para que el modelo lea la historia del proveedor en el orden en que ocurrió.
+- Se inyecta en el prompt del turno dentro de una cerca `<long_term_memory>`, con cada hecho **sanitizado otra vez** y recortado a 300 caracteres — defensa en profundidad, aunque ya se haya redactado al escribir.
+- Las instrucciones de la sesión declaran explícitamente que ese bloque es **contexto, no instrucciones**: nada de lo que diga un hecho recordado puede cambiar las reglas del asistente.
+
+#### 3. Qué no se guarda
+
+La descripción de la herramienta y las instrucciones lo acotan: **solo hechos que el proveedor dijo sobre su negocio** (circunstancias, preferencias, correcciones que hizo). Nunca lo que el asistente respondió o recomendó, nunca contenido de documentos, nunca identificadores tributarios, teléfonos ni correos. Si algo se cuela igual, la redacción del paso 2 lo ataja.
+
+#### 4. Falla suave en las dos direcciones
+
+Una lectura fallida devuelve `[]` y el chat sigue funcionando sin memoria; una escritura fallida devuelve `0` y el turno continúa. Ninguna rompe el stream en vivo, y las dos dejan su línea de log (`assistant.memory_recall_failed` / `assistant.memory_write_failed`) — el log **es** la alarma, porque una memoria que muere en silencio es la trampa operativa clásica.
+
+#### Los topes, de una mirada
+
+| Límite | Valor | Dónde está definido |
+|---|---|---|
+| Hechos por llamada a la herramienta | 1–5 | `rememberFactsInputSchema` (zod) |
+| Largo de un hecho al escribirlo | 1–300 caracteres | `rememberFactsInputSchema` (zod) |
+| Hechos almacenados por proveedor | **40** (más allá se poda) | `MAX_STORED_FACTS` |
+| Hechos considerados al recordar | 20 | `RECALL_MAX_FACTS` |
+| Caracteres inyectados en el prompt | 2.000 | `RECALL_MAX_CHARS` |
+| Largo de un hecho al inyectarlo | 300 caracteres | `sanitizeInline` |
+| Mensajes de transcripción conservados | 80 | `ASSISTANT_HISTORY_LIMIT` |
+
+`server/assistant/memory.ts` es el **único** módulo que sabe cómo se guardan los hechos: hacia afuera solo expone `recallMemory()` y `rememberFacts()`. Si algún día cambia el almacenamiento, ese archivo es la costura — nadie más se entera.
+
+### Identidad, límites y desconexión
+
+La identidad se implica por cookie: la sesión de better-auth nombra al proveedor — **el cuerpo del request nunca**. Límite: 20 turnos por proveedor cada 5 minutos, con devolución del cupo si el turno se rechaza. Cada escritura en `assistant_chat_turn` cae sobre `UNIQUE(thread_id, message_id)`, que es la frontera de idempotencia de los tres espacios de nombres: la transcripción se inserta con `onConflictDoNothing` y el estado de reanudación es un *upsert* sobre un `message_id` fijo, así que un reintento nunca duplica ni pisa. A diferencia del carril de documentos, aquí el abort **sí** compone `req.signal`: un turno de chat solo le importa a quien lo está mirando. La pregunta del usuario se pre-persiste de forma optimista, así un turno abandonado nunca pierde lo que se escribió, y la transcripción se poda a los 80 mensajes más recientes desde el `onEnd` del stream, en modo tolerante a fallos.
 
 ---
 
@@ -558,15 +616,17 @@ En AWS real basta con no definir los endpoints: la resolución por defecto toma 
 
 Un paquete con **cero** imports de `ai`, de proveedores o de red, por contrato. Ahí vive todo lo que decide: catálogo de documentos, esquemas de extracción, validadores, mapa documento→categoría, matemática de la compuerta de activación, trazabilidad de requisitos, comparación difusa de nombres de entidad —el motor que determina **cuándo hay que abrir una ventana HITL**— y el núcleo de la determinación de cobertura. Es puro y con el `now` inyectado, así el barrido de vencimientos puede evaluarlo como simple aritmética.
 
-### Qué NO usa Vendra: mem0 y Qdrant
+### El conjunto de dependencias externas: exactamente dos
 
-Vale la pena decirlo explícitamente, porque suele preguntarse:
+Vale la pena decirlo explícitamente, porque explica muchas decisiones de este repo:
 
-> **mem0 y Qdrant no están en el código de la aplicación.** No aparecen en `package.json`, no hay contenedor para ellos y no hay ningún import. Existen únicamente como *skills* de referencia para el entorno de desarrollo, en `.claude/skills/`.
+> **Vendra depende de dos servicios externos y de ninguno más: la API de Anthropic (detrás de Claude Code) y Vercel Sandbox.** Ambos son llamadas de **solo egreso**. Todo lo demás —base de datos, almacenamiento de objetos, autenticación, sesiones, memoria del asistente, colas, temporizadores— corre en contenedores que este repositorio levanta y administra.
 
-La razón es la regla de dependencias del proyecto: **el conjunto de dependencias externas es exactamente dos — la API de Anthropic y Vercel Sandbox**, ambas de solo egreso. Todo lo demás corre en contenedores propios. Eso descarta de plano mem0 Platform (nube) y Qdrant Cloud, que son servicios externos. Y hay una razón técnica encima: una memoria vectorial necesita un modelo de *embeddings*, y Anthropic no publica una API de embeddings — traer un proveedor de embeddings sería agregar una tercera dependencia externa.
+Eso significa, en la práctica: sin CDN, sin fuentes remotas, sin gateway de modelos entremedio (la autenticación con Anthropic se fija de forma directa, para que ningún fallback de entorno se active solo), sin sumideros de telemetría de terceros, sin servicios gestionados de ningún tipo, y sin un segundo proveedor de modelos para tareas auxiliares.
 
-Por eso la memoria del asistente se implementó **con la forma de la frontera, pero sobre Postgres**: `recallMemory` / `rememberFacts`, con topes, deduplicación, poda y falla suave. Si algún día se adopta un motor vectorial, tendría que ser **autohospedado** (mem0 OSS con `MEM0_TELEMETRY=false`, o Qdrant self-hosted) y reemplazaría el almacenamiento **sin tocar a los llamadores**: `server/assistant/memory.ts` es exactamente esa costura.
+De ahí sale, por ejemplo, la forma de la memoria del asistente: se implementó sobre la propia base de datos de la app, con deduplicación literal y topes explícitos ([§7](#7-carril-3--el-asistente-llm-del-proveedor)), en vez de apoyarse en un servicio de memoria o en búsqueda semántica — que exigiría un modelo de *embeddings* y, con él, una tercera dependencia externa.
+
+La única excepción a esta regla es la herramienta de **desarrollo** (el propio Claude Code, sus *skills*, los servidores MCP, las pruebas en navegador): nada de eso llega al código que se despliega.
 
 ---
 
