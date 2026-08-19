@@ -1,10 +1,12 @@
 # Vendra
 
-**Onboarding de proveedores y cumplimiento continuo, adjudicado con IA — un backend construido sobre un *agent harness* de Claude Code.**
+**Onboarding de proveedores y cumplimiento continuo, adjudicado con IA — un backend construido sobre un *agent harness* de Claude Code, con el humano en el centro de las decisiones.**
 
 Un proveedor sube los documentos de cumplimiento que tenga (certificados de seguro, W-9, licencias, historial de seguridad…). **Cada documento abre su propia sesión de agente Claude Code** dentro de una MicroVM desechable en la nube: el agente lee las páginas, clasifica el documento contra un catálogo y extrae datos estructurados — todo transmitido **en vivo** al navegador. Todo lo que viene después es código determinista del host: validación, mapeo de requisitos, matemática de cobertura, bitácora de auditoría. Un segundo carril de agente resuelve la **cobertura agregada de seguros** (¿la póliza umbrella se apila sobre la de responsabilidad civil para alcanzar el límite exigido?). Y un tercer carril es el **asistente conversacional** del proveedor: el mismo harness, esta vez como chat.
 
-> **La regla de oro del proyecto:** el modelo nunca decide el cumplimiento. Solo lee documentos y responde preguntas. Las decisiones —validar, otorgar un requisito, aprobar una cuenta— las calcula código puro o las toma una persona.
+**El sistema se detiene y le pregunta a una persona en los dos puntos donde el juicio humano es insustituible.** Cuando un documento nombra a otra empresa —la póliza de la matriz, un nombre de fantasía—, el pipeline **abre una ventana HITL durable y le pregunta al proveedor** en pleno procesamiento: la pregunta sobrevive a un refresh, tiene 5 minutos de vigencia y, si nadie contesta, continúa de forma explícita y auditada en vez de quedarse bloqueada. Y del otro lado del mostrador, **el oficial de cumplimiento es quien adjudica**: dispensa validaciones fallidas, recategoriza documentos, otorga o revoca requisitos a mano, reintenta procesamientos y firma el estado final — cada acción con justificación obligatoria, alcance acotado por el servidor y una fila de auditoría escrita en la misma transacción.
+
+> **La regla de oro del proyecto:** el modelo nunca decide el cumplimiento. Solo lee documentos y responde preguntas. Las decisiones las calcula código puro y determinista, o las toma **una persona**: el proveedor en su ventana de confirmación, el oficial en su panel de adjudicación.
 
 ---
 
@@ -13,16 +15,17 @@ Un proveedor sube los documentos de cumplimiento que tenga (certificados de segu
 1. [¿Qué hace esta app? (explicación para principiantes)](#1-qué-hace-esta-app-explicación-para-principiantes)
 2. [Arranque rápido](#2-arranque-rápido-solo-necesita-docker)
 3. [La idea central: *harness* como backend](#3-la-idea-central-harness-como-backend)
-4. [Carril 1 — el pipeline por documento](#4-carril-1--el-pipeline-por-documento)
-5. [Carril 2 — la determinación de cobertura](#5-carril-2--la-determinación-de-cobertura)
-6. [Carril 3 — el asistente LLM del proveedor](#6-carril-3--el-asistente-llm-del-proveedor)
-7. [Arquitectura completa](#7-arquitectura-completa)
-8. [El rol de cada pieza del stack](#8-el-rol-de-cada-pieza-del-stack)
-9. [Versiones exactas](#9-versiones-exactas)
-10. [Modelo de datos](#10-modelo-de-datos)
-11. [Seguridad y privacidad](#11-seguridad-y-privacidad)
-12. [Desarrollo local sin Docker](#12-desarrollo-local-sin-docker)
-13. [Solución de problemas](#13-solución-de-problemas)
+4. [**Los dos puntos HITL: dónde decide una persona**](#4-los-dos-puntos-hitl-dónde-decide-una-persona)
+5. [Carril 1 — el pipeline por documento](#5-carril-1--el-pipeline-por-documento)
+6. [Carril 2 — la determinación de cobertura](#6-carril-2--la-determinación-de-cobertura)
+7. [Carril 3 — el asistente LLM del proveedor](#7-carril-3--el-asistente-llm-del-proveedor)
+8. [Arquitectura completa](#8-arquitectura-completa)
+9. [El rol de cada pieza del stack](#9-el-rol-de-cada-pieza-del-stack)
+10. [Versiones exactas](#10-versiones-exactas)
+11. [Modelo de datos](#11-modelo-de-datos)
+12. [Seguridad y privacidad](#12-seguridad-y-privacidad)
+13. [Desarrollo local sin Docker](#13-desarrollo-local-sin-docker)
+14. [Solución de problemas](#14-solución-de-problemas)
 
 ---
 
@@ -32,51 +35,57 @@ Un proveedor sube los documentos de cumplimiento que tenga (certificados de segu
 
 Antes de que una empresa grande (el *comprador*) le pague a un proveedor nuevo, alguien tiene que revisar papeles: ¿tiene seguro vigente y con el monto suficiente?, ¿entregó su formulario tributario?, ¿su licencia comercial está al día?, ¿venció algo desde la última revisión? Hoy eso lo hace una persona abriendo PDFs uno por uno. Es lento, se equivoca y no queda registro de por qué se aprobó algo.
 
-**Vendra automatiza la lectura y deja la decisión donde corresponde.**
+**Vendra automatiza la lectura y deja la decisión donde corresponde: en las personas.**
 
-### Los dos usuarios
+### Los dos usuarios — y las dos decisiones humanas
 
-| Rol | Quién es | Qué ve |
-|---|---|---|
-| **Contacto del proveedor** (`VENDOR_CONTACT`) | La empresa que quiere venderle al comprador | Su portal: sube documentos, ve el progreso en vivo, revisa qué le falta, activa su cuenta, y conversa con un asistente |
-| **Oficial de cumplimiento** (`COMPLIANCE_OFFICER`) | Quien revisa y aprueba del lado del comprador | Un panel aparte: listado de proveedores, detalle de cada uno, y las herramientas para dispensar, reclasificar, otorgar manualmente, revocar, reintentar y aprobar |
+| Rol | Quién es | Qué ve | **Su decisión HITL** |
+|---|---|---|---|
+| **Contacto del proveedor** (`VENDOR_CONTACT`) | La empresa que quiere venderle al comprador | Su portal: sube documentos, ve el progreso en vivo, revisa qué le falta y conversa con un asistente | Responde las **confirmaciones sobre sus propios documentos** (¿esta póliza de la matriz lo cubre?), marca categorías como "no aplica" y decide cuándo activar su cuenta |
+| **Oficial de cumplimiento** (`COMPLIANCE_OFFICER`) | Quien revisa y aprueba del lado del comprador | Un panel aparte: listado de proveedores, detalle completo, trazabilidad de requisitos | **Adjudica**: dispensa, recategoriza, otorga o revoca requisitos, reintenta y firma el estado final |
+
+Los dos puntos son distintos a propósito: **el proveedor aporta el conocimiento que solo él tiene** (la estructura societaria de su negocio), **el oficial aporta el criterio que solo él puede ejercer** (aceptar una excepción y hacerse responsable). El sistema no le pide a ninguno lo que le corresponde al otro. El detalle completo está en la [sección 4](#4-los-dos-puntos-hitl-dónde-decide-una-persona).
 
 ### El recorrido del proveedor, paso a paso
 
 1. **Se registra** con correo y contraseña, e ingresa los datos del negocio (nombre legal, tipo de entidad, estados donde trabaja, si es 100% remoto…). Esos datos definen su **perfil de requisitos**: por ejemplo, un proveedor totalmente remoto no necesita seguro de auto ni compensación laboral.
 2. **Sube sus documentos** (hasta 40 archivos, 10 MB cada uno; PDF o imagen). El navegador los sube directo al almacenamiento con una URL prefirmada — no pasan por el servidor de la app.
 3. **Mira el procesamiento en vivo.** Cada tarjeta de documento muestra 8 etapas (`leyendo → analizando → clasificando → extrayendo → guardando → validando → mapeando → finalizando`), el razonamiento del agente y frases cortas del tipo *"Leyendo ambas páginas de su certificado."* Todo llega por streaming, en español.
-4. **Responde una confirmación si aparece.** Si un documento nombra a otra empresa (la póliza de la matriz, un nombre de fantasía), la app se detiene y pregunta: *"¿Esta póliza de ACME Holdings cubre a su empresa?"*. Hay 5 minutos para contestar; si nadie contesta, el sistema continúa con el criterio por defecto y lo deja registrado. La pregunta sobrevive a un refresh de la página.
-5. **Ve su checklist de requisitos** — 11 categorías (identidad fiscal, responsabilidad civil, compensación laboral, auto, licencia, diversidad, seguridad, bancaria, seguridad de datos, acuerdos firmados, sanciones) — con lo que está cubierto, lo que falta y lo que se puede marcar "no aplica".
-6. **Consulta al asistente** cuando algo no le calza: *"¿Por qué falló mi certificado?"*, *"¿Qué me falta para activar?"*. El asistente consulta el estado real en el momento, no adivina.
-7. **Activa su cuenta** cuando el checklist se completa → el estado pasa a `PRE_APPROVED`.
+4. 🧑‍⚖️ **Responde la confirmación cuando aparece — este es el HITL del proveedor.** Si un documento nombra a otra empresa, la app se detiene y pregunta: *"Esta póliza nombra a «ACME Holdings» como asegurado. ¿Es esa su empresa matriz y la cobertura se extiende a su negocio?"*. Hay 5 minutos para contestar; la pregunta sobrevive a un refresh de la página y se puede responder desde otra pestaña o incluso desde otra instancia del servidor. Si nadie contesta, el sistema **continúa** con el criterio por defecto y deja registrado que fue por vencimiento — nunca se queda colgado.
+5. **Ve su checklist de requisitos** — 11 categorías (identidad fiscal, responsabilidad civil, compensación laboral, auto, licencia, diversidad, seguridad, bancaria, seguridad de datos, acuerdos firmados, sanciones) — con lo cubierto, lo que falta y lo que **él mismo** puede marcar como "no aplica" (dentro de lo que el perfil permite; nunca las categorías obligatorias).
+6. **Consulta al asistente** cuando algo no le calza: *"¿Por qué falló mi certificado?"*, *"¿Qué me falta para activar?"*. El asistente consulta el estado real en el momento, no adivina — y tiene prohibido prometer resultados o pasar por encima de una decisión del oficial.
+7. **Activa su cuenta** cuando el checklist se completa → el estado pasa a `PRE_APPROVED`. Es una acción deliberada del proveedor, y el servidor vuelve a calcular la compuerta antes de aceptarla.
 
 ### El recorrido del oficial
 
-Entra a `/vendors`, filtra el listado, abre un proveedor y ve: los requisitos con su **trazabilidad** (qué documento otorgó qué categoría), cada documento con su clasificación / datos extraídos / reglas de validación, y la determinación de cobertura con el desglose de qué póliza aportó cuánto. Desde ahí puede:
+Entra a `/vendors`, filtra el listado, abre un proveedor y ve: los requisitos con su **trazabilidad** (qué documento otorgó qué categoría), cada documento con su clasificación / datos extraídos / reglas de validación, y la determinación de cobertura con el desglose de qué póliza aportó cuánto.
 
-- **Dispensar** una validación fallida (con justificación y alcance acotado por el servidor),
-- **Reclasificar** un documento mal tipificado (crea una versión nueva; nunca sobrescribe),
-- **Otorgar manualmente** una categoría,
+🧑‍⚖️ **Desde ahí adjudica — este es el HITL del oficial.** Nada de lo que hace es automático, y nada de lo que hace queda sin registro:
+
+- **Dispensar** una validación fallida (con justificación obligatoria, fecha de vencimiento y un alcance que el servidor **recorta** a lo que esa falla realmente bloquea),
+- **Recategorizar** un documento mal tipificado (inserta una versión nueva; nunca sobrescribe la anterior),
+- **Otorgar manualmente** una categoría, reconociendo explícitamente la anulación si el documento de respaldo falló,
 - **Revocar** ese otorgamiento,
 - **Reintentar** el procesamiento,
-- **Finalizar** el estado (`APPROVED` / `NEED_REVIEW` / `REJECTED`),
+- **Firmar el estado final** (`APPROVED` / `NEED_REVIEW` / `REJECTED` / `PRE_APPROVED`), que queda sellado con su identidad y la hora,
 - **Etiquetar** al proveedor.
 
-Cada acción escribe una fila de actividad y recalcula el estado del proveedor **en la misma transacción**. Nada queda a medias.
+Cada acción escribe una fila de actividad y recalcula el estado del proveedor **en la misma transacción**. Nada queda a medias, y toda la bitácora es reconstruible.
 
 ### Y el tiempo también decide
 
-Un barrido horario revisa vencimientos: cuando un documento obligatorio caduca, el proveedor `APPROVED` pasa a `EXPIRED` solo; a 30, 14 y 1 día del vencimiento se generan avisos de renovación. Si el proveedor sube la renovación y valida, vuelve a `APPROVED` sin que un oficial tenga que tocar nada.
+Un barrido horario revisa vencimientos: cuando un documento obligatorio caduca, el proveedor `APPROVED` pasa a `EXPIRED` solo; a 30, 14 y 1 día del vencimiento se generan avisos de renovación. Si el proveedor sube la renovación y valida, vuelve a `APPROVED` **sin que un oficial tenga que tocar nada** — el HITL se reserva para lo que de verdad exige criterio.
 
 ### Glosario mínimo
 
 | Término | Qué significa aquí |
 |---|---|
+| **HITL** (*human in the loop*) | El punto donde el sistema se detiene y le pregunta a una persona. En Vendra hay dos: la confirmación del proveedor durante el procesamiento y la adjudicación del oficial en su panel |
+| **Ventana durable** | Una pregunta HITL que vive en la base de datos, no solo en memoria: sobrevive a recargas, se puede responder desde cualquier instancia y vence de forma explícita |
+| **Fail-open** | Si la ventana vence sin respuesta, el proceso **continúa** con un criterio por defecto registrado, en vez de quedarse bloqueado |
 | **Harness** | Un agente de codificación ya hecho (Claude Code) con su propio ciclo de razonamiento y herramientas. Este backend lo *arrienda* en vez de armar el loop a mano |
 | **Sandbox / MicroVM** | Una máquina virtual desechable donde corre el agente, aislada del servidor y con salida a internet restringida |
 | **Host tool** | Una herramienta que el agente llama, pero que se ejecuta en el servidor Next.js (no dentro de la VM). Así el agente pide "guarda esta clasificación" y el host decide qué hacer con eso |
-| **HITL** | *Human in the loop*: el punto donde el sistema se detiene y le pregunta a una persona |
 | **Compuerta de activación** | La matemática que decide si el proveedor puede activar su cuenta |
 | **SSE / streaming** | La técnica para que el navegador reciba el avance en vivo mientras el agente trabaja |
 
@@ -113,9 +122,9 @@ Ese único comando levanta **cinco servicios**:
 
 1. http://localhost:3000 → entre como **proveedor** (`vendor@summit-demo.test` / `VendorDemo123!`).
 2. Complete los datos del negocio y suba un COI + W-9 + licencia (o cualquier PDF/imagen). Mire el streaming.
-3. Si aparece una confirmación, respóndala (o déjela vencer: el sistema continúa).
+3. **Provoque el HITL:** suba una póliza a nombre de otra empresa (una matriz o un DBA). Aparecerá la confirmación — respóndala, o recargue la página para comprobar que sigue ahí, o déjela vencer para ver el *fail-open* en acción.
 4. Cuando el checklist se complete → **Activar cuenta** → `PRE_APPROVED`.
-5. Cierre sesión y entre como **oficial** (`officer@acme-demo.test` / `OfficerDemo123!`) → `/vendors` → abra el proveedor → dispense / reclasifique / otorgue / finalice.
+5. Cierre sesión y entre como **oficial** (`officer@acme-demo.test` / `OfficerDemo123!`) → `/vendors` → abra el proveedor → dispense, recategorice, otorgue a mano y firme el estado final. Revise después la pestaña de actividad: cada decisión suya quedó registrada con actor, hora y justificación.
 6. `docker compose down && docker compose up` → todo el estado sobrevive (volúmenes con nombre).
 
 ---
@@ -162,16 +171,16 @@ Esta es la decisión de diseño más importante del proyecto.
 │                                          │   │                                      │
 │  • Postgres, MinIO, sesiones, auth       │   │  • El CLI de Claude Code             │
 │  • Los motores puros (@vendra/workflow)  │◄──┤  • El "bridge" que habla con el host │
-│  • Las HOST TOOLS:                       │   │  • La herramienta interna `read`     │
-│      saveClassification                  │   │  • El archivo del documento          │
-│      saveExtraction                      │   │                                      │
-│      finalizeDocument   ← aquí se decide │   │  Sin shell, sin escritura, sin web.  │
-│      failDocument                        │   │  Egreso permitido SOLO hacia         │
-│                                          │   │  api.anthropic.com y *.npmjs.org     │
+│  • Las ventanas HITL del proveedor       │   │  • La herramienta interna `read`     │
+│  • Las HOST TOOLS:                       │   │  • El archivo del documento          │
+│      saveClassification                  │   │                                      │
+│      saveExtraction                      │   │  Sin shell, sin escritura, sin web.  │
+│      finalizeDocument   ← aquí se decide │   │  Egreso permitido SOLO hacia         │
+│      failDocument                        │   │  api.anthropic.com y *.npmjs.org     │
 └──────────────────────────────────────────┘   └──────────────────────────────────────┘
 ```
 
-El agente **solo** puede: leer el archivo y llamar cuatro herramientas del host. No puede escribir archivos, no puede correr comandos, no puede navegar. Y cuando llama a `finalizeDocument`, quien valida, mapea requisitos y escribe en la base es el host — con código puro y determinista.
+El agente **solo** puede: leer el archivo y llamar cuatro herramientas del host. No puede escribir archivos, no puede correr comandos, no puede navegar. Y cuando llama a `finalizeDocument`, quien valida, decide si hay que preguntarle al proveedor, mapea requisitos y escribe en la base es el host — con código puro y determinista.
 
 **Los bytes originales entran sin tocarse.** No hay rasterización ni conversión previa: el `read` interno de Claude Code abre PDFs e imágenes nativamente. Es una invariante deliberada.
 
@@ -207,11 +216,99 @@ Los 4 puertos se reparten con dos semáforos:
 - **Todo `createSession` y todo `stream` lleva `abortSignal`.** Sin excepción.
 - **Todo se transmite con `agent.stream()` envuelto en `createUIMessageStream`** — nunca `createAgentUIStreamResponse` (no hilvana la sesión del harness).
 - **Nunca `z.record` cruzando el puente del harness**: descarta las llaves dinámicas. Los esquemas usan formas explícitas.
-- **El contrato vive en un solo módulo**: `features/vendor-compliance/lib/vendor-harness-contract.ts` — etapas, constantes de subida, tipos de *data part* y esquemas zod de las herramientas. Lo importan las rutas, las herramientas del servidor y el cliente React, así el contrato del stream no puede desincronizarse entre capas.
+- **El contrato vive en un solo módulo**: `features/vendor-compliance/lib/vendor-harness-contract.ts` — etapas, constantes de subida, tipos de *data part* (incluidas las partes de confirmación HITL) y esquemas zod de las herramientas. Lo importan las rutas, las herramientas del servidor y el cliente React, así el contrato del stream no puede desincronizarse entre capas.
 
 ---
 
-## 4. Carril 1 — el pipeline por documento
+## 4. Los dos puntos HITL: dónde decide una persona
+
+Vendra automatiza la **lectura**, no el **criterio**. Hay exactamente dos lugares donde el sistema entrega el control a un ser humano, y están diseñados con reglas opuestas porque resuelven problemas opuestos.
+
+| | **HITL del proveedor** | **HITL del oficial** |
+|---|---|---|
+| **Quién decide** | El contacto del proveedor, sobre su propio negocio | El oficial de cumplimiento, sobre el expediente ajeno |
+| **Cuándo** | **Durante** el procesamiento — el pipeline está esperando | **Después**, en cualquier momento, sobre el estado ya calculado |
+| **Qué aporta** | Conocimiento que solo él tiene (estructura societaria, DBA, endosos) | Criterio y responsabilidad (aceptar una excepción y firmarla) |
+| **Si no responde** | *Fail-open*: el proceso continúa con el criterio por defecto, registrado | No hay vencimiento: el expediente simplemente espera |
+| **Superficie** | Una tarjeta de pregunta en el portal, ventana de 5 min | Siete mutaciones tRPC en el panel `/vendors` |
+| **Rastro** | Fila en `document_confirmation` con pregunta, respuesta, hora y resultado | Fila en `vendor_activity` + transición de estado, en la misma transacción |
+| **Dónde vive** | `server/harness/confirmations.ts` | `server/trpc/router.ts` |
+
+### 4.1 HITL del proveedor — la ventana de confirmación durable
+
+**Cuándo se abre.** Después de extraer, el host compara el nombre de la entidad que aparece en el documento con la razón social registrada (con comparación difusa: variantes de nombres, sufijos societarios, abreviaturas). Si no calzan, o si falta información que solo el proveedor puede aclarar, el host abre una ventana con una de tres preguntas:
+
+| Tipo | La pregunta que ve el proveedor |
+|---|---|
+| `PARENT_POLICY_COVERS_SUBSIDIARY` | *"Esta póliza nombra a «X» como asegurado. ¿Es esa su empresa matriz y la cobertura de dicha empresa se extiende a su negocio?"* |
+| `DBA_SAME_ENTITY` | *"Este documento muestra el nombre «X». ¿Se trata de la misma empresa registrada bajo su razón social (es decir, un DBA o nombre comercial)?"* |
+| `BLANKET_ENDORSEMENT_APPLIES` | *"El certificado no indica la condición de asegurado adicional. ¿Aplica a esta relación un endoso general (blanket) de asegurado adicional en la póliza?"* |
+
+**Por qué es una ventana durable y no `toolApproval` del AI SDK.** El SDK v7 trae aprobaciones de herramienta con alcance de stream. Aquí no sirven: la pregunta tiene que **sobrevivir a que el proveedor recargue la página, cambie de pestaña o vuelva 4 minutos después**, y tiene que poder resolverse desde una instancia distinta de la que está corriendo el pipeline. Por eso el patrón es otro:
+
+```
+1. El host escribe PRIMERO el registro durable (document_confirmation)
+   └── si esa escritura falla, degrada a solo-memoria; nunca bloquea el pipeline
+2. Abre la ventana: temporizador de 5 min (unref'd) + espera en memoria
+3. El proveedor responde por POST /api/vendor/documents/{uuid}/confirmation
+   └── la respuesta gana PRIMERO el registro en base, después toca al esperador local
+4. La instancia dueña también hace poll a la base cada 5 s
+   └── así llega una respuesta contestada en otra instancia
+5. Al vencer: arbitraje ATÓMICO — gana exactamente uno de {respuesta, vencimiento}
+   └── si el vencimiento pierde, es porque una respuesta llegó tarde: se adopta
+6. Resultado del vencimiento: la respuesta por defecto si se conoce,
+   si no `timeout` → FAIL-OPEN, el documento sigue procesándose
+```
+
+**Mientras tanto, el agente espera sin morirse.** El agente llama a `finalizeDocument`, el host le responde "confirmación pendiente" y el agente vuelve a llamar. Cada espera se trocea en tramos de 30 segundos para mantener vivo el bridge, y el presupuesto de turnos de la sesión se calcula con holgura explícita para eso: `28 + 2 × (ventana / 30 s)`.
+
+**Garantías de seguridad de la ventana:**
+- El `[uuid]` de la ruta debe coincidir con el documento de la confirmación: un POST cruzado **no puede** ganar la ventana de otro documento.
+- La guardia de autenticación corre **antes** de parsear el cuerpo, para no entregar un oráculo 400-vs-401 sobre la forma del payload.
+- Una corrida que ya abrió o resolvió una ventana **nunca se reintenta**: el reintento transitorio solo aplica mientras la corrida sigue siendo invisible para el proveedor.
+- Preferencia por la vivacidad sobre la consistencia: si la base falla en el arbitraje, se registra la advertencia y el pipeline continúa — jamás se cuelga un documento por un problema de base.
+
+**Los otros dos momentos del proveedor.** Además de la ventana, el proveedor toma dos decisiones propias, ambas verificadas en el servidor:
+
+- **"No aplica"**: puede descartar categorías, pero el servidor filtra la lista contra las que el perfil marca como descartables, respeta el tope `maxManualDismissable` y **nunca** deja descartar una categoría obligatoria. Una categoría descartada tampoco cuenta como satisfecha (nada de doble crédito).
+- **Activar la cuenta**: la matemática de la compuerta que corre en el cliente es solo experiencia de usuario; el servidor **la vuelve a derivar** y rechaza en tres niveles — `412` si la cobertura todavía se está determinando, `400` **nombrando** las categorías obligatorias que faltan, o `400` con el rechazo genérico por conteo. Y un proveedor en `REJECTED` no puede reactivarse solo: eso es una decisión del oficial (`EXPIRED`, en cambio, sí es autoservicio).
+
+### 4.2 HITL del oficial — la adjudicación
+
+El oficial no "revisa lo que hizo la IA": es la autoridad del expediente. Sus siete mutaciones comparten un mismo **contrato de atomicidad**, sin excepción:
+
+```
+bloqueo de fila (FOR UPDATE)
+   → mutación
+   → fila de actividad con actor y justificación
+   → recálculo del proveedor
+todo dentro de la MISMA transacción, con tramos de latencia registrados
+   → después, fuera de la transacción, dispara la determinación de cobertura
+```
+
+| Mutación | Qué hace y qué la protege |
+|---|---|
+| `waiveDocumentValidation` | **Dispensa** una validación fallida. Exige justificación (10–1000 caracteres) y fecha de vencimiento. El **alcance se recorta en el servidor**: se toma lo que ese tipo de documento podría otorgar, se cruza con lo que la falla realmente bloquea y se intersecta con la intención del oficial — por construcción, un desajuste de nombre **jamás** puede dispensar la identidad fiscal. Lleva además un seguro de concurrencia optimista: si el estado de la dispensa cambió mientras el oficial trabajaba, devuelve `CONFLICT` |
+| `reclassifyDocument` | **Recategoriza** un documento mal tipificado. Inserta `version + 1` en la tabla de extracciones — **append-only, jamás sobrescribe**. Rechaza `UNKNOWN` y rechaza cualquier tipo que el perfil del proveedor no acepte |
+| `grantManualRequirement` | **Otorga** una categoría a mano. Si el documento de respaldo falló, exige un `acknowledgeOverride` explícito: el oficial declara que sabe lo que está haciendo. Rechaza otorgar lo ya satisfecho — **salvo en las tres categorías de seguro**, donde la determinación es la única autoridad y por lo tanto el otorgamiento manual es el único remedio disponible |
+| `revokeManualRequirement` | **Revoca** un otorgamiento, con justificación. Un índice parcial único garantiza un solo otorgamiento activo por (documento, categoría) |
+| `retryDocumentProcessing` | **Reintenta** el pipeline de un documento |
+| `finalizeStatus` | **Firma el estado final** (`PRE_APPROVED` / `NEED_REVIEW` / `APPROVED` / `REJECTED`). Sella `signoffUserId` y `signoffAt`: el expediente queda con nombre y hora. Es idempotente — refirmar el mismo estado no altera el reloj de la firma |
+| `setVendorTags` | Etiqueta al proveedor para la gestión del listado |
+
+**Privacidad dentro del propio HITL:** el texto de justificación del oficial es información sensible de negocio y **nunca se escribe en los logs** — solo su largo (`noteLen`). Queda íntegro en la base, accesible desde el panel, no desparramado en la salida estándar.
+
+**Autorización:** todas viven detrás de `complianceAdminProcedure`, que resuelve la sesión en el servidor, verifica el rol y acota a la organización del oficial. Un no-oficial recibe `NOT_FOUND`, no `FORBIDDEN` — el sistema no filtra ni siquiera la existencia del expediente.
+
+### 4.3 Lo que el HITL *no* es
+
+- **No es una aprobación ciega de lo que dijo el modelo.** El agente nunca propone "apruebo/rechazo": propone una clasificación y unos datos. Lo que se valida, se mapea y se aprueba es responsabilidad del código puro y del oficial.
+- **No es un cuello de botella.** El HITL del proveedor solo se abre cuando hay una ambigüedad real de identidad, y vence solo. Las renovaciones rutinarias se resuelven sin intervención de nadie.
+- **No es opcional en su rastro.** Toda respuesta y toda adjudicación quedan en la base con actor, hora, justificación y resultado. La pregunta "¿por qué este proveedor está aprobado?" siempre tiene respuesta.
+
+---
+
+## 5. Carril 1 — el pipeline por documento
 
 ```
 Navegador                     Host (Next.js)                        MicroVM
@@ -234,8 +331,10 @@ Navegador                     Host (Next.js)                        MicroVM
    │                                │◄── saveExtraction ───────────────│ extrae campos
    │                                │◄── finalizeDocument ─────────────│
    │                                │ 5. valida (código puro)          │
-   │  ¿pregunta HITL? ◄─────────────│ 6. compara nombres de entidad    │
-   │  respuesta ───────────────────►│    → ventana de 5 min            │
+   │                                │ 6. compara nombres de entidad    │
+   │ 🧑‍⚖️ HITL ◄────────────────────│    → ventana durable de 5 min    │
+   │ respuesta ───────────────────►│      (el agente reintenta        │
+   │  (o vence → fail-open)         │       finalizeDocument cada 30s) │
    │                                │ 7. mapea requisitos              │
    │                                │ 8. CAS: →PROCESSED / FAILED      │
    │                                │ 9. recalcula el proveedor        │
@@ -245,14 +344,14 @@ Navegador                     Host (Next.js)                        MicroVM
 Puntos finos que importan:
 
 - **CAS en cada reclamo y cada terminal** (*compare-and-swap*): dos clics simultáneos o el conserje automático nunca pueden procesar dos veces ni pisar un estado final.
-- **Semántica de desconexión:** el `abortSignal` de la ruta **excluye a propósito `req.signal`** — cerrar la pestaña no debe matar el procesamiento. El cliente se re-sincroniza con un *poll* de snapshot cada 10 s.
-- **Recuperación transitoria:** si la sesión se cae y todavía no se escribió nada hacia el proveedor (sin terminal, sin ventana HITL abierta), se reintenta en una sesión nueva. Si ya hubo efectos, no se reintenta.
+- **Semántica de desconexión:** el `abortSignal` de la ruta **excluye a propósito `req.signal`** — cerrar la pestaña no debe matar el procesamiento, y menos aún abandonar una ventana HITL abierta. El cliente se re-sincroniza con un *poll* de snapshot cada 10 s, y la pregunta pendiente reaparece.
+- **Recuperación transitoria:** si la sesión se cae y todavía no se escribió nada hacia el proveedor (sin terminal, **sin ventana HITL abierta ni resuelta**), se reintenta en una sesión nueva. Si ya hubo efectos visibles para la persona, no se reintenta.
 - **El catálogo manda:** 17 tipos de documento (16 reales + `UNKNOWN`), y el agente solo puede elegir entre los tipos que el perfil del proveedor exige. Las descripciones de cada campo del esquema (`.describe()` en Zod) **son literalmente** las instrucciones de extracción que recibe el modelo.
 - **Sin fallo silencioso:** si la corrida termina sin estado final, el host escribe la falla con una razón accionable en español.
 
 ---
 
-## 5. Carril 2 — la determinación de cobertura
+## 6. Carril 2 — la determinación de cobertura
 
 Un certificado de seguro rara vez alcanza solo: la póliza primaria da 1 M USD, la umbrella agrega 4 M encima, y el requisito es 5 M. Decidir eso exige leer varios documentos juntos.
 
@@ -264,13 +363,13 @@ Disciplina de este carril:
 - **Caché por firma:** un hash del conjunto de entradas corta las recorridas idénticas; la firma lleva un eje de versión (la palanca para purgar la política).
 - **Fail-open explícito:** tras 3 intentos se persiste un registro `UNDETERMINED`. Los lectores muestran "sin determinar", **nunca** una cifra vieja disfrazada de fresca.
 - **El host es la autoridad:** el validador rebota los payloads malos de vuelta al agente, y las cifras persistidas se re-derivan de las contribuciones.
-- **Solo la determinación otorga** las tres categorías de seguro. Un documento suelto no puede otorgarlas por su cuenta — por eso el otorgamiento manual del oficial siempre está permitido en esas categorías: es su único remedio.
+- **Solo la determinación otorga** las tres categorías de seguro. Un documento suelto no puede otorgarlas por su cuenta — y por eso, como se explicó en §4.2, el otorgamiento manual del oficial siempre está permitido ahí: es su único remedio cuando la máquina no alcanza a concluir.
 
 El progreso se ve en vivo en el navegador con un `useChat` de solo-adjuntar que reconecta al stream GET (`resumeStream()` + `prepareReconnectToStreamRequest`).
 
 ---
 
-## 6. Carril 3 — el asistente LLM del proveedor
+## 7. Carril 3 — el asistente LLM del proveedor
 
 Un cajón de chat plegable en el portal. Por dentro es **el mismo harness**, y ahí está lo interesante.
 
@@ -298,6 +397,10 @@ Además hay un *try-lock* por proveedor: un segundo turno simultáneo en el mism
 
 Los números que da el asistente **son los mismos** que renderiza la página: ambas superficies derivan del mismo módulo de snapshot. Toda herramienta falla suave (`{ ok: false, note }`); una excepción mataría el stream en vivo.
 
+### El asistente también respeta el HITL
+
+Sus instrucciones lo dicen explícitamente: **"usted nunca decide el cumplimiento"**. Puede explicar por qué un documento falló, qué falta para activar o qué significa una dispensa, pero tiene prohibido pasar por encima de una decisión del oficial, prometer un resultado o inventar un estado. Es un traductor del expediente, no un adjudicador — el complemento natural de los dos puntos HITL, no un tercero.
+
 ### Memoria de largo plazo: el "sándwich de memoria"
 
 ```
@@ -317,18 +420,20 @@ Transcripción, estado de reanudación y hechos viven en la tabla `assistant_cha
 
 ---
 
-## 7. Arquitectura completa
+## 8. Arquitectura completa
 
 ```mermaid
 flowchart TB
     subgraph browser["Navegador"]
         VP["Portal del proveedor<br/>useChat · SSE · AI Elements"]
-        OD["Panel del oficial<br/>tRPC · TanStack Query"]
+        HITL["🧑‍⚖️ Tarjeta de confirmación<br/>ventana de 5 min"]
+        OD["Panel del oficial<br/>🧑‍⚖️ 7 mutaciones de adjudicación"]
     end
 
     subgraph host["Contenedor app — Next.js 16 (Node)"]
         AUTH["better-auth<br/>correo+clave · 2 roles"]
         API["Rutas /api/vendor/*<br/>streams SSE"]
+        CONF["Ventanas HITL durables<br/>confirmations.ts"]
         TRPC["Router tRPC<br/>5 consultas · 7 mutaciones"]
         LANES["Carriles del harness<br/>doc-run · coverage-runner · assistant"]
         PURE["@vendra/workflow<br/>motores puros, sin IA ni IO"]
@@ -348,10 +453,14 @@ flowchart TB
     end
 
     VP --> API
+    VP --- HITL
+    HITL --> CONF
     OD --> TRPC
     VP -.->|cookie| AUTH
     OD -.->|cookie| AUTH
     API --> LANES
+    LANES --> CONF
+    CONF --> DRIZ
     TRPC --> RECOMP
     LANES --> PURE
     LANES --> RECOMP
@@ -370,26 +479,27 @@ flowchart TB
 |---|---|---|
 | **Runtime de sandbox compartido** | `server/harness/sandbox.ts` | UNA MicroVM de larga vida en modo *wrap*; grupo de 4 puertos bridge; pre-horneado del bridge; renovación proactiva a los 35 min con 8 min de gracia; egreso restringido; guardia de credenciales con errores nombrados; calentamiento desde `instrumentation.ts` |
 | **Pipeline por documento** | `server/harness/doc-run.ts`, `tools.ts`, `prompt.ts` | Reclamo CAS → verificación de bytes → sesión `HarnessAgent` con el documento montado → 4 herramientas del host → validación y transiciones del lado del host |
-| **Contrato del stream** | `features/vendor-compliance/lib/vendor-harness-contract.ts` | UN archivo compartido por rutas, herramientas y cliente: *data parts* tipados, esquemas zod de las herramientas, constantes de subida |
+| **🧑‍⚖️ Ventanas HITL del proveedor** | `server/harness/confirmations.ts` + `/api/vendor/documents/[uuid]/confirmation` | Registro durable primero, ventana de 5 min, poll cruzado cada 5 s entre instancias, esperas troceadas de 30 s que mantienen vivo el bridge, arbitraje atómico entre respuesta y vencimiento, expiración *fail-open*. Ver [§4.1](#41-hitl-del-proveedor--la-ventana-de-confirmación-durable) |
+| **🧑‍⚖️ Kit de adjudicación del oficial** | `server/trpc/router.ts` | 7 mutaciones bajo el mismo contrato de atomicidad: bloqueo de fila → mutación → fila de actividad → recálculo, todo en la misma transacción. Alcances de dispensa recortados en el servidor, recategorización *append-only*, firma con actor y hora. Ver [§4.2](#42-hitl-del-oficial--la-adjudicación) |
+| **Contrato del stream** | `features/vendor-compliance/lib/vendor-harness-contract.ts` | UN archivo compartido por rutas, herramientas y cliente: *data parts* tipados (etapas, extracción, validación, **confirmación**, terminal), esquemas zod de las herramientas, constantes de subida |
 | **Asistente del proveedor** | `server/assistant/` + `/api/vendor/assistant` | Sesión estacionada por hilo, 3 herramientas del host, memoria de 40 hechos con redacción de PII, transcripción en Postgres |
-| **Ventanas HITL durables** | `server/harness/confirmations.ts` | Registro en base primero, ventana de 5 min, esperas troceadas de 30 s (mantienen vivo el bridge), arbitraje atómico entre respuesta y vencimiento, expiración *fail-open* |
 | **Carril de cobertura** | `server/harness/coverage-runner.ts` | Sesión coalescida por proveedor, caché por firma de entradas, pensamiento deshabilitado, validación del payload en el host, registro `UNDETERMINED` a prueba de fallos |
 | **Elementos de IA vendorizados** | `src/components/ai-elements/` | Primitivas de render del AI SDK como código propio: `Tool` con su máquina de estados, `Reasoning` que se abre y cierra solo, `Task` como checklist de etapas, `Conversation`, `PromptInput`, `Response` |
-| **Motores puros** | `packages/workflow/src/vendor/` | Sin IA, sin IO: catálogo de 17 tipos + esquemas de extracción, validadores, mapa documento→categoría, matemática de la compuerta, trazabilidad, comparación difusa de nombres de entidad, núcleo de cobertura |
-| **Motor de recálculo** | `server/recompute.ts` | Todo terminal, toda mutación del oficial y todo tic del barrido pasan por un único pliegue: lecturas sobre la transacción del llamante, categorías de cobertura solo desde la determinación, un solo *merge* jsonb, bloqueos `FOR UPDATE` |
-| **Kit de rescate del oficial** | `server/trpc/router.ts` | 7 mutaciones bajo el mismo contrato de atomicidad: bloqueo de fila → mutación → fila de actividad → recálculo, todo en la misma transacción. Los alcances de dispensa se **acotan en el servidor** (un desajuste de nombre jamás puede dispensar la identidad fiscal) |
-| **Barrido de vencimientos** | `server/sweep.ts` | Tic horario con *advisory lock*: `APPROVED → EXPIRED` cuando caduca un documento requerido; avisos a 30/14/1 día; la renovación válida revierte el estado sola |
+| **Motores puros** | `packages/workflow/src/vendor/` | Sin IA, sin IO: catálogo de 17 tipos + esquemas de extracción, validadores, mapa documento→categoría, matemática de la compuerta, trazabilidad, comparación difusa de nombres de entidad (lo que dispara el HITL), núcleo de cobertura |
+| **Motor de recálculo** | `server/recompute.ts` | Todo terminal, toda adjudicación del oficial y todo tic del barrido pasan por un único pliegue: lecturas sobre la transacción del llamante, categorías de cobertura solo desde la determinación, un solo *merge* jsonb, bloqueos `FOR UPDATE` |
+| **Barrido de vencimientos** | `server/sweep.ts` | Tic horario con *advisory lock*: `APPROVED → EXPIRED` cuando caduca un documento requerido; avisos a 30/14/1 día; la renovación válida revierte el estado sola, sin HITL |
 | **Conserje** | `server/harness/janitor.ts` | Rescata corridas huérfanas (por ejemplo si la app se reinició a mitad del procesamiento) |
 
 ### Reglas de diseño no negociables
 
 - **Veracidad ante todo:** una corrida que no terminó **no escribe nada**; una determinación vieja se muestra como "actualizando", nunca como cifra fresca; un documento fallido trae una razón real y accionable.
-- **Observabilidad desde el día uno:** cada evento del pipeline es una línea grepeable — `[vendra:<evento>] k=v k=v` — desde `process.start` hasta `process.done`, con tramos de latencia por fase.
+- **El humano nunca queda bloqueado ni ignorado:** una ventana HITL siempre se cierra (con respuesta o con vencimiento registrado), y una adjudicación del oficial siempre se refleja en el estado dentro de la misma transacción.
+- **Observabilidad desde el día uno:** cada evento del pipeline es una línea grepeable — `[vendra:<evento>] k=v k=v` — desde `process.start` hasta `process.done`, incluyendo `confirmation.answered` / `confirmation.expired` y `officer.waive`, con tramos de latencia por fase.
 - **Cero confianza en el cliente:** toda ruta `/api/vendor/*` y todo procedimiento tRPC resuelve la sesión en el servidor. El cuerpo del POST de `/process` se ignora deliberadamente: las entradas se cargan de la fila y del almacenamiento.
 
 ---
 
-## 8. El rol de cada pieza del stack
+## 9. El rol de cada pieza del stack
 
 ### Capa de IA — AI SDK v7
 
@@ -400,13 +510,15 @@ flowchart TB
 | **`@ai-sdk/harness-claude-code`** | El adaptador concreto: `createClaudeCode({ model, thinking, maxTurns, auth })`. Instala y opera el CLI de Claude Code dentro de la VM y expone sus herramientas internas |
 | **`@ai-sdk/sandbox-vercel`** | El proveedor de sandbox: `createVercelSandbox({ sandbox, bridgePorts })` en modo *wrap* — este repo es dueño del ciclo de vida de la VM |
 | **`@vercel/sandbox`** | El SDK crudo de la MicroVM: `Sandbox.create({ runtime, ports, networkPolicy, timeout, env })`, y sus tipos de error (`APIError`, `StreamError`) que se aplanan en campos de log |
-| **`@ai-sdk/react`** | `useChat` en el cliente: consume los *data parts* tipados del stream, maneja `resumeStream()` para reconectar al progreso de cobertura y renderiza las partes de herramienta |
+| **`@ai-sdk/react`** | `useChat` en el cliente: consume los *data parts* tipados del stream — incluida la parte de confirmación que **renderiza la tarjeta HITL** —, maneja `resumeStream()` para reconectar al progreso de cobertura y renderiza las partes de herramienta |
+
+> Nota sobre el HITL y el SDK: v7 ofrece `toolApproval` para aprobaciones humanas con alcance de stream. Vendra **no lo usa** a propósito — ver [§4.1](#41-hitl-del-proveedor--la-ventana-de-confirmación-durable): la ventana debe sobrevivir a recargas y resolverse desde cualquier instancia, y eso exige un registro durable en base, no un estado de stream.
 
 ### Autenticación — better-auth
 
 Instancia local, **solo correo y contraseña**. Sin SSO, sin captcha, sin envío de correos, sin *haveibeenpwned*: crear cuenta e iniciar sesión funcionan **100% offline** contra los contenedores propios del repo.
 
-- Dos roles reales (`VENDOR_CONTACT`, `COMPLIANCE_OFFICER`, más `ADMIN`), guardados como `additionalFields` en la fila de usuario junto con `organizationId` y `vendorId`.
+- Dos roles reales (`VENDOR_CONTACT`, `COMPLIANCE_OFFICER`, más `ADMIN`), guardados como `additionalFields` en la fila de usuario junto con `organizationId` y `vendorId`. **Ese rol es lo que separa los dos puntos HITL**: quién puede responder una ventana y quién puede adjudicar.
 - **`input: false` en cada campo adicional**: el rol y el vínculo con el tenant nunca son seteables desde el cliente — se asignan en el servidor al registrar.
 - `disabledPaths: ["/sign-up/email"]`: el registro va por `/api/vendor/register`, que es quien asigna rol y tenant. El `auth.api.signUpEmail` interno sigue disponible para la semilla y los scripts.
 - **Rate limiting activo en todos los modos** (la librería por defecto solo lo activa en producción) y telemetría explícitamente apagada.
@@ -419,7 +531,7 @@ Este repositorio **es dueño de su esquema**. Nada de apuntar a una base ajena.
 - El esquema vive en un solo archivo: `packages/db-vendor/drizzle/schema.ts`.
 - Los cambios se generan con `drizzle-kit generate` y se aplican con el migrador programático de `drizzle-orm` (servicio `migrate` del compose). **Nunca `push`, nunca DDL a mano por psql.**
 - **Toda interacción con la base pasa por Drizzle.** El *query builder* es la regla; el tag parametrizado `` sql`` `` se permite solo donde el builder no tiene equivalente (advisory locks, *merge* de hermanos jsonb, `NULLS LAST`). Nunca SQL armado con strings, nunca `sql.raw`, nunca un segundo cliente `pg`.
-- Un solo cliente compartido en `packages/db-vendor/src/client.ts`.
+- Es también **el sustrato del HITL**: la durabilidad de la ventana de confirmación y la atomicidad de cada adjudicación (bloqueo + mutación + actividad + recálculo en una transacción) son garantías de Postgres expresadas en Drizzle.
 
 ### Almacenamiento — MinIO (compatible con S3)
 
@@ -435,16 +547,16 @@ En AWS real basta con no definir los endpoints: la resolución por defecto toma 
 | Pieza | Rol |
 |---|---|
 | **Next.js 16** (App Router) | Un solo servidor para las dos interfaces + todas las APIs. `runtime: "nodejs"`, `instrumentation.ts` para calentar el sandbox y arrancar el barrido |
-| **React 19** | Componentes de servidor para las páginas, cliente para las superficies en vivo |
+| **React 19** | Componentes de servidor para las páginas, cliente para las superficies en vivo (streaming, tarjeta HITL, diálogos de adjudicación) |
 | **tRPC 11 + TanStack Query 5** | La superficie del oficial: tipos punta a punta, `superjson` como transformer, `complianceAdminProcedure` que valida rol y organización en el servidor (un no-oficial recibe `NOT_FOUND`, indistinguible de "no existe") |
-| **Rutas SSE** | La superficie del proveedor: el streaming en vivo no cabe en tRPC, así que son rutas `/api/vendor/*` con `createUIMessageStream` |
+| **Rutas SSE** | La superficie del proveedor: el streaming en vivo y la ventana HITL no caben en tRPC, así que son rutas `/api/vendor/*` con `createUIMessageStream` |
 | **Tailwind CSS 3** + `clsx` + `tailwind-merge` | Estilos, sin CDN ni fuentes externas |
 | **AI Elements vendorizados** + **streamdown** | Render de partes de herramienta, razonamiento y markdown en streaming |
-| **Zod 4** | La frontera de validación: entradas de las herramientas del host, cuerpos de las rutas, variables de entorno (vía `@t3-oss/env-nextjs`), y los esquemas de extracción cuyas descripciones son el prompt del modelo |
+| **Zod 4** | La frontera de validación: entradas de las herramientas del host, cuerpos de las rutas (incluida la respuesta HITL), justificaciones del oficial con largos mínimos y máximos, variables de entorno (vía `@t3-oss/env-nextjs`), y los esquemas de extracción cuyas descripciones son el prompt del modelo |
 
 ### Los motores puros — `@vendra/workflow`
 
-Un paquete con **cero** imports de `ai`, de proveedores o de red, por contrato. Ahí vive todo lo que decide: catálogo de documentos, esquemas de extracción, validadores, mapa documento→categoría, matemática de la compuerta de activación, trazabilidad de requisitos, comparación difusa de nombres de entidad y el núcleo de la determinación de cobertura. Es puro y con el `now` inyectado, así el barrido de vencimientos puede evaluarlo como simple aritmética.
+Un paquete con **cero** imports de `ai`, de proveedores o de red, por contrato. Ahí vive todo lo que decide: catálogo de documentos, esquemas de extracción, validadores, mapa documento→categoría, matemática de la compuerta de activación, trazabilidad de requisitos, comparación difusa de nombres de entidad —el motor que determina **cuándo hay que abrir una ventana HITL**— y el núcleo de la determinación de cobertura. Es puro y con el `now` inyectado, así el barrido de vencimientos puede evaluarlo como simple aritmética.
 
 ### Qué NO usa Vendra: mem0 y Qdrant
 
@@ -458,7 +570,7 @@ Por eso la memoria del asistente se implementó **con la forma de la frontera, p
 
 ---
 
-## 9. Versiones exactas
+## 10. Versiones exactas
 
 Runtime: **Node ≥ 22.10** · gestor de paquetes: **pnpm 10.4.1** · workspace de 3 paquetes.
 
@@ -475,10 +587,10 @@ Runtime: **Node ≥ 22.10** · gestor de paquetes: **pnpm 10.4.1** · workspace 
 | `@ai-sdk/sandbox-vercel` | **1.0.74** | Proveedor de sandbox |
 | `@ai-sdk/react` | **4.0.70** | `useChat` |
 | `@vercel/sandbox` | **2.9.2** | SDK de la MicroVM |
-| `better-auth` | **1.7.1** | Autenticación |
+| `better-auth` | **1.7.1** | Autenticación y los dos roles |
 | `drizzle-orm` | **0.45.2** | ORM |
 | `pg` | **8.23.0** | Driver de Postgres |
-| `@trpc/server` · `@trpc/client` · `@trpc/tanstack-react-query` | **11.x** (11.18.0) | API tipada del oficial |
+| `@trpc/server` · `@trpc/client` · `@trpc/tanstack-react-query` | **11.x** (11.18.0) | API tipada del oficial (las 7 mutaciones de adjudicación) |
 | `@tanstack/react-query` | **5.101.4** | Caché de datos en el cliente |
 | `zod` | **4.4.3** | Validación de esquemas |
 | `@aws-sdk/client-s3` · `@aws-sdk/s3-request-presigner` | **3.x** | Almacenamiento y URLs prefirmadas |
@@ -510,7 +622,7 @@ Runtime: **Node ≥ 22.10** · gestor de paquetes: **pnpm 10.4.1** · workspace 
 
 ---
 
-## 10. Modelo de datos
+## 11. Modelo de datos
 
 Todo en la base propia de la app (`vendra`), definido en `packages/db-vendor/drizzle/schema.ts`.
 
@@ -518,13 +630,13 @@ Todo en la base propia de la app (`vendra`), definido en `packages/db-vendor/dri
 |---|---|
 | `organization` | El comprador (tenant). El `slug` es display/ruteo — **nunca** una entrada de permisos |
 | `vendor_requirement_profile` | Qué exige ese comprador: categorías requeridas, obligatorias, descartables, umbrales (jsonb) |
-| `vendor` | El proveedor: nombre legal, DBA, últimos 4 del identificador tributario, perfil de trabajo (jsonb), categorías descartadas, estado de cumplimiento, metadata (jsonb: determinación de cobertura, overrides, reintentos), próxima expiración denormalizada |
+| `vendor` | El proveedor: nombre legal, DBA, últimos 4 del identificador tributario, perfil de trabajo (jsonb), categorías descartadas por él mismo, estado de cumplimiento, **firma del oficial** (`signoff_user_id`, `signoff_at`), metadata (jsonb: determinación de cobertura, overrides, reintentos), próxima expiración denormalizada |
 | `vendor_document` | Un archivo subido: estado (transicionado por CAS), llave en el almacén, metadata del archivo, tipo resuelto, fecha de expiración extraída |
-| `vendor_document_extraction` | **Append-only**: una versión por clasificación. Reclasificar inserta `version+1`, jamás muta. Guarda tipo, confianza, razonamiento, datos extraídos (con el TIN ya enmascarado), reglas de validación, categorías otorgadas y la dispensa |
-| `manual_requirement_grant` | Otorgamientos manuales del oficial, con índice parcial único: **un solo otorgamiento activo** por (documento, categoría) |
-| `vendor_activity` | La bitácora: 15 tipos de evento, actor, documento, metadata |
-| `vendor_status_transition` | Cada cambio de estado con su origen (`gate` / `officer_decision` / `sweep`) |
-| `document_confirmation` | Las ventanas HITL durables: pregunta, entidad, respuesta por defecto, vencimiento, resultado |
+| `vendor_document_extraction` | **Append-only**: una versión por clasificación. Recategorizar inserta `version+1`, jamás muta. Guarda tipo, confianza, razonamiento, datos extraídos (con el TIN ya enmascarado), reglas de validación, categorías otorgadas y **la dispensa del oficial** (con nota, alcance, vencimiento y actor) |
+| `manual_requirement_grant` | Otorgamientos manuales del oficial, con índice parcial único: **un solo otorgamiento activo** por (documento, categoría). Guarda justificación, quién otorgó, quién revocó y por qué |
+| **`document_confirmation`** | **El registro durable del HITL del proveedor**: pregunta, tipo, entidad nombrada, respuesta por defecto, momento en que se levantó, vencimiento, respuesta y resultado (`answered` / `default` / `timeout`) |
+| `vendor_activity` | La bitácora: 15 tipos de evento (subida, verificación, rechazo, **dispensa**, **recategorización**, **otorgamiento y revocación manual**, reintento, cambio de estado, vencimientos…), actor, documento, metadata |
+| `vendor_status_transition` | Cada cambio de estado con su origen: `gate` (la compuerta), `officer_decision` (el HITL del oficial) o `sweep` (el tiempo) |
 | `renewal_notification` | Avisos de renovación a 30/14/1 día, únicos por (proveedor, categoría, horizonte, vencimiento) |
 | `api_check_evidence` | Evidencia de verificaciones automáticas |
 | `assistant_chat_turn` | El chat: transcripción, estado de reanudación del harness y hechos de memoria, en tres espacios de nombres por `thread_id` |
@@ -542,18 +654,19 @@ Los archivos bajo `drizzle/` son artefactos de solo lectura. El servicio `migrat
 
 ---
 
-## 11. Seguridad y privacidad
+## 12. Seguridad y privacidad
 
-- **PII:** los identificadores tributarios completos y los números de cuenta bancaria nunca se piden, nunca se guardan, y se vuelven a enmascarar al momento de persistir (defensa en profundidad). El texto de justificación del oficial nunca se registra en logs (solo su largo).
+- **PII:** los identificadores tributarios completos y los números de cuenta bancaria nunca se piden, nunca se guardan, y se vuelven a enmascarar al momento de persistir (defensa en profundidad). **El texto de justificación del oficial nunca se registra en logs** (solo su largo): una decisión HITL deja rastro auditable en la base, no en la salida estándar.
 - **Aislamiento del agente:** lista blanca de herramientas (`activeTools`), `permissionMode: "allow-reads"`, egreso denegado por defecto salvo dos hosts, y el documento montado en un directorio de trabajo por sesión.
 - **Inyección de prompt:** el contenido de documentos y los hechos recordados se declaran como contexto, no instrucciones; el marcado se sanitiza al escribir y al inyectar.
 - **Autorización:** cada ruta y cada procedimiento resuelve la sesión en el servidor. El rol y el tenant nunca vienen del cliente. Un no-oficial recibe `NOT_FOUND`, no `FORBIDDEN` (no filtra existencia).
-- **Alcances acotados en el servidor:** una dispensa por desajuste de nombre no puede, por construcción, dispensar la identidad fiscal.
+- **Integridad del HITL:** una respuesta de confirmación solo vale para el documento al que pertenece (el `uuid` de la ruta y el de la ventana deben coincidir); la guardia de autenticación corre antes de parsear el cuerpo; y el arbitraje entre respuesta y vencimiento es atómico, así una ventana no puede resolverse dos veces con resultados distintos.
+- **Alcances acotados en el servidor:** una dispensa por desajuste de nombre no puede, por construcción, dispensar la identidad fiscal. El oficial decide; el servidor delimita hasta dónde llega esa decisión.
 - **Secretos:** las cuatro llaves remotas viven solo en el entorno; nunca en código, commits, logs ni respuestas.
 
 ---
 
-## 12. Desarrollo local sin Docker
+## 13. Desarrollo local sin Docker
 
 Requisitos: Node ≥ 22.10, pnpm 10.4.1, y Docker solo para Postgres y MinIO.
 
@@ -579,18 +692,22 @@ Crear cuentas de prueba (proveedores u oficiales) a demanda:
 pnpm --filter vendra create-account
 ```
 
+Para probar el HITL del proveedor sin esperar 5 minutos, existe una palanca de entorno: `VENDOR_CONFIRMATION_WINDOW_MS` acorta la ventana de confirmación (y `VENDOR_SWEEP_INTERVAL_MS` acelera el barrido de vencimientos). Sin definir, se usan los valores de producción.
+
 ---
 
-## 13. Solución de problemas
+## 14. Solución de problemas
 
 | Síntoma | Causa / arreglo |
 |---|---|
 | El PUT prefirmado falla desde el navegador | `S3_PUBLIC_ENDPOINT_URL` mal configurado — SigV4 firma el host, así que el endpoint de prefirma debe ser el que **el navegador** alcanza (`http://localhost:9000` en compose) |
 | `/process` devuelve 503 nombrando llaves faltantes | La guardia de credenciales del harness — complete las cuatro llaves en `.env.docker` y `docker compose up -d app` |
 | Documentos atascados en `PROCESSING` ~25 min y luego `FAILED` | El conserje funcionando como debe (una corrida huérfana, por ejemplo si la app se reinició). Use "Intentar de nuevo" |
+| Una confirmación HITL desapareció sin que nadie contestara | Venció la ventana de 5 minutos: el sistema aplicó el criterio por defecto y siguió (*fail-open*). El resultado quedó en `document_confirmation` y en la línea de log `confirmation.expired` |
 | La creación del sandbox falla con `402 payment_required` | Cuota de sandbox del equipo en Vercel — use un token con alcance de equipo en un plan pagado, u otro equipo |
 | Error 4xx del modelo nombrando el modelo | La llave de Anthropic no tiene acceso a `HARNESS_MODEL` (habilitación, no credenciales). Elija un modelo que su llave pueda invocar |
 | La cobertura queda "determinando" | Abra el proveedor en el panel del oficial — toda superficie del oficial dispara la determinación al verla; el portal también la dispara en su siguiente *poll* |
+| Una dispensa devuelve `CONFLICT` | El seguro de concurrencia optimista: otra persona cambió el estado de esa dispensa mientras usted trabajaba. Recargue y vuelva a intentar |
 | `harness: unconfigured` en `/api/health` | Faltan una o más de las cuatro llaves remotas. La app funciona igual, pero los documentos quedan en cola |
 
 ---
@@ -600,10 +717,13 @@ pnpm --filter vendra create-account
 ```
 apps/vendra/               la app Next.js (ambas interfaces + APIs + harness)
   src/app/                   rutas: páginas y /api
-  src/server/harness/        los carriles de documento y cobertura + el sandbox compartido
+  src/server/harness/        los carriles de documento y cobertura, el sandbox
+                             compartido y las ventanas HITL (confirmations.ts)
   src/server/assistant/      el asistente LLM (sesión, herramientas, memoria, prompt, store)
-  src/server/trpc/           la API del oficial
+  src/server/trpc/           la API del oficial — las 7 mutaciones de adjudicación
   src/features/…/lib/vendor-harness-contract.ts   EL contrato compartido
+  src/features/…/components/hitl-prompt.tsx       la tarjeta de confirmación del proveedor
+  src/features/…/components/officer/mutation-dialogs.tsx  los diálogos de adjudicación
   src/components/ai-elements/  primitivas de render vendorizadas
 packages/workflow/         motores puros (catálogo, validadores, compuerta) — sin IA, sin IO
 packages/db-vendor/        el esquema Drizzle propio + migraciones commiteadas
