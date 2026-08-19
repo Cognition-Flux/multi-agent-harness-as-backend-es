@@ -500,7 +500,7 @@ export function buildVendorDocTools(ctx: DocRunToolContext) {
           if (outcome === "confirmed") {
             ctx.vendorContext = { ...ctx.vendorContext, entityConfirmed: true };
           } else if (outcome === "denied") {
-            const reason = `You confirmed "${entityName}" is not your business, so this document cannot count toward your compliance.`;
+            const reason = `Usted confirmó que "${entityName}" no es su empresa, por lo que este documento no puede contar para su cumplimiento.`;
             await failVendorDocumentInternal(ctx, reason, [reason]);
             return { finished: true };
           }

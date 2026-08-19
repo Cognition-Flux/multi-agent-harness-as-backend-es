@@ -461,9 +461,14 @@ async function runAttempt(
       prompt: buildCoveragePrompt(inputs, thresholds),
       abortSignal: signal,
     });
-    // Drain the stream, surfacing narration text live.
+    // Drain the stream, surfacing narration text live. The protocol's
+    // terminal reply (the literal "done" the save instruction asks for) is
+    // a stop token, not narration — publishing it glued "…done" onto the
+    // next attempt's sentence in the vendor card.
     for await (const part of result.stream) {
       if (part.type === "text-delta" && typeof part.text === "string") {
+        const trimmed = part.text.trim().toLowerCase();
+        if (trimmed === "done" || trimmed === "'done'" || trimmed === "done.") continue;
         publishCoverageNarration(vendorId, { text: part.text });
       }
     }

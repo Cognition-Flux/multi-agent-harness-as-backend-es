@@ -569,7 +569,9 @@ export const appRouter = router({
           source: "officer_reclassify",
         });
 
-        // Status follows the re-validation verdict.
+        // Status follows the re-validation verdict. A fail→success
+        // reclassify must also DROP the stale failureReason (SPEC §17 C3:
+        // a failure note must never sit beside a Verified pill).
         if (validation?.valid) {
           await tx
             .update(vendorDocument)
@@ -580,6 +582,7 @@ export const appRouter = router({
                 input.newDocumentType,
                 extractedData,
               ),
+              fileMetadata: sql`COALESCE(${vendorDocument.fileMetadata}, '{}'::jsonb) - 'failureReason'`,
               updatedAt: sql`now()`,
             })
             .where(eq(vendorDocument.id, doc.id));
@@ -590,7 +593,7 @@ export const appRouter = router({
             .set({
               uploadStatus: "FAILED",
               uploadType: null,
-              fileMetadata: sql`COALESCE(${vendorDocument.fileMetadata}, '{}'::jsonb) || jsonb_build_object('failureReason', ${failedMessages[0] ?? "Document validation failed."}::text)`,
+              fileMetadata: sql`COALESCE(${vendorDocument.fileMetadata}, '{}'::jsonb) || jsonb_build_object('failureReason', ${failedMessages[0] ?? "La validación del documento falló."}::text)`,
               updatedAt: sql`now()`,
             })
             .where(eq(vendorDocument.id, doc.id));
@@ -839,7 +842,13 @@ export const appRouter = router({
 
         const reset = await tx
           .update(vendorDocument)
-          .set({ uploadStatus: "UPLOADED", updatedAt: sql`now()` })
+          .set({
+            uploadStatus: "UPLOADED",
+            // The reset doc is no longer failed — drop the stale
+            // failureReason so nothing renders it beside a live pill.
+            fileMetadata: sql`COALESCE(${vendorDocument.fileMetadata}, '{}'::jsonb) - 'failureReason'`,
+            updatedAt: sql`now()`,
+          })
           .where(
             and(
               eq(vendorDocument.id, row.id),

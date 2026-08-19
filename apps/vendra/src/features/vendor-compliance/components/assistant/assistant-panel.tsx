@@ -57,12 +57,29 @@ export function AssistantPanel() {
 
   // Move focus into the drawer on open — the Escape handler lives on the
   // <aside>, so without this the key does nothing until the user clicks in.
+  // On FIRST open the chat (and its textarea) mounts a beat after the panel,
+  // so retry briefly — but never steal focus once the user moved it.
   useEffect(() => {
     if (!open) return;
     const panel = panelRef.current;
     if (!panel) return;
-    const textarea = panel.querySelector<HTMLElement>("textarea");
-    (textarea ?? panel).focus();
+    const focusComposer = () => {
+      const textarea = panel.querySelector<HTMLElement>("textarea");
+      if (!textarea) return false;
+      textarea.focus();
+      return true;
+    };
+    if (focusComposer()) return;
+    panel.focus();
+    const started = Date.now();
+    const timer = window.setInterval(() => {
+      const active = document.activeElement;
+      const focusStillOurs = active === panel || active === document.body;
+      if (!focusStillOurs || focusComposer() || Date.now() - started > 600) {
+        window.clearInterval(timer);
+      }
+    }, 50);
+    return () => window.clearInterval(timer);
   }, [open]);
 
   return (

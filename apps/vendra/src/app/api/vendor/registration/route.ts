@@ -77,7 +77,7 @@ export async function PATCH(req: Request) {
       const max = requirementProfile.maxManualDismissable;
       return Response.json(
         {
-          error: `You can mark at most ${max} requirement${max === 1 ? "" : "s"} as not applicable.`,
+          error: `Puede marcar como máximo ${max} requisito${max === 1 ? "" : "s"} como “no aplica”.`,
         },
         { status: 400 },
       );

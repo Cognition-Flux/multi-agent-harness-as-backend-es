@@ -219,13 +219,21 @@ export async function POST(req: Request) {
         );
         await result.text;
       } catch (err) {
-        fatal = true;
+        // A user Stop lands here as the signal's AbortError — that is a
+        // deliberate outcome, not a lane failure: leave fatal=false so
+        // turn_done logs aborted=true fatal=false (finish() already
+        // destroys on aborted alone).
+        if (!abortSignal.aborted) {
+          fatal = true;
+        }
         throw err;
       }
     },
     onError: (err) => {
-      const msg = err instanceof Error ? err.message : String(err);
-      vendraError("assistant.stream_error", { vendor: vendorUuid, err: msg });
+      if (!abortSignal.aborted) {
+        const msg = err instanceof Error ? err.message : String(err);
+        vendraError("assistant.stream_error", { vendor: vendorUuid, err: msg });
+      }
       return "El asistente tuvo un problema al responder. Intente de nuevo.";
     },
     onEnd: async ({ messages }) => {

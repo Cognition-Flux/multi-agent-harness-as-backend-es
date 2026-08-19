@@ -63,8 +63,16 @@ export function useCoverageProgress(options: {
       if (part.type === "data-coverage-stage") {
         const parsed = parseCoverageStagePart(part.data);
         if (!parsed) return;
-        // A fresh run resets the narration tail.
-        if (parsed.stage === "queued" || parsed.stage === "starting") {
+        // A fresh run/attempt resets the narration tail. "reviewing" and
+        // "retrying" are included because a late-attaching subscriber can
+        // miss the transient queued/starting parts and would otherwise glue
+        // the previous attempt's tail onto the new narration.
+        if (
+          parsed.stage === "queued" ||
+          parsed.stage === "starting" ||
+          parsed.stage === "reviewing" ||
+          parsed.stage === "retrying"
+        ) {
           narrationBufferRef.current = "";
           setNarration(null);
         }
