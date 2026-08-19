@@ -231,7 +231,7 @@ Si corre la app sin Docker (§13), el mismo comando funciona directo: `pnpm --fi
 
 ### 2.5 Qué documentos subir
 
-El agente clasifica por **lo que el documento muestra**, no por el nombre del archivo. Un PDF o una imagen sirven igual (hasta 40 archivos, 10 MB cada uno). Esta es la tabla que importa: qué debe verse en la página para que el documento se reconozca, y qué categoría otorga si además pasa la validación.
+El agente clasifica por **lo que el documento muestra**, no por el nombre del archivo. Se aceptan **PDF, PNG, JPEG y WebP**, hasta 40 archivos de 10 MB cada uno. Esta es la tabla que importa: qué debe verse en la página para que el documento se reconozca, y qué categoría otorga si además pasa la validación.
 
 | Suba esto | Debe mostrar | Otorga |
 |---|---|---|
@@ -248,7 +248,29 @@ El agente clasifica por **lo que el documento muestra**, no por el nombre del ar
 | **MSA o NDA firmado** | Contrato titulado "Master Services Agreement" o "Non-Disclosure Agreement", con bloques de firma | Acuerdos firmados |
 | **SOC 2 / ISO 27001 / póliza cíber** | El informe, el certificado o la póliza correspondiente | Seguridad de datos (perfil `general-supplier`) |
 
-**De dónde sacar archivos de prueba.** El W-9 y el OSHA 300A son formularios públicos que se descargan en blanco desde los sitios oficiales del IRS y de OSHA — sirven tal cual (un W-9 en blanco se clasifica igual; la extracción registra lo que falta). Para lo demás: plantillas de ejemplo de ACORD 25 y de cartas bancarias abundan en la web, y cualquier documento que usted redacte e imprima a PDF funciona siempre que muestre los identificadores de la tabla. **No use documentos reales con datos personales**: los identificadores tributarios y las cuentas bancarias se enmascaran, pero no hay razón para arriesgarlos.
+**De dónde sacar archivos de prueba.** El W-9 y el OSHA 300A son formularios públicos que se descargan en blanco desde los sitios oficiales del IRS y de OSHA — sirven tal cual (un W-9 en blanco se clasifica igual; la extracción registra lo que falta). Para lo demás, plantillas de ejemplo de ACORD 25 y de cartas bancarias abundan en la web.
+
+**O fabrique el suyo en 30 segundos**, que es la vía más rápida para probar un caso concreto: escriba un HTML con los identificadores de la tabla e imprímalo a PDF sin abrir nada.
+
+```bash
+cat > /tmp/w9.html <<'HTML'
+<h1>Form W-9</h1>
+<h2>Request for Taxpayer Identification Number and Certification</h2>
+<p>1 Name of entity: <b>Northwind Remote Services LLC</b></p>
+<p>3a Federal tax classification: [x] LLC — S corporation</p>
+<h3>Part I — Taxpayer Identification Number (TIN)</h3>
+<p>Employer identification number: 47-3914826</p>
+<h3>Part II — Certification</h3>
+<p>Signature: Dana Whitfield, Managing Member &nbsp; Date: 2026-02-14</p>
+HTML
+
+google-chrome --headless --no-pdf-header-footer \
+  --print-to-pdf=/tmp/w9.pdf file:///tmp/w9.html
+```
+
+Ese PDF de prueba se clasifica como W-9, pasa la validación y otorga identidad fiscal. Cambiando el contenido se arma cualquier caso: una licencia comercial vencida, un certificado con límites por debajo del umbral, una póliza a nombre de otra empresa para disparar la ventana HITL.
+
+**No use documentos reales con datos personales**: los identificadores tributarios y las cuentas bancarias se enmascaran, pero no hay razón para arriesgarlos.
 
 **Un archivo que no calza con nada** se clasifica como `UNKNOWN` a propósito — cotizaciones de seguros, material de marketing o correspondencia deberían dar exactamente eso. Es una prueba válida, no un error.
 
@@ -261,8 +283,8 @@ El perfil sembrado por defecto, `construction-sub`, exige nueve categorías: ide
 El objetivo es llegar a `PRE_APPROVED` con la menor cantidad de documentos.
 
 1. Regístrese en `/register` como **"Northwind Remote Services LLC"**.
-2. En los datos del negocio marque **trabajo 100% remoto**. Eso descarta automáticamente auto y compensación laboral (no son obligatorias en este perfil).
-3. Marque **"No aplica"** en certificación de diversidad e historial de seguridad — el perfil permite hasta dos descartes manuales.
+2. En "Datos de la empresa" marque **"Solo remoto (sin trabajo presencial)"** y guarde. Eso descarta automáticamente seguro de auto y compensación laboral (no son obligatorias en este perfil) — y **sin gastar** ninguno de sus dos descartes manuales: quedará en 7 categorías pendientes y "0 de 2 descartes utilizados".
+3. Marque **"No aplica"** en certificación de diversidad e historial de seguridad — los dos descartes manuales que permite el perfil. Quedan 5 pendientes: identidad fiscal, responsabilidad civil, licencia comercial, verificación bancaria y acuerdos firmados.
 4. Suba cinco documentos: **W-9**, **certificado ACORD 25**, **licencia comercial**, **carta bancaria** y un **MSA firmado**.
 5. Cuando el checklist quede completo → **Activar cuenta** → `PRE_APPROVED`.
 
