@@ -13,7 +13,7 @@ Un proveedor sube los documentos de cumplimiento que tenga (certificados de segu
 ## Índice
 
 1. [¿Qué hace esta app? (explicación para principiantes)](#1-qué-hace-esta-app-explicación-para-principiantes)
-2. [Arranque rápido](#2-arranque-rápido-solo-necesita-docker)
+2. [Arranque rápido y cómo probar la app](#2-arranque-rápido-y-cómo-probar-la-app)
 3. [La idea central: *harness* como backend](#3-la-idea-central-harness-como-backend)
 4. [**Los dos puntos HITL: dónde decide una persona**](#4-los-dos-puntos-hitl-dónde-decide-una-persona)
 5. [Carril 1 — el pipeline por documento](#5-carril-1--el-pipeline-por-documento)
@@ -91,41 +91,209 @@ Un barrido horario revisa vencimientos: cuando un documento obligatorio caduca, 
 
 ---
 
-## 2. Arranque rápido (solo necesita Docker)
+## 2. Arranque rápido y cómo probar la app
+
+Esta sección va completa: levantar el stack, entrar, **crear sus propias cuentas de proveedor y de oficial**, y qué documentos subir para ver funcionar cada parte del sistema. Si logra correr la app, debería poder usarla.
+
+### 2.1 Requisitos previos
+
+Solo **Docker** con Docker Compose v2 (`docker compose version` debe responder). No hace falta Node ni pnpm para el camino de Docker.
+
+Y cuatro credenciales de las dos dependencias remotas:
+
+| Variable | De dónde sale |
+|---|---|
+| `ANTHROPIC_API_KEY` | Consola de Anthropic → API Keys. La llave debe tener habilitado el modelo de `HARNESS_MODEL` (por defecto `claude-sonnet-4-6`) |
+| `VERCEL_TOKEN` | Vercel → Account Settings → Tokens. Créelo **con alcance del equipo**, no personal |
+| `VERCEL_TEAM_ID` | Vercel → Team Settings → General (empieza con `team_`) |
+| `VERCEL_PROJECT_ID` | Vercel → cualquier proyecto → Settings → General (empieza con `prj_`) |
+
+> **Se puede arrancar sin ellas.** La app igual levanta, sirve las dos interfaces, permite registrarse y aceptar subidas: los documentos quedan en cola y `/api/health` reporta `harness: unconfigured`. Lo que no ocurre es el procesamiento con agentes.
+
+### 2.2 Levantar el stack
 
 ```bash
 git clone https://github.com/Cognition-Flux/multi-agent-harness-as-backend-es.git
 cd multi-agent-harness-as-backend-es
+
 cp .env.docker.example .env.docker
-# edite .env.docker y complete las CUATRO llaves de dependencias remotas:
-#   ANTHROPIC_API_KEY=…   (el modelo)
-#   VERCEL_TOKEN=…        (Vercel Sandbox — la MicroVM donde corren los agentes)
-#   VERCEL_TEAM_ID=…
-#   VERCEL_PROJECT_ID=…
-# y ponga cualquier cadena aleatoria en BETTER_AUTH_SECRET (openssl rand -hex 32)
+# Edite .env.docker:
+#   1. las cuatro llaves de arriba
+#   2. BETTER_AUTH_SECRET → cualquier cadena aleatoria:  openssl rand -hex 32
+# El resto del archivo ya viene con los valores correctos para compose.
+
 docker compose up
 ```
 
-Ese único comando levanta **cinco servicios**:
+La primera vez la construcción de la imagen tarda algunos minutos. Ese único comando levanta **cinco servicios**:
 
-| Servicio | Qué hace |
+| Servicio | Qué hace | Cuándo termina |
+|---|---|---|
+| `postgres` | Postgres 16, la base propia de la app (puerto host **5436**) | queda corriendo |
+| `minio` | Almacenamiento de objetos compatible con S3 (**9000** API / **9001** consola) | queda corriendo |
+| `minio-init` | Crea el bucket `vendor-docs` | one-shot |
+| `migrate` | Aplica las migraciones y siembra la demo — **mire su log: ahí salen las credenciales** | one-shot |
+| `app` | El servidor Next.js en **http://localhost:3000** | queda corriendo |
+
+El servicio `app` espera a que `migrate` y `minio-init` terminen bien, así que cuando el puerto 3000 responde, la base ya está lista.
+
+**Comprobar que quedó sano:**
+
+```bash
+curl -s http://localhost:3000/api/health
+# {"db":"ok","storage":"ok","harness":"ok","sweeper":{...}}
+# harness:"unconfigured" + "missing":[...] = falta alguna de las cuatro llaves
+```
+
+**Comandos del día a día:**
+
+```bash
+docker compose up -d                 # levantar en segundo plano
+docker compose logs -f app           # seguir los logs de la app
+docker compose logs migrate          # volver a ver las credenciales sembradas
+docker compose restart app           # reiniciar solo la app (tras cambiar .env.docker)
+docker compose down                  # detener; los datos sobreviven (volúmenes con nombre)
+docker compose down -v               # detener Y BORRAR todo: base, archivos, cuentas
+```
+
+La consola de MinIO queda en http://localhost:9001 (`minioadmin` / `minioadmin`) si quiere ver los archivos subidos.
+
+### 2.3 Las cuentas sembradas
+
+El servicio `migrate` deja creadas una organización compradora (**Acme Construction Group**), dos perfiles de requisitos y dos cuentas:
+
+| Rol | Correo | Contraseña |
+|---|---|---|
+| Oficial de cumplimiento | `officer@acme-demo.test` | `OfficerDemo123!` |
+| Contacto de proveedor | `vendor@summit-demo.test` | `VendorDemo123!` |
+
+Son credenciales de demo local, no secretos. La semilla es idempotente: si la organización ya existe, no hace nada.
+
+### 2.4 Crear más cuentas de prueba
+
+Para probar de punta a punta conviene tener varios proveedores (cada uno con su propio expediente) y más de un oficial. Hay dos caminos, y son distintos a propósito.
+
+#### Proveedores → desde el navegador, sin tocar la terminal
+
+Vaya a **http://localhost:3000/register** y complete cuatro campos: razón social, nombre del contacto, correo y contraseña (mínimo 8 caracteres). Eso crea la cuenta, crea la fila del proveedor dentro de `acme-construction` y la vincula con el primer perfil de requisitos (`construction-sub`). Es el mismo camino que usaría un proveedor real.
+
+Repítalo con distintas razones sociales para tener varios expedientes en el listado del oficial.
+
+#### Oficiales → por script, porque no hay registro público
+
+Un oficial adjudica expedientes ajenos: por diseño **no existe** una página de registro para ese rol. Se crean con el script `create-account`, que usa la propia instancia de better-auth de la app (nunca escribe en las tablas de auth a mano).
+
+**Con el stack en Docker corriendo:**
+
+```bash
+docker compose run --rm migrate \
+  pnpm --filter vendra create-account -- \
+    --role officer \
+    --email officer2@acme-demo.test \
+    --password 'Officer2Demo123!' \
+    --name "Segunda Oficial"
+```
+
+`docker compose run --rm migrate <comando>` reutiliza la imagen del migrador —que sí trae pnpm y el código fuente— y toma el entorno de `.env.docker`. El `--rm` borra el contenedor al terminar.
+
+El mismo script crea proveedores, si prefiere la terminal al navegador:
+
+```bash
+docker compose run --rm migrate \
+  pnpm --filter vendra create-account -- \
+    --role vendor \
+    --email vendor@maple-demo.test \
+    --password 'MapleDemo123!' \
+    --name "Robin Vale" \
+    --legal-name "Maple Works LLC"
+```
+
+**Banderas disponibles:**
+
+| Bandera | Obligatoria | Qué hace |
+|---|---|---|
+| `--role` | sí | `officer` o `vendor` |
+| `--email` | sí | Correo de inicio de sesión (único) |
+| `--password` | sí | 8–128 caracteres (política de better-auth) |
+| `--name` | sí | Nombre de la persona |
+| `--legal-name` | solo `vendor` | Razón social — es el nombre contra el que se comparan los documentos |
+| `--org` | no | Slug de la organización (por defecto `acme-construction`) |
+| `--profile` | no | Nombre del perfil de requisitos: `construction-sub` (9 categorías) o `general-supplier` (5). Por defecto, el primero de la organización |
+
+Imprime una línea JSON con lo creado, útil para guionar:
+
+```json
+{"userId":"NDKs…","role":"COMPLIANCE_OFFICER","email":"officer2@acme-demo.test"}
+{"userId":"9C2D…","role":"VENDOR_CONTACT","email":"vendor@maple-demo.test","vendorId":4,"vendorUuid":"2e2b…"}
+```
+
+Si corre la app sin Docker (§13), el mismo comando funciona directo: `pnpm --filter vendra create-account -- --role officer …`.
+
+### 2.5 Qué documentos subir
+
+El agente clasifica por **lo que el documento muestra**, no por el nombre del archivo. Un PDF o una imagen sirven igual (hasta 40 archivos, 10 MB cada uno). Esta es la tabla que importa: qué debe verse en la página para que el documento se reconozca, y qué categoría otorga si además pasa la validación.
+
+| Suba esto | Debe mostrar | Otorga |
+|---|---|---|
+| **Certificado de seguro ACORD 25** | El título "CERTIFICATE OF LIABILITY INSURANCE", la casilla INSURED y la grilla de límites por línea | Responsabilidad civil, compensación laboral y/o auto |
+| **Página de declaraciones de póliza** | Página "Declarations" de la aseguradora con asegurado, número de póliza, vigencia y límites de UNA póliza | Las mismas líneas de seguro |
+| **Póliza umbrella / exceso** | Un documento "Umbrella" o "Excess Liability" con su propio límite | Responsabilidad civil y auto (apilándose sobre la primaria) |
+| **Formulario W-9** | El encabezado "Form W-9" y la casilla del TIN en la Parte I | Identidad fiscal |
+| **Formulario W-8BEN-E** | El encabezado "Form W-8BEN-E" (entidades extranjeras) | Identidad fiscal |
+| **Licencia comercial** | Licencia o registro emitido por un estado/condado/ciudad, con número y fecha de vencimiento | Licencia comercial |
+| **Certificación de diversidad** | Certificado de un organismo certificador (MBE / WBE / DBE / VOSB / 8(a) / HUBZone) | Certificación de diversidad |
+| **Carta de EMR** | Carta de la aseguradora o del buró que indica la tasa de modificación por experiencia | Historial de seguridad |
+| **OSHA 300A** | El encabezado del formulario 300A con los totales anuales | Historial de seguridad |
+| **Carta bancaria** o **cheque anulado** | Carta en papel membretado del banco confirmando la cuenta, o un cheque marcado "VOID" | Verificación bancaria |
+| **MSA o NDA firmado** | Contrato titulado "Master Services Agreement" o "Non-Disclosure Agreement", con bloques de firma | Acuerdos firmados |
+| **SOC 2 / ISO 27001 / póliza cíber** | El informe, el certificado o la póliza correspondiente | Seguridad de datos (perfil `general-supplier`) |
+
+**De dónde sacar archivos de prueba.** El W-9 y el OSHA 300A son formularios públicos que se descargan en blanco desde los sitios oficiales del IRS y de OSHA — sirven tal cual (un W-9 en blanco se clasifica igual; la extracción registra lo que falta). Para lo demás: plantillas de ejemplo de ACORD 25 y de cartas bancarias abundan en la web, y cualquier documento que usted redacte e imprima a PDF funciona siempre que muestre los identificadores de la tabla. **No use documentos reales con datos personales**: los identificadores tributarios y las cuentas bancarias se enmascaran, pero no hay razón para arriesgarlos.
+
+**Un archivo que no calza con nada** se clasifica como `UNKNOWN` a propósito — cotizaciones de seguros, material de marketing o correspondencia deberían dar exactamente eso. Es una prueba válida, no un error.
+
+### 2.6 Cuatro guiones de prueba
+
+El perfil sembrado por defecto, `construction-sub`, exige nueve categorías: identidad fiscal, responsabilidad civil, compensación laboral, auto, licencia comercial, historial de seguridad, verificación bancaria, acuerdos firmados y certificación de diversidad. De esas, **identidad fiscal y responsabilidad civil son obligatorias** (no se pueden descartar), y sus umbrales son 1 M USD por ocurrencia / 2 M agregado, con asegurado adicional requerido.
+
+#### Guión A — el camino corto hasta la activación
+
+El objetivo es llegar a `PRE_APPROVED` con la menor cantidad de documentos.
+
+1. Regístrese en `/register` como **"Northwind Remote Services LLC"**.
+2. En los datos del negocio marque **trabajo 100% remoto**. Eso descarta automáticamente auto y compensación laboral (no son obligatorias en este perfil).
+3. Marque **"No aplica"** en certificación de diversidad e historial de seguridad — el perfil permite hasta dos descartes manuales.
+4. Suba cinco documentos: **W-9**, **certificado ACORD 25**, **licencia comercial**, **carta bancaria** y un **MSA firmado**.
+5. Cuando el checklist quede completo → **Activar cuenta** → `PRE_APPROVED`.
+
+#### Guión B — la ventana HITL del proveedor
+
+Hay tres formas de provocarla, y cada una dispara una pregunta distinta:
+
+| Para ver… | Suba… |
 |---|---|
-| `postgres` | Postgres 16, la base de datos propia de la app (puerto host **5436**) |
-| `minio` | Almacenamiento de objetos compatible con S3 (**9000** API / **9001** consola) |
-| `minio-init` | Crea el bucket `vendor-docs` una sola vez |
-| `migrate` | Aplica las migraciones y siembra la demo — **mire su log: ahí salen las credenciales** |
-| `app` | El servidor Next.js en **http://localhost:3000** |
+| *"¿Es esa su empresa matriz?"* | Una póliza o certificado a nombre de **otra empresa** claramente distinta (regístrese como "Cedar Grove Electric LLC" y suba un COI a nombre de "Cedar Holdings Group Inc.") |
+| *"¿Es el mismo negocio bajo otro nombre?"* | Un documento con un nombre **parecido pero no igual** al registrado (registrado "Cedar Grove Electric LLC", documento "Cedar Grove Electrical Co.") |
+| *"¿Aplica un endoso general de asegurado adicional?"* | Un **ACORD 25 que no indique** la condición de asegurado adicional — el perfil `construction-sub` la exige |
 
-**Todo corre local excepto dos dependencias remotas, ambas de solo salida:** la API de Anthropic y Vercel Sandbox. Sin las cuatro llaves la app igual arranca, sirve las dos interfaces y acepta subidas; los documentos quedan en cola y `/api/health` reporta `harness: unconfigured`.
+Con la pregunta en pantalla, pruebe las tres salidas: respóndala, **recargue la página** (sigue ahí, con su reloj corriendo), o **déjela vencer** los 5 minutos para ver el *fail-open* — el documento continúa y el resultado queda registrado como vencimiento.
 
-### La demo en 6 pasos
+#### Guión C — el apilamiento de cobertura
 
-1. http://localhost:3000 → entre como **proveedor** (`vendor@summit-demo.test` / `VendorDemo123!`).
-2. Complete los datos del negocio y suba un COI + W-9 + licencia (o cualquier PDF/imagen). Mire el streaming.
-3. **Provoque el HITL:** suba una póliza a nombre de otra empresa (una matriz o un DBA). Aparecerá la confirmación — respóndala, o recargue la página para comprobar que sigue ahí, o déjela vencer para ver el *fail-open* en acción.
-4. Cuando el checklist se complete → **Activar cuenta** → `PRE_APPROVED`.
-5. Cierre sesión y entre como **oficial** (`officer@acme-demo.test` / `OfficerDemo123!`) → `/vendors` → abra el proveedor → dispense, recategorice, otorgue a mano y firme el estado final. Revise después la pestaña de actividad: cada decisión suya quedó registrada con actor, hora y justificación.
-6. `docker compose down && docker compose up` → todo el estado sobrevive (volúmenes con nombre).
+1. Suba un certificado o declaración con responsabilidad civil de **500.000 USD por ocurrencia** — por debajo del umbral de 1 M. La determinación quedará en `BELOW`.
+2. Suba ahora una **póliza umbrella de 2.000.000 USD**.
+3. Espere a que el carril de cobertura vuelva a correr. El veredicto pasa a `MEETS` con límite efectivo de 2,5 M, y el desglose muestra qué documento aportó como `primary` y cuál como `umbrella`.
+
+Esa categoría **solo** la otorga la determinación: ningún documento suelto la concede por su cuenta.
+
+#### Guión D — el rescate del oficial
+
+1. Como proveedor, suba un documento que **falle** la validación: un certificado vencido, o uno cuyos límites no alcanzan el umbral.
+2. Entre como oficial (`officer@acme-demo.test`), abra `/vendors` y luego el proveedor.
+3. Pruebe las herramientas de adjudicación: **dispensar** la validación fallida (pide justificación de al menos 10 caracteres y fecha de vencimiento), **recategorizar** un documento mal tipificado, **otorgar a mano** una categoría, **revocarla** y **firmar** el estado final.
+4. Abra la actividad del proveedor: cada acción quedó con actor, hora y justificación. Ese es el punto — el expediente explica por qué está como está.
+
+Al terminar, `docker compose down && docker compose up` para comprobar que todo el estado sobrevive.
 
 ---
 
@@ -782,14 +950,21 @@ docker compose up -d postgres minio minio-init
 
 pnpm --filter vendra migrate     # aplica migraciones + siembra la demo
 pnpm --filter vendra dev         # http://localhost:3000
-pnpm -r type-check               # gate de tipos
+pnpm --filter vendra type-check  # gate de tipos
 pnpm --filter vendra build       # gate de build
 ```
 
-Crear cuentas de prueba (proveedores u oficiales) a demanda:
+Los scripts `migrate` y `create-account` cargan `apps/vendra/.env.local` por sí solos cuando existe (`--env-file-if-exists`), así que corren igual desde la terminal local y dentro del contenedor del migrador, donde el entorno llega por `.env.docker`.
+
+Crear cuentas de prueba a demanda — las mismas banderas de [§2.4](#oficiales--por-script-porque-no-hay-registro-público):
 
 ```bash
-pnpm --filter vendra create-account
+pnpm --filter vendra create-account -- --role officer \
+  --email officer2@acme-demo.test --password 'Officer2Demo123!' --name "Segunda Oficial"
+
+pnpm --filter vendra create-account -- --role vendor \
+  --email vendor@maple-demo.test --password 'MapleDemo123!' \
+  --name "Robin Vale" --legal-name "Maple Works LLC"
 ```
 
 Para probar el HITL del proveedor sin esperar 5 minutos, existe una palanca de entorno: `VENDOR_CONFIRMATION_WINDOW_MS` acorta la ventana de confirmación (y `VENDOR_SWEEP_INTERVAL_MS` acelera el barrido de vencimientos). Sin definir, se usan los valores de producción.

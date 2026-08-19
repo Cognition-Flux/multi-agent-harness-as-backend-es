@@ -8,8 +8,8 @@
     "build": "next build",
     "start": "next start",
     "type-check": "tsc --noEmit",
-    "migrate": "tsx scripts/migrate-and-seed.ts",
-    "create-account": "tsx --env-file=.env.local scripts/create-account.ts"
+    "migrate": "tsx --env-file-if-exists=.env.local scripts/migrate-and-seed.ts",
+    "create-account": "tsx --env-file-if-exists=.env.local scripts/create-account.ts"
   },
   "dependencies": {
     "@ai-sdk/harness": "1.0.74",
