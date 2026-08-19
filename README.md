@@ -427,6 +427,46 @@ DURANTE el turno │ el agente conversa y, si el proveedor le contó algo durade
 DESPUÉS          │ nada que hacer: los hechos ya están en la base para la próxima sesión
 ```
 
+#### Qué dispara la escritura: la decide el LLM, no el host
+
+No hay ninguna heurística del servidor que analice la conversación y decida guardar. **La escritura la dispara el modelo**, llamando a una herramienta — igual que el agente de documentos llama a `saveClassification`. El host no propone: solo ofrece la herramienta, valida y ejecuta.
+
+La cadena completa, paquete por paquete:
+
+```
+1. ai (núcleo v7)                     tools.ts  → tool({ description, inputSchema, execute })
+       │                                          la DESCRIPTION es lo que el modelo lee
+       ▼                                          para decidir; execute es código del host
+2. @ai-sdk/harness                   session.ts → new HarnessAgent({ tools, activeTools })
+       │                                          activeTools es la lista blanca: sin
+       ▼                                          "rememberFacts" ahí, no existe para el modelo
+3. @ai-sdk/harness-claude-code                  → createClaudeCode(): corre el CLI de Claude
+       │                                          Code dentro de la MicroVM y le publica
+       ▼                                          las herramientas del host
+4. EL MODELO decide                              → emite la llamada rememberFacts({ facts: [...] })
+       │                                          guiado por dos textos: la description de la
+       ▼                                          herramienta y el bloque instructions
+5. el bridge (puertos 4000-4003)                → la llamada viaja de la VM al proceso Next.js
+       │
+       ▼
+6. zod valida el payload                        → 1-5 hechos, 1-300 caracteres cada uno
+       │
+       ▼
+7. execute() corre EN EL HOST        memory.ts → redactar → deduplicar → insertar → podar
+       │                              (Drizzle) → Postgres
+       ▼
+8. devuelve { stored: n } al modelo             → sigue su turno sabiendo cuántos se guardaron
+```
+
+**Los dos textos que gobiernan la decisión** están a la vista en el repositorio (en el código están escritos en inglés, porque los lee el modelo; aquí van traducidos):
+
+- La **descripción de la herramienta** (`server/assistant/tools.ts`): *"Guarda hasta 5 hechos breves y duraderos que el proveedor le contó sobre su negocio, para sesiones futuras. Nunca guarde salida del asistente, contenido de documentos ni datos de contacto o tributarios."*
+- El **bloque de instrucciones** de la sesión (`server/assistant/prompt.ts`), que agrega el criterio: solo lo que **el proveedor dijo** —circunstancias del negocio, preferencias, correcciones—, y *"omita las cortesías"*.
+
+Cambiar cuándo se recuerda algo es, entonces, **editar esos dos textos** — no escribir lógica nueva.
+
+Y el proveedor lo ve pasar: la parte de herramienta se renderiza en el chat como *"Tomando nota…"* → *"Anotado para la próxima vez"* con un ícono de bombilla (`assistant-chat.tsx`). La memoria no se escribe a espaldas de nadie.
+
 #### 1. Escritura — qué pasa exactamente al llamar `rememberFacts`
 
 1. **Validación en el borde:** el esquema zod acepta entre **1 y 5 hechos por llamada**, cada uno de **1 a 300 caracteres**.
