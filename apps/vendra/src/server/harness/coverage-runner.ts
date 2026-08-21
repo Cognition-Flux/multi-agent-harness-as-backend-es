@@ -292,7 +292,9 @@ function buildCoveragePrompt(
     ["GENERAL_LIABILITY", "WORKERS_COMP", "AUTO"] as const
   ).map(
     (line) =>
-      `- ${line}: required per-occurrence limit $${requiredOccurrenceLimit(line, thresholds).toLocaleString("en-US")} (${requirementCategoryLabel(line === "GENERAL_LIABILITY" ? "INSURANCE_GENERAL_LIABILITY" : line === "WORKERS_COMP" ? "INSURANCE_WORKERS_COMP" : "INSURANCE_AUTO")})`,
+      // The aggregate is stated for GL because the save tool enforces it there
+      // (SPEC §18 D2) — never enforce a limit the prompt did not name.
+      `- ${line}: required per-occurrence limit $${requiredOccurrenceLimit(line, thresholds).toLocaleString("en-US")}${line === "GENERAL_LIABILITY" ? `, required aggregate limit $${thresholds.glAggregateUsd.toLocaleString("en-US")}` : ""} (${requirementCategoryLabel(line === "GENERAL_LIABILITY" ? "INSURANCE_GENERAL_LIABILITY" : line === "WORKERS_COMP" ? "INSURANCE_WORKERS_COMP" : "INSURANCE_AUTO")})`,
   );
 
   const docBlocks = inputs.map((doc) => {
@@ -346,6 +348,11 @@ Output contract — the save tool ENFORCES every rule below and bounces violatio
 - Each line's effectiveOccurrenceLimitUsd MUST equal the sum of its non-rejected contributions' amountAppliedUsd (within 1%). Attribute every dollar to a document.
 - Every contributions[].documentUuid MUST be one of the input document UUIDs above.
 - A "rejected" contribution MUST carry amountAppliedUsd 0.
+- Report ONE line per coverage line you evaluated. An empty lines[] is rejected — where the evidence does not resolve, say so with verdict "UNDETERMINED" rather than omitting the line.
+- Every amountAppliedUsd MUST be >= 0. Never net one policy against another: a policy that does not apply is role "rejected" with 0.
+- verdict "UNDETERMINED" is illegal once the resolved effective limit already meets the required limit — report "MEETS", or reject the contributions the figure rests on and explain why in a conflict.
+- effectiveAggregateLimitUsd, when you report one, MUST NOT be below that line's effectiveOccurrenceLimitUsd. Use null when the aggregate is not legible on the document.
+- A GENERAL_LIABILITY "MEETS" requires the reported aggregate to be >= the required aggregate limit listed under "Required limits" above. When the per-occurrence limit clears but the aggregate falls short, the line is "BELOW" — say so in that line's reasoning, naming the aggregate as the reason.
 
 All vendor-facing prose — the per-line reasoning fields, conflicts, the narrative, and the status sentence — must be written in Latin-American Spanish (español latinoamericano, trato de usted).
 

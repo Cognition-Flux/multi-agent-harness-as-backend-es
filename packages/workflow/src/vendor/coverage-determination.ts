@@ -97,7 +97,7 @@ export function requiredOccurrenceLimit(
  * even with no input-axis change (a rules-only change otherwise leaves
  * stale persisted verdicts looking fresh).
  */
-export const COVERAGE_DETERMINATION_VERSION = 1;
+export const COVERAGE_DETERMINATION_VERSION = 2;
 
 export interface CoverageSignatureInput {
   documentUuid: string;
@@ -187,6 +187,19 @@ export function validateCoverageDetermination(
   allowedDocumentUuids: ReadonlySet<string>,
   thresholds: RequirementThresholds,
 ): CoverageValidationResult {
+  // SPEC §18 D2. An empty payload passed every check below and then persisted
+  // as a FRESH determination for the current signature: no coverage category
+  // was ever granted and the lane would not re-run until an input changed.
+  // The runner returns early when there are no insurance inputs, so the tool is
+  // only ever reachable with something to report on.
+  if (input.lines.length === 0) {
+    return {
+      ok: false,
+      reason:
+        "lines[] is empty — report one entry per coverage line you evaluated (use verdict UNDETERMINED where the evidence does not resolve).",
+    };
+  }
+
   const seenLines = new Set<string>();
   for (const line of input.lines) {
     if (seenLines.has(line.category)) {
@@ -202,6 +215,15 @@ export function validateCoverageDetermination(
           reason: `contributions[].documentUuid "${contribution.documentUuid}" is not one of this vendor's input documents. Use only the document UUIDs listed in the prompt.`,
         };
       }
+      // SPEC §18 D2. Nothing bounded the amount from below, so offsetting
+      // entries (+2,000,000 and -1,000,000) satisfied the ±1% re-derivation
+      // with arithmetic no document supports.
+      if (contribution.amountAppliedUsd < 0) {
+        return {
+          ok: false,
+          reason: `contributions[].amountAppliedUsd must be >= 0 (${contribution.documentUuid} carries ${contribution.amountAppliedUsd}). Mark a non-applying policy "rejected" with 0 rather than netting it out.`,
+        };
+      }
       // Role→arithmetic gate: a rejected input may not contribute dollars.
       if (contribution.role === "rejected" && contribution.amountAppliedUsd > 0) {
         return {
@@ -211,12 +233,15 @@ export function validateCoverageDetermination(
       }
     }
 
-    // Policy anchor gate (a): a MEETS verdict with an unresolved value is
-    // illegal — an unresolvable figure can never satisfy its category.
-    if (line.verdict === "MEETS" && line.effectiveOccurrenceLimitUsd === null) {
+    // Policy anchor gate (a): an unresolved value is illegal on any verdict
+    // that claims to know the answer — an unresolvable figure can never
+    // satisfy its category, and it cannot be shown to fall short either.
+    // SPEC §18 D2: the refusal copy always claimed null was UNDETERMINED-only,
+    // but only MEETS was checked, so BELOW + null persisted.
+    if (line.effectiveOccurrenceLimitUsd === null && line.verdict !== "UNDETERMINED") {
       return {
         ok: false,
-        reason: `${line.category}: verdict MEETS requires a resolved effectiveOccurrenceLimitUsd (null is only legal with verdict UNDETERMINED).`,
+        reason: `${line.category}: verdict ${line.verdict} requires a resolved effectiveOccurrenceLimitUsd (null is only legal with verdict UNDETERMINED).`,
       };
     }
 
@@ -249,6 +274,15 @@ export function validateCoverageDetermination(
     // the ±1% drift gate but would persist as the self-contradictory
     // "BELOW at exactly the required limit".
     const required = requiredOccurrenceLimit(line.category, thresholds);
+    // SPEC §18 D2. A GL aggregate below the profile's required aggregate is a
+    // legitimate reason for the line to be BELOW even when the per-occurrence
+    // figure clears — without this, such a line would have NO legal verdict
+    // (MEETS fails the aggregate gate, BELOW failed the B12 gate, and
+    // UNDETERMINED fails the sufficiency gate) and the lane would deadlock.
+    const aggregateShort =
+      line.category === "GENERAL_LIABILITY" &&
+      line.effectiveAggregateLimitUsd !== null &&
+      line.effectiveAggregateLimitUsd < thresholds.glAggregateUsd;
     if (line.effectiveOccurrenceLimitUsd !== null) {
       const persistedEffective = line.contributions
         .filter((c) => c.role !== "rejected")
@@ -262,13 +296,48 @@ export function validateCoverageDetermination(
           reason: `${line.category}: verdict MEETS but the effective limit ${Math.min(line.effectiveOccurrenceLimitUsd, persistedEffective)} is below the required ${required}.`,
         };
       }
+      // The §16 B12 disjunction must stay a disjunction — the persisted figure
+      // is the one that lands, so either being at/above `required` is a
+      // contradiction. D2 only adds the aggregate exemption on top of it.
       if (
         line.verdict === "BELOW" &&
-        (line.effectiveOccurrenceLimitUsd >= required || persistedEffective >= required)
+        (line.effectiveOccurrenceLimitUsd >= required || persistedEffective >= required) &&
+        !aggregateShort
       ) {
         return {
           ok: false,
           reason: `${line.category}: verdict BELOW but the contributions sum to ${persistedEffective} against the required ${required} — either mark the non-applying contributions "rejected" with amountAppliedUsd: 0, or change the verdict.`,
+        };
+      }
+      // SPEC §18 D2. UNDETERMINED while the evidence already resolves at or
+      // above the requirement is a false negative: it blocks the vendor on
+      // coverage the payload itself demonstrates.
+      if (line.verdict === "UNDETERMINED" && line.effectiveOccurrenceLimitUsd >= required) {
+        return {
+          ok: false,
+          reason: `${line.category}: verdict UNDETERMINED but the effective limit ${line.effectiveOccurrenceLimitUsd} already meets the required ${required} — report ${aggregateShort ? "BELOW (the aggregate limit falls short)" : "MEETS"}, or explain the doubt by rejecting the contributions it rests on.`,
+        };
+      }
+    }
+
+    // SPEC §18 D2. effectiveAggregateLimitUsd was never validated: not
+    // re-derived, not compared to any threshold, and free to sit below its own
+    // per-occurrence figure. Contributions are attributed per occurrence, so
+    // the aggregate cannot be re-derived — it is bounded instead.
+    if (line.effectiveAggregateLimitUsd !== null) {
+      if (
+        line.effectiveOccurrenceLimitUsd !== null &&
+        line.effectiveAggregateLimitUsd < line.effectiveOccurrenceLimitUsd
+      ) {
+        return {
+          ok: false,
+          reason: `${line.category}: effectiveAggregateLimitUsd ${line.effectiveAggregateLimitUsd} is below the per-occurrence limit ${line.effectiveOccurrenceLimitUsd} — an aggregate can never be the smaller figure.`,
+        };
+      }
+      if (line.verdict === "MEETS" && aggregateShort) {
+        return {
+          ok: false,
+          reason: `GENERAL_LIABILITY: verdict MEETS but effectiveAggregateLimitUsd ${line.effectiveAggregateLimitUsd} is below the required aggregate ${thresholds.glAggregateUsd} — report BELOW.`,
         };
       }
     }

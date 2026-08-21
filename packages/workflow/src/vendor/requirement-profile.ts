@@ -2,10 +2,12 @@
  * The activation-gate math (SPEC §6.5) — pure and `now`-injected so the
  * expiry sweep (§6.8) can evaluate it as plain math.
  *
- * Two hardening layers sit on top of the long-stable count component —
- * (1) a dismissed category never double-counts as completed, and
+ * Three hardening layers sit on top of the long-stable count component —
+ * (1) a dismissed category never double-counts as completed,
  * (2) the mandatory set is checked independently of any count, with the
- *     result naming the missing categories for the refusal copy.
+ *     result naming the missing categories for the refusal copy, and
+ * (3) the honored-dismissal subset is a function of the SET, never of the
+ *     order `dismissed_categories` happens to hold (SPEC §18 D1).
  */
 import type { RequirementCategoryType } from "./categories";
 
@@ -63,23 +65,31 @@ export function calculateActivationGate(input: {
   autoDismissed: Set<RequirementCategoryType>;
   now: Date;
 }): ActivationGateResult {
-  const honoredManual = [...input.manualDismissed]
-    .filter(
-      (c) =>
-        input.profile.dismissible.includes(c) &&
-        !input.profile.mandatory.includes(c),
-    )
-    .slice(0, input.profile.maxManualDismissable);
-  const dismissed = new Set<RequirementCategoryType>([
-    ...[...input.autoDismissed].filter((c) => !input.profile.mandatory.includes(c)),
-    ...honoredManual,
-  ]);
-
   const satisfied = (cat: RequirementCategoryType): boolean => {
     const waiver = input.waived.get(cat);
     if (waiver && waiver.expiresAt.getTime() > input.now.getTime()) return true;
     return hasUnexpiredGrant(input.granted.get(cat), input.now);
   };
+
+  // SPEC §18 D1. Iterating the Set honored dismissals in `dismissed_categories`
+  // column order, so the same vendor with the same evidence cleared or blocked
+  // depending on how the toggles happened to be stored, and the cap could be
+  // spent on a category that already held an unexpired grant. Drive the order
+  // off the profile instead: unsatisfied categories first (the cap buys relief
+  // where relief is needed), then `dismissible` order — server-owned config, so
+  // the honored choice is explainable to an officer.
+  const qualifying = input.profile.dismissible.filter(
+    (c) =>
+      input.manualDismissed.has(c) && !input.profile.mandatory.includes(c),
+  );
+  const honoredManual = [
+    ...qualifying.filter((c) => !satisfied(c)),
+    ...qualifying.filter((c) => satisfied(c)),
+  ].slice(0, input.profile.maxManualDismissable);
+  const dismissed = new Set<RequirementCategoryType>([
+    ...[...input.autoDismissed].filter((c) => !input.profile.mandatory.includes(c)),
+    ...honoredManual,
+  ]);
 
   // A dismissed category is NEVER also counted as satisfied (no-double-credit).
   const blocking = input.profile.required.filter(
