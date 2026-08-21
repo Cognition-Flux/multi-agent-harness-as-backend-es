@@ -209,6 +209,12 @@ export async function provisionCompany(
     } catch (err) {
       // Compensating rollback — the §16 B10 contract. A tenant with no officer
       // and a half-created login is worse than no tenant.
+      //
+      // The message is re-mapped on the way out: better-auth reports a taken
+      // address in English ("User already exists. Use another email."), and the
+      // console renders whatever it gets, so the raw string surfaced in an
+      // otherwise all-Spanish dialog. `createOfficer` already maps it; these two
+      // paths do the same act and must speak the same language.
       await db
         .delete(companyPolicy)
         .where(eq(companyPolicy.organizationId, created.org.id))
@@ -221,6 +227,13 @@ export async function provisionCompany(
         .delete(organization)
         .where(eq(organization.id, created.org.id))
         .catch(() => undefined);
+      const message = err instanceof Error ? err.message : String(err);
+      if (/exist|taken|unique/i.test(message)) {
+        throw new ProvisioningError(
+          "Ya existe una cuenta con ese correo.",
+          "INVALID",
+        );
+      }
       throw err;
     }
   }

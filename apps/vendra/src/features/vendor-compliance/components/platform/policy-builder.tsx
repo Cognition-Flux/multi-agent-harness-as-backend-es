@@ -132,7 +132,11 @@ function describeFinding(
     case "structural_field_deselected":
       return `El campo ${field ?? "estructural"} de ${doc ?? "ese documento"} alimenta un cálculo de la plataforma y no puede desactivarse.`;
     case "required_category_ungrantable":
-      return `${cat ?? "Un requisito"} es obligatorio para esta empresa, pero ningún documento aceptado puede acreditarlo.`;
+      // "requisito", not "obligatorio": this console already uses "requisito
+      // obligatorio" for the MANDATORY subset, and the rule fires for anything
+      // merely REQUIRED — saying "es obligatorio" claims something stronger
+      // than the policy checked.
+      return `${cat ?? "Un requisito"} es un requisito de esta empresa, pero ningún documento aceptado puede acreditarlo.`;
     case "refereeable_not_required":
       return `${cat ?? "Ese requisito"} está marcado para aprobación automática, pero ningún perfil lo exige: la marca no tiene efecto.`;
     case "mandatory_category_referred":

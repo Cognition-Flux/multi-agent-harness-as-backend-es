@@ -75,9 +75,18 @@ import { vendraError, vendraLog, vendraWarn } from "./log";
 export const UNRECOGNIZED_DOCUMENT_REASON =
   "No pudimos reconocer el tipo de este documento. Suba un documento de alguno de los tipos aceptados que se listan a la derecha.";
 
-/** Production lesson: name what was read when the profile doesn't accept it. */
+/**
+ * Production lesson: name what was read when the type is not accepted here.
+ *
+ * Deliberately says "esta empresa" rather than "este perfil": the allowlist is
+ * `policy ∩ profileDerived` (§19.1), so the excluding authority may be either
+ * the requirement profile OR the company's own policy. Blaming the profile
+ * misinforms the vendor whenever a buyer narrowed the accepted set — a case the
+ * superadmin console made reachable, and one an e2e round hit on a voided check
+ * the profile does derive.
+ */
 export function notAcceptedDocumentReason(documentType: string): string {
-  return `Leímos este documento como "${vendorDocumentTypeTitle(documentType)}", pero este perfil de cumplimiento no requiere ese tipo de documento. Suba un documento de alguno de los tipos aceptados que se listan a la derecha.`;
+  return `Leímos este documento como "${vendorDocumentTypeTitle(documentType)}", pero esta empresa no acepta ese tipo de documento. Suba un documento de alguno de los tipos aceptados que se listan a la derecha.`;
 }
 
 /** Accept an object as-is; parse a JSON-encoded object string; else null. */
