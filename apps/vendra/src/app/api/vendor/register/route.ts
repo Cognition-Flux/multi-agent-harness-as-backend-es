@@ -12,6 +12,7 @@ import { vendraError, vendraLog } from "@vendra/workflow/vendor";
 
 import { VENDOR_CONTACT_ROLE } from "@/server/auth";
 import { createUserWithRole } from "@/server/auth-admin";
+import { activeCompanyPolicyId } from "@/server/company-policy";
 import { insertActivity } from "@/server/harness/db/documents";
 
 export const runtime = "nodejs";
@@ -56,6 +57,11 @@ export async function POST(req: Request) {
     );
   }
 
+  // Pin the vendor to the version governing the company right now (§19.3), so
+  // a later activation cannot re-judge them mid-onboarding unless a superadmin
+  // asks for it explicitly.
+  const policyId = await activeCompanyPolicyId(org.id);
+
   const [vendorRow] = await db
     .insert(schema.vendor)
     .values({
@@ -63,6 +69,7 @@ export async function POST(req: Request) {
       legalName: input.legalName,
       contactEmail: input.email,
       requirementProfileId: profile.id,
+      companyPolicyId: policyId,
     })
     .returning();
   if (!vendorRow) {

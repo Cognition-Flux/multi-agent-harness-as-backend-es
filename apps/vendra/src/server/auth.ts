@@ -17,8 +17,28 @@ import { env } from "@/env";
 export const VENDOR_CONTACT_ROLE = "VENDOR_CONTACT";
 export const COMPLIANCE_OFFICER_ROLE = "COMPLIANCE_OFFICER";
 export const ADMIN_ROLE = "ADMIN";
+/** Platform operator: onboards companies (SPEC §19.5). Cross-tenant BY DESIGN. */
+export const SUPERADMIN_ROLE = "SUPERADMIN";
 
+/**
+ * Roles that act INSIDE one organization. Every officer surface org-scopes its
+ * reads against the caller's `organizationId`, so membership here means
+ * "trusted within a tenant".
+ *
+ * SUPERADMIN is deliberately NOT a member. It is not a bigger officer — it is a
+ * different axis (it operates ACROSS tenants and never adjudicates a vendor), and
+ * adding it here would silently grant officer powers inside every company at
+ * once. `requireSuperadmin` is its own guard.
+ */
 export const OFFICER_ROLES = new Set([COMPLIANCE_OFFICER_ROLE, ADMIN_ROLE]);
+
+/**
+ * The organization a superadmin's user row points at. `user.organization_id` is
+ * NOT NULL and every existing guard reads it, so rather than widening the column
+ * (and every falsy check that depends on it) a superadmin belongs to a real,
+ * seeded platform row that owns no vendors and no requirement profiles.
+ */
+export const PLATFORM_ORG_SLUG = "vendra-platform";
 
 function createAuth() {
   return betterAuth({

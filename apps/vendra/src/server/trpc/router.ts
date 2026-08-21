@@ -40,6 +40,7 @@ import { recomputeCrossDocumentRequirementsForVendor } from "@/server/recompute"
 import { generateDownloadUrl } from "@/server/storage";
 
 import { complianceAdminProcedure, router } from "./init";
+import { platformRouter } from "./platform-router";
 
 const {
   manualRequirementGrant,
@@ -142,6 +143,9 @@ function insertActivityOnTx(
 }
 
 export const appRouter = router({
+  /** The superadmin surface (SPEC §19.5) — cross-tenant, its own guard. */
+  platform: platformRouter,
+
   // ═══════════════════════════════════════════════ queries ═══════
 
   listVendors: complianceAdminProcedure

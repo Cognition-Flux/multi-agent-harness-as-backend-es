@@ -12,7 +12,13 @@ import { getDb, schema } from "@vendra/db-vendor";
 import type { DocumentRunContext } from "@/server/harness/db/documents";
 import { getDocumentRunContext } from "@/server/harness/db/documents";
 import { vendraWarn } from "@/server/harness/log";
-import { OFFICER_ROLES, VENDOR_CONTACT_ROLE, getSessionUser, type SessionUser } from "./auth";
+import {
+  OFFICER_ROLES,
+  SUPERADMIN_ROLE,
+  VENDOR_CONTACT_ROLE,
+  getSessionUser,
+  type SessionUser,
+} from "./auth";
 
 const { organization, vendor, vendorRequirementProfile } = schema;
 
@@ -109,6 +115,45 @@ export async function requireComplianceOfficer(): Promise<ComplianceOfficerAuthR
     return { ok: false, failure: { kind: "not_found", message: "No encontrado" } };
   }
   return { ok: true, ctx: { user, organization: org } };
+}
+
+export interface SuperadminContext {
+  user: SessionUser;
+  /** The platform organization row the superadmin belongs to (not a tenant). */
+  platformOrganization: typeof organization.$inferSelect;
+}
+
+export type SuperadminAuthResult =
+  | { ok: true; ctx: SuperadminContext }
+  | { ok: false; failure: VendraAuthFailure };
+
+/**
+ * Resolve a SUPERADMIN caller (SPEC §19.5).
+ *
+ * This is the ONE guard that does not org-scope, because onboarding companies is
+ * inherently cross-tenant. Everything else about §6.4 still holds: a non-
+ * superadmin gets 404 (indistinguishable from missing, never a role hint), and a
+ * slug in a URL remains a display value — every procedure resolves the target
+ * organization from its own uuid and never trusts a client-supplied tenant.
+ *
+ * Because it grants cross-tenant reach, this guard is deliberately narrow: it
+ * checks the role against SUPERADMIN_ROLE alone, never OFFICER_ROLES.
+ */
+export async function requireSuperadmin(): Promise<SuperadminAuthResult> {
+  const user = await getSessionUser(await headers());
+  if (!user) return { ok: false, failure: { kind: "unauthorized" } };
+  if (user.role !== SUPERADMIN_ROLE || !user.organizationId) {
+    return { ok: false, failure: { kind: "not_found", message: "No encontrado" } };
+  }
+  const [org] = await getDb()
+    .select()
+    .from(organization)
+    .where(eq(organization.id, user.organizationId))
+    .limit(1);
+  if (!org) {
+    return { ok: false, failure: { kind: "not_found", message: "No encontrado" } };
+  }
+  return { ok: true, ctx: { user, platformOrganization: org } };
 }
 
 export type OwnedDocumentAuthResult =

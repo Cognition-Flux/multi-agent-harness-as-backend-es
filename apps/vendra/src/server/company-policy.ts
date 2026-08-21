@@ -90,6 +90,30 @@ export async function loadActiveCompanyPolicy(
 }
 
 /**
+ * The id of the organization's ACTIVE policy — what a new vendor gets pinned to.
+ *
+ * Pinning at creation is what makes §19.3's promise true. Without it the pin
+ * stays NULL, `loadVendorCompanyPolicy` falls back to whatever is ACTIVE *now*,
+ * and activating a new version silently re-judges vendors mid-onboarding — the
+ * exact thing the console's opt-in "apply to existing vendors" exists to avoid.
+ */
+export async function activeCompanyPolicyId(
+  organizationId: number,
+): Promise<number | null> {
+  const [row] = await getDb()
+    .select({ id: companyPolicy.id })
+    .from(companyPolicy)
+    .where(
+      and(
+        eq(companyPolicy.organizationId, organizationId),
+        eq(companyPolicy.status, "ACTIVE"),
+      ),
+    )
+    .limit(1);
+  return row?.id ?? null;
+}
+
+/**
  * The policy a vendor is judged under: the version PINNED on the vendor row,
  * falling back to the org's active one when the pin is absent (a vendor created
  * before the backfill, or between activation and pinning).
@@ -171,6 +195,17 @@ export async function backfillCompanyPolicies(): Promise<BackfillResult> {
       .select()
       .from(vendorRequirementProfile)
       .where(eq(vendorRequirementProfile.organizationId, org.id));
+    // An org with no requirement profile has nothing to derive a policy FROM,
+    // and the gate rightly refuses the empty result ("accepts no document
+    // type"). The platform organization is exactly that by design — a tenancy
+    // placeholder holding superadmins, never vendors — so skipping is correct
+    // rather than a workaround. Without this the whole boot fails as soon as a
+    // superadmin exists, which is how it was found.
+    if (profileRows.length === 0) {
+      vendraLog("policy.backfill_skipped_no_profile", { org: org.id });
+      continue;
+    }
+
     const profiles = profileRows.map((row) => ({
       required: row.required,
       mandatory: row.mandatory,

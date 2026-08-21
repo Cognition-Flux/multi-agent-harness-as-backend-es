@@ -10,6 +10,7 @@
     "type-check": "tsc --noEmit",
     "migrate": "tsx --env-file-if-exists=.env.local scripts/migrate-and-seed.ts",
     "create-account": "tsx --env-file-if-exists=.env.local scripts/create-account.ts",
+    "create-company": "tsx --env-file-if-exists=.env.local scripts/create-company.ts",
     "policy:build": "bash ../../policy/build-wasm.sh"
   },
   "dependencies": {

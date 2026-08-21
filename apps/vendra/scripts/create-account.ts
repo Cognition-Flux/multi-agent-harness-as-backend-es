@@ -12,6 +12,9 @@
  *     --email officer2@acme-demo.test --password 'Officer2Demo123!' \
  *     --name "Second Officer"
  *
+ *   pnpm --filter vendra create-account -- --role superadmin \
+ *     --email super2@vendra.test --password 'Super2Demo123!' --name "Platform Op"
+ *
  *   pnpm --filter vendra create-account -- --role vendor \
  *     --email vendor@maple-e2e.test --password 'MapleE2E123!' \
  *     --name "Robin Vale" --legal-name "Maple Works LLC"
@@ -28,9 +31,12 @@ import { getDb, getPool, schema } from "@vendra/db-vendor";
 
 import {
   COMPLIANCE_OFFICER_ROLE,
+  SUPERADMIN_ROLE,
   VENDOR_CONTACT_ROLE,
 } from "../src/server/auth";
 import { createUserWithRole } from "../src/server/auth-admin";
+import { activeCompanyPolicyId } from "../src/server/company-policy";
+import { ensurePlatformOrganization } from "../src/server/company-provisioning";
 import { insertActivity } from "../src/server/harness/db/documents";
 
 function fail(message: string): never {
@@ -63,8 +69,8 @@ async function main() {
   });
 
   const role = values.role;
-  if (role !== "officer" && role !== "vendor") {
-    fail('--role must be "officer" or "vendor"');
+  if (role !== "officer" && role !== "vendor" && role !== "superadmin") {
+    fail('--role must be "officer", "vendor", or "superadmin"');
   }
   if (!values.email || !values.password || !values.name) {
     fail("--email, --password, and --name are required");
@@ -77,6 +83,25 @@ async function main() {
   }
 
   const db = getDb();
+
+  // A superadmin belongs to the PLATFORM organization, not a tenant (SPEC
+  // §19.5), so it needs no --org and the row is created on demand. This is the
+  // scripted path the e2e rounds use to mint a fresh platform operator.
+  if (role === "superadmin") {
+    const platform = await ensurePlatformOrganization();
+    const { userId } = await createUserWithRole({
+      email: values.email!,
+      password: values.password!,
+      name: values.name!,
+      role: SUPERADMIN_ROLE,
+      organizationId: platform.id,
+    });
+    console.log(
+      JSON.stringify({ userId, role: SUPERADMIN_ROLE, email: values.email }),
+    );
+    return;
+  }
+
   const [org] = await db
     .select()
     .from(schema.organization)
@@ -124,6 +149,9 @@ async function main() {
       legalName: values["legal-name"]!,
       contactEmail: values.email,
       requirementProfileId: profile.id,
+      // Same pin as /api/vendor/register (§19.3) — a seeded vendor must be
+      // governed exactly like a registered one.
+      companyPolicyId: await activeCompanyPolicyId(org.id),
     })
     .returning();
   if (!vendorRow) fail("vendor insert returned no row");

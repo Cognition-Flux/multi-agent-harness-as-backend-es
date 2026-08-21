@@ -12,12 +12,15 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@vendra/db-vendor";
 import { RequirementCategory, vendraLog } from "@vendra/workflow/vendor";
 
-import { COMPLIANCE_OFFICER_ROLE, VENDOR_CONTACT_ROLE } from "./auth";
+import { COMPLIANCE_OFFICER_ROLE, SUPERADMIN_ROLE, VENDOR_CONTACT_ROLE } from "./auth";
 import { createUserWithRole } from "./auth-admin";
+import { ensurePlatformOrganization } from "./company-provisioning";
+import { REQUIREMENT_PRESETS } from "./requirement-presets";
 
 const DEMO_ORG_SLUG = "acme-construction";
 
 export const DEMO_CREDENTIALS = {
+  superadmin: { email: "superadmin@vendra.test", password: "SuperDemo123!" },
   officer: { email: "officer@acme-demo.test", password: "OfficerDemo123!" },
   vendor: { email: "vendor@summit-demo.test", password: "VendorDemo123!" },
 } as const;
@@ -40,64 +43,24 @@ export async function seedDemo(): Promise<void> {
     .returning();
   if (!org) throw new Error("seed: organization insert returned no row");
 
-  // The two v1 requirement-profile presets — profiles are DATA per org (R5).
-  const [constructionSub] = await db
+  // The two v1 requirement-profile presets — profiles are DATA per org (R5),
+  // and the SAME definitions the superadmin console provisions from, so a
+  // console-created company and the demo org can never drift apart.
+  const inserted = await db
     .insert(schema.vendorRequirementProfile)
-    .values({
-      organizationId: org.id,
-      name: "construction-sub",
-      required: [
-        RequirementCategory.TAX_IDENTITY,
-        RequirementCategory.INSURANCE_GENERAL_LIABILITY,
-        RequirementCategory.INSURANCE_WORKERS_COMP,
-        RequirementCategory.INSURANCE_AUTO,
-        RequirementCategory.BUSINESS_LICENSE,
-        RequirementCategory.SAFETY_RECORD,
-        RequirementCategory.BANKING_VERIFICATION,
-        RequirementCategory.SIGNED_AGREEMENTS,
-        RequirementCategory.DIVERSITY_CERTIFICATION,
-      ],
-      mandatory: [
-        RequirementCategory.TAX_IDENTITY,
-        RequirementCategory.INSURANCE_GENERAL_LIABILITY,
-      ],
-      dismissible: [
-        RequirementCategory.DIVERSITY_CERTIFICATION,
-        RequirementCategory.INSURANCE_AUTO,
-        RequirementCategory.INSURANCE_WORKERS_COMP,
-        RequirementCategory.SAFETY_RECORD,
-      ],
-      maxManualDismissable: 2,
-      thresholds: {
-        gl_occurrence_usd: 1_000_000,
-        gl_aggregate_usd: 2_000_000,
-        auto_limit_usd: 1_000_000,
-        wc_limit_usd: 500_000,
-        emr_max: 1.0,
-        soc2_max_age_months: 12,
-        require_additional_insured: true,
-      },
-    })
+    .values(
+      REQUIREMENT_PRESETS.map((preset) => ({
+        organizationId: org.id,
+        name: preset.name,
+        required: preset.required,
+        mandatory: preset.mandatory,
+        dismissible: preset.dismissible,
+        maxManualDismissable: preset.maxManualDismissable,
+        thresholds: preset.thresholds,
+      })),
+    )
     .returning();
-  await db.insert(schema.vendorRequirementProfile).values({
-    organizationId: org.id,
-    name: "general-supplier",
-    required: [
-      RequirementCategory.TAX_IDENTITY,
-      RequirementCategory.BANKING_VERIFICATION,
-      RequirementCategory.SIGNED_AGREEMENTS,
-      RequirementCategory.INSURANCE_GENERAL_LIABILITY,
-      RequirementCategory.DATA_SECURITY,
-    ],
-    mandatory: [RequirementCategory.TAX_IDENTITY],
-    dismissible: [RequirementCategory.DATA_SECURITY],
-    maxManualDismissable: 1,
-    thresholds: {
-      gl_occurrence_usd: 1_000_000,
-      gl_aggregate_usd: 2_000_000,
-      require_additional_insured: false,
-    },
-  });
+  const constructionSub = inserted.find((row) => row.name === "construction-sub");
   if (!constructionSub) throw new Error("seed: profile insert returned no row");
 
   // The seeded compliance officer.
@@ -129,15 +92,35 @@ export async function seedDemo(): Promise<void> {
     vendorId: vendorRow.id,
   });
 
-  vendraLog("seed.done", { org: org.id, vendor: vendorRow.id });
+  // The platform superadmin (SPEC §19.5). Its own organization row, so the
+  // NOT NULL user.organization_id FK holds without weakening it for anyone else.
+  const platform = await ensurePlatformOrganization();
+  await createUserWithRole({
+    email: DEMO_CREDENTIALS.superadmin.email,
+    password: DEMO_CREDENTIALS.superadmin.password,
+    name: "Vera Superadmin",
+    role: SUPERADMIN_ROLE,
+    organizationId: platform.id,
+  });
+
+  vendraLog("seed.done", { org: org.id, vendor: vendorRow.id, platform: platform.id });
+  // Padded from the content rather than by hand: the previous fixed-width
+  // literals drifted out of alignment the moment an email length changed.
+  const rows: [string, string][] = [
+    ["Superadmin", DEMO_CREDENTIALS.superadmin.email],
+    ["", DEMO_CREDENTIALS.superadmin.password],
+    ["Compliance officer", DEMO_CREDENTIALS.officer.email],
+    ["", DEMO_CREDENTIALS.officer.password],
+    ["Vendor contact", DEMO_CREDENTIALS.vendor.email],
+    ["", DEMO_CREDENTIALS.vendor.password],
+  ];
+  const title = "Vendra demo seeded — log in at http://localhost:3000";
+  const label = (name: string) => (name ? `${name}:`.padEnd(20) : " ".repeat(20));
+  const lines = [title, "", ...rows.map(([n, v]) => `${label(n)} ${v}`)];
+  const width = Math.max(...lines.map((l) => l.length)) + 4;
   console.log("");
-  console.log("┌─────────────────────────────────────────────────────────────┐");
-  console.log("│  Vendra demo seeded — log in at http://localhost:3000       │");
-  console.log("│                                                             │");
-  console.log(`│  Compliance officer:  ${DEMO_CREDENTIALS.officer.email}          │`);
-  console.log(`│                       ${DEMO_CREDENTIALS.officer.password}                      │`);
-  console.log(`│  Vendor contact:      ${DEMO_CREDENTIALS.vendor.email}           │`);
-  console.log(`│                       ${DEMO_CREDENTIALS.vendor.password}                       │`);
-  console.log("└─────────────────────────────────────────────────────────────┘");
+  console.log(`┌${"─".repeat(width)}┐`);
+  for (const line of lines) console.log(`│  ${line.padEnd(width - 2)}│`);
+  console.log(`└${"─".repeat(width)}┘`);
   console.log("");
 }
