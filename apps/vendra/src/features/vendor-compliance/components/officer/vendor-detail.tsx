@@ -634,16 +634,28 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
                         className={cn(
                           category.granted
                             ? "text-success"
-                            : category.determining
-                              ? "text-muted-foreground"
-                              : category.dismissed
+                            : category.referred
+                              ? "text-warning"
+                              : category.determining
                                 ? "text-muted-foreground"
-                                : failed.length > 0
-                                  ? "text-destructive"
-                                  : "text-muted-foreground",
+                                : category.dismissed
+                                  ? "text-muted-foreground"
+                                  : failed.length > 0
+                                    ? "text-destructive"
+                                    : "text-muted-foreground",
                         )}
                       >
-                        {category.granted ? "✓" : category.determining ? "…" : category.dismissed ? "—" : total === 0 ? "○" : "✕"}
+                        {category.granted
+                          ? "✓"
+                          : category.referred
+                            ? "⏳"
+                            : category.determining
+                              ? "…"
+                              : category.dismissed
+                                ? "—"
+                                : total === 0
+                                  ? "○"
+                                  : "✕"}
                       </span>
                       {category.label}
                       {category.mandatory ? (
@@ -666,6 +678,18 @@ export function VendorDetail({ vendorUuid }: { vendorUuid: string }) {
                   {category.expiresAt ? (
                     <p className="text-xs tabular-nums text-muted-foreground">
                       Vence el {formatDate(category.expiresAt)}
+                    </p>
+                  ) : null}
+                  {category.referred ? (
+                    // SPEC §19.4: the documentation supports the requirement and
+                    // the pipeline would have granted it, but this company's
+                    // policy withholds that decision. Rendering it as a failure
+                    // (the old `✕` branch, since `total > 0`) told the officer
+                    // the paperwork was bad when the system is waiting on THEM.
+                    <p className="text-xs text-warning">
+                      Esperando su decisión: la documentación respalda este
+                      requisito, pero la política de la empresa no permite que el
+                      sistema lo apruebe. Use «Otorgar manualmente…».
                     </p>
                   ) : null}
                   {category.determining ? (

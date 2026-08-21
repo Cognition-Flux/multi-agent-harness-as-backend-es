@@ -146,6 +146,30 @@ export async function reconcileRequirementReferrals(
 }
 
 /** Open referrals for one vendor — the officer queue's read model. */
+/**
+ * Is this category's grant currently withheld from the pipeline, waiting on an
+ * officer? Read inside the caller's transaction, because the one caller that
+ * needs it (`grantRequirement`) decides under a document row lock.
+ */
+export async function hasOpenReferral(
+  vendorId: number,
+  category: string,
+  executor: Executor = getDb(),
+): Promise<boolean> {
+  const [row] = await executor
+    .select({ id: requirementReferral.id })
+    .from(requirementReferral)
+    .where(
+      and(
+        eq(requirementReferral.vendorId, vendorId),
+        eq(requirementReferral.category, category),
+        isNull(requirementReferral.resolvedAt),
+      ),
+    )
+    .limit(1);
+  return !!row;
+}
+
 export async function listOpenReferrals(vendorId: number) {
   return getDb()
     .select()

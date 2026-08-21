@@ -34,6 +34,7 @@ import {
 import { buildComplianceSummary } from "@/server/compliance-summary";
 import { runCoverageDetermination } from "@/server/harness/coverage-runner";
 import { loadDocumentsSnapshot } from "@/server/harness/db/page-load";
+import { hasOpenReferral } from "@/server/harness/db/referrals";
 import { loadVendorCompanyPolicy } from "@/server/company-policy";
 import { toRequirementProfile, toThresholds, toWorkProfile } from "@/server/profile";
 import { recomputeCrossDocumentRequirementsForVendor } from "@/server/recompute";
@@ -695,11 +696,23 @@ export const appRouter = router({
           });
         }
 
-        // Already-satisfied rejection — EXCEPT the coverage-determination
-        // categories: for those, per-doc extraction evidence is never the
-        // effective grant, so the manual grant is the officer's ONLY
-        // remedy; rejecting it as "already satisfied" was a dead end.
-        if (!isCoverageDeterminationCategory(input.category)) {
+        // Already-satisfied rejection — EXCEPT where per-doc extraction
+        // evidence is not the effective grant, in which case the manual grant
+        // is the officer's ONLY remedy and rejecting it as "already satisfied"
+        // is a dead end. Two such cases:
+        //
+        //  - the coverage-determination categories, where the determination is
+        //    the authority (§18 D2);
+        //  - a category with an OPEN REFERRAL (§19.4). The extraction row
+        //    truthfully records what the document evidenced, while the fold
+        //    withholds the grant by policy — so this check fired on exactly the
+        //    categories the referral exists to have a human decide, making the
+        //    referee boundary unresolvable. Found by driving the flow on
+        //    browser: the W-9 verified, the referral opened, and "Otorgar
+        //    manualmente" answered "this document already satisfies that
+        //    category".
+        const referred = await hasOpenReferral(vendorRow.id, input.category, tx);
+        if (!isCoverageDeterminationCategory(input.category) && !referred) {
           const extraction = await latestExtractionOnTx(tx, doc.id);
           const alreadyProven =
             doc.uploadStatus === "PROCESSED" &&
