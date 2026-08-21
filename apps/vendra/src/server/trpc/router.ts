@@ -16,6 +16,9 @@ import {
   VENDOR_DOCUMENT_TYPE_VALUES,
   VendorDocumentTypeEnum,
   deriveAllowedDocumentTypes,
+  applyValidatorPolicy,
+  effectiveAllowedDocumentTypes,
+  resolveDocumentPolicy,
   deriveExtractedExpirationDate,
   failedValidationMessages,
   getPotentialRequirementsForDocumentType,
@@ -31,6 +34,7 @@ import {
 import { buildComplianceSummary } from "@/server/compliance-summary";
 import { runCoverageDetermination } from "@/server/harness/coverage-runner";
 import { loadDocumentsSnapshot } from "@/server/harness/db/page-load";
+import { loadVendorCompanyPolicy } from "@/server/company-policy";
 import { toRequirementProfile, toThresholds, toWorkProfile } from "@/server/profile";
 import { recomputeCrossDocumentRequirementsForVendor } from "@/server/recompute";
 import { generateDownloadUrl } from "@/server/storage";
@@ -513,7 +517,14 @@ export const appRouter = router({
           .limit(1);
         if (!profileRow) throw new TRPCError({ code: "NOT_FOUND" });
         const profile = toRequirementProfile(profileRow);
-        const allowed = deriveAllowedDocumentTypes(profile.required);
+        // SPEC §19.1: the company policy bounds the profile-derived set, exactly
+        // as the document lane does — an officer must not be able to reclassify
+        // into a type the company does not accept.
+        const policy = await loadVendorCompanyPolicy(vendorRow);
+        const profileDerived = deriveAllowedDocumentTypes(profile.required);
+        const allowed = policy
+          ? effectiveAllowedDocumentTypes(policy, profileDerived)
+          : profileDerived;
         if (!allowed.has(input.newDocumentType)) {
           throw new TRPCError({
             code: "BAD_REQUEST",
@@ -533,7 +544,7 @@ export const appRouter = router({
         // Re-run validation + requirement verification on the carried-forward
         // extraction under the new type.
         const workProfile = toWorkProfile(vendorRow.workProfile);
-        const validation = validateVendorDocument(
+        const rawValidation = validateVendorDocument(
           input.newDocumentType,
           extractedData,
           {
@@ -543,6 +554,14 @@ export const appRouter = router({
           },
           { thresholds: toThresholds(profileRow) },
         );
+        // §19.1: persist the COMPANY's verdict, not the superset's. Without this
+        // a reclassify is stricter than the pipeline that produced the document.
+        const docPolicy = policy
+          ? resolveDocumentPolicy(policy, input.newDocumentType)
+          : null;
+        const validation = docPolicy
+          ? applyValidatorPolicy(rawValidation, docPolicy.validators)
+          : rawValidation;
         const requirements = verifyRequirements(
           input.newDocumentType,
           extractedData,

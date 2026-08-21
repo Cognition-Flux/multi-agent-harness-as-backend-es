@@ -22,6 +22,12 @@ export type CategoryState =
   | "COMPLETED"
   | "PARTIALLY_COMPLETE"
   | "DETERMINING"
+  /**
+   * The pipeline proved it, but company policy withholds ratification and an
+   * officer must decide (SPEC §19.4). Distinct from PARTIALLY_COMPLETE, which
+   * means "keep uploading" — here there is nothing the vendor can do.
+   */
+  | "REFERRED"
   | "DISMISSED"
   | null;
 
@@ -31,6 +37,8 @@ export interface SummaryCategory {
   state: CategoryState;
   granted: boolean;
   determining: boolean;
+  /** Awaiting an officer's ratification (§19.4) — not the vendor's move. */
+  referred: boolean;
   dismissed: boolean;
   autoDismissed: boolean;
   mandatory: boolean;
@@ -106,6 +114,7 @@ export async function buildComplianceSummary(
     let state: CategoryState = null;
     if (dismissed) state = "DISMISSED";
     else if (entry?.granted) state = "COMPLETED";
+    else if (entry?.referred) state = "REFERRED";
     else if (entry?.determining) state = "DETERMINING";
     else if (
       entry &&
@@ -122,6 +131,7 @@ export async function buildComplianceSummary(
       state,
       granted: entry?.granted ?? false,
       determining: entry?.determining ?? false,
+      referred: entry?.referred ?? false,
       dismissed,
       autoDismissed,
       mandatory: profile.mandatory.includes(category),

@@ -7,6 +7,9 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@vendra/db-vendor";
+import type { CompanyPolicy } from "@vendra/workflow/vendor";
+
+import { loadVendorCompanyPolicy } from "@/server/company-policy";
 import { normalizeAdditionalEntityNames } from "@vendra/workflow/vendor";
 
 const { organization, vendor, vendorActivity, vendorDocument, vendorRequirementProfile } =
@@ -229,11 +232,17 @@ export interface DocumentRunContext {
   vendor: VendorRow;
   organization: typeof organization.$inferSelect;
   profile: typeof vendorRequirementProfile.$inferSelect;
+  /**
+   * The governance policy this vendor is judged under (SPEC §19). Null only
+   * before the first policy exists for the org — every consumer falls back to
+   * pre-governance behaviour in that case.
+   */
+  policy: CompanyPolicy | null;
 }
 
 /**
  * Everything the process route needs for one document run: the document row
- * plus its vendor, organization, and requirement profile.
+ * plus its vendor, organization, requirement profile, and governance policy.
  */
 export async function getDocumentRunContext(
   documentUuid: string,
@@ -254,7 +263,11 @@ export async function getDocumentRunContext(
     )
     .where(eq(vendorDocument.uuid, documentUuid))
     .limit(1);
-  return row ?? null;
+  if (!row) return null;
+  // The pinned version, so activating a new policy never re-judges a run that
+  // is already in flight (§19.3).
+  const policy = await loadVendorCompanyPolicy(row.vendor);
+  return { ...row, policy };
 }
 
 /** All document rows for one vendor, oldest first. */

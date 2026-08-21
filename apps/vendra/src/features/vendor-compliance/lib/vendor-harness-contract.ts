@@ -132,6 +132,12 @@ export interface VendorDocTerminalPart {
   documentSubtype?: string | null;
   validUploadType?: string | null;
   requirementsGranted: string[];
+  /**
+   * Categories the document evidenced but company policy withheld from the
+   * automated pipeline (SPEC §19.4) — an officer must ratify them. Present only
+   * when non-empty, so a full-autonomy policy streams exactly as before.
+   */
+  requirementsReferred?: string[];
   reason?: string;
   failedValidations?: string[];
   /** Coverage-scoped categories on a FAILED doc — renders "Counted · coverage". */
@@ -443,6 +449,12 @@ export interface AssistantCategorySnapshot {
   status:
     | "complete"
     | "determining"
+    /**
+     * Proved by the pipeline, withheld by company policy for an officer to
+     * ratify (SPEC §19.4). The assistant must NOT tell the vendor to upload
+     * anything for a category in this state — there is nothing for them to do.
+     */
+    | "awaiting_officer"
     | "dismissed"
     | "incomplete";
   mandatory: boolean;

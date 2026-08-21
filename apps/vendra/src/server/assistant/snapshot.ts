@@ -111,13 +111,17 @@ export async function buildComplianceState(
     categories: summary.categories.map((cat) => ({
       category: cat.category,
       label: cat.label,
+      // `referred` sits BEFORE `incomplete`: telling a vendor to upload something
+      // an officer is already holding is the assistant's worst failure mode.
       status: cat.dismissed
         ? ("dismissed" as const)
         : cat.granted
           ? ("complete" as const)
-          : cat.determining
-            ? ("determining" as const)
-            : ("incomplete" as const),
+          : cat.referred
+            ? ("awaiting_officer" as const)
+            : cat.determining
+              ? ("determining" as const)
+              : ("incomplete" as const),
       mandatory: cat.mandatory,
       dismissible: cat.dismissible,
       grantSources: cat.grantSources.map((s) => s.kind),

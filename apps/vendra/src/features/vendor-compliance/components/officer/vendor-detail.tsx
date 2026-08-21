@@ -74,6 +74,9 @@ const ACTIVITY_LABELS: Record<string, string> = {
   API_CHECK_RUN: "verificación por API ejecutada",
   VENDOR_REGISTERED: "proveedor registrado",
   ACTIVATION_SUBMITTED: "activación enviada",
+  POLICY_ACTIVATED: "política de cumplimiento activada",
+  REQUIREMENT_REFERRED: "requisito derivado a revisión",
+  REQUIREMENT_REFERRAL_RESOLVED: "derivación resuelta",
 };
 
 /** Spanish labels for grant-source kinds (fallback: humanized token). */

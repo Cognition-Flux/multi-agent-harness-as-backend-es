@@ -14,6 +14,7 @@ import {
 } from "@vendra/workflow/vendor";
 
 import { authFailureResponse, requireVendorContact } from "@/server/auth-guards";
+import { openReferralCategories } from "@/server/harness/db/referrals";
 import { vendraLog } from "@/server/harness/log";
 import { toRequirementProfile, toWorkProfile } from "@/server/profile";
 import { recomputeBestEffort } from "@/server/recompute";
@@ -73,6 +74,22 @@ export async function PATCH(req: Request) {
     // the array would make the gate's cap slice count them against the
     // manual budget (a different count than this guard enforces).
     dismissed = dismissed.filter((c) => !autoDismissed.has(c));
+
+    // SPEC §19.4: a category an officer is being asked to ratify cannot be
+    // dismissed away by the vendor. Without this the governance boundary is
+    // optional — mark the requirement "no aplica" and the pending question
+    // becomes moot while the vendor activates.
+    const openReferrals = await openReferralCategories([vendorRow.id]);
+    const referred = new Set<string>(openReferrals.get(vendorRow.id) ?? []);
+    if (dismissed.some((c) => referred.has(c))) {
+      return Response.json(
+        {
+          error:
+            "Un oficial de cumplimiento está revisando estos requisitos, por lo que no puede marcarlos como “no aplica”.",
+        },
+        { status: 400 },
+      );
+    }
     if (dismissed.length > requirementProfile.maxManualDismissable) {
       const max = requirementProfile.maxManualDismissable;
       return Response.json(

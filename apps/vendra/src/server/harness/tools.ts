@@ -14,6 +14,8 @@ import { getDb, schema } from "@vendra/db-vendor";
 import {
   SchemaRegistry,
   VendorDocumentTypeEnum,
+  applyValidatorPolicy,
+  projectExtractedData,
   compareEntityNames,
   deriveExtractedExpirationDate,
   deriveTinLast4,
@@ -21,10 +23,16 @@ import {
   enforceMaskedFields,
   evaluateCoverageScopedGrant,
   failedValidationMessages,
+  hasBlockingChecks,
   isInsuranceDocumentType,
+  resolveDocumentPolicy,
+  structuralExtractionFields,
+  extractionFieldNames,
   validateVendorDocument,
   vendorDocumentTypeTitle,
   verifyRequirements,
+  type CompanyPolicy,
+  type RequirementCategoryType,
   type RequirementThresholds,
   type VendorContext,
   type VendorDocumentType,
@@ -93,6 +101,8 @@ function coerceRecord(value: unknown): Record<string, unknown> | null {
 export interface DocRunToolContext {
   writer: UIMessageStreamWriter<VendorDocUIMessage>;
   run: DocumentRunContext;
+  /** The governance policy this run is judged under (SPEC §19); null pre-policy. */
+  policy: CompanyPolicy | null;
   allowedTypes: ReadonlySet<VendorDocumentType>;
   vendorContext: VendorContext;
   thresholds: RequirementThresholds;
@@ -359,11 +369,17 @@ export function buildVendorDocTools(ctx: DocRunToolContext) {
       );
 
       writeStage(ctx, "PROCESSING", "extracting");
+      // SPEC §19.1: the company's field selection, projected onto the type's
+      // schema. Empty/absent selection = every field, so a default policy hands
+      // over exactly the pre-governance contract.
+      const docPolicy = ctx.policy
+        ? resolveDocumentPolicy(ctx.policy, type)
+        : null;
       return {
         finished: false,
         extraction: {
           systemPrompt: SchemaRegistry.getSystemPrompt(type),
-          jsonSchema: SchemaRegistry.getJsonSchema(type),
+          jsonSchema: SchemaRegistry.getJsonSchema(type, docPolicy?.extractFields),
         },
         instruction:
           "Extract per systemPrompt + jsonSchema, then call saveExtraction exactly once.",
@@ -383,7 +399,7 @@ export function buildVendorDocTools(ctx: DocRunToolContext) {
       // Tolerant coercion: the model sometimes sends extractedData as a
       // JSON-encoded STRING; a string reaching the validators reads every
       // field as undefined — coerce here, bounce unparseable input back.
-      const extractedData = coerceRecord(input.extractedData);
+      let extractedData = coerceRecord(input.extractedData);
       if (extractedData === null) {
         return {
           error:
@@ -394,6 +410,31 @@ export function buildVendorDocTools(ctx: DocRunToolContext) {
 
       // PII defense in depth: enforce last-4 masks at persist time (§10).
       enforceMaskedFields(extractedData);
+
+      // SPEC §19.1: field selection is enforced HERE, not just in the contract
+      // the agent received. A model that volunteers a deselected field must not
+      // have it stored — otherwise the console's "these are the fields we
+      // extract" is a claim the code does not keep. Structural fields survive.
+      const extractionPolicy = ctx.policy
+        ? resolveDocumentPolicy(ctx.policy, ctx.classification.documentType)
+        : null;
+      if (extractionPolicy && extractionPolicy.extractFields.length > 0) {
+        const projected = projectExtractedData(
+          extractedData,
+          extractionPolicy.extractFields,
+          structuralExtractionFields(ctx.classification.documentType),
+          extractionFieldNames(ctx.classification.documentType),
+        );
+        const dropped = Object.keys(extractedData).length - Object.keys(projected).length;
+        if (dropped > 0) {
+          vendraLog("policy.fields_dropped", {
+            doc: ctx.run.document.uuid,
+            type: ctx.classification.documentType,
+            dropped,
+          });
+          extractedData = projected;
+        }
+      }
 
       // Non-blocking schema check — log-only, field PATHS only (zod issue
       // messages can echo received values).
@@ -421,6 +462,7 @@ export function buildVendorDocTools(ctx: DocRunToolContext) {
         extractedData,
         fieldConfidences: rawConfidences,
         model: env.HARNESS_MODEL,
+        companyPolicyId: ctx.policy?.id ?? null,
       });
       ctx.extractedData = extractedData;
 
@@ -543,12 +585,41 @@ export function buildVendorDocTools(ctx: DocRunToolContext) {
 
       // ── Validation (host-run, pure validators).
       writeStage(ctx, "PROCESSING", "validating");
-      const validation = validateVendorDocument(
+      const rawValidation = validateVendorDocument(
         docType,
         extractedData,
         ctx.vendorContext,
         { thresholds: ctx.thresholds },
       );
+      // SPEC §19.1: narrow to the validators THIS company counts. A default
+      // policy selects every validator, so this filters nothing and recomputes
+      // the same verdict.
+      const validatorPolicy = ctx.policy
+        ? resolveDocumentPolicy(ctx.policy, docType)
+        : null;
+      const validation = validatorPolicy
+        ? applyValidatorPolicy(rawValidation, validatorPolicy.validators)
+        : rawValidation;
+
+      // §19.5 vacuous-truth guard. `[].every(...)` is true, so a policy that
+      // filtered away every failable rule would turn the document into a free
+      // pass. Phrased as "narrowing erased the checks" rather than "there are
+      // no checks", so it can never fire for a full-validator policy — which is
+      // what keeps the default a no-op. Admissibility refuses zero-validator
+      // policies, so reaching here means the config drifted.
+      if (hasBlockingChecks(rawValidation) && !hasBlockingChecks(validation)) {
+        const reason =
+          "La política de su empresa no dejó ninguna validación aplicable a este documento. Un oficial de cumplimiento debe revisarlo.";
+        vendraError("policy.no_effective_validators", {
+          doc: ctx.run.document.uuid,
+          type: docType,
+          policy: ctx.policy?.id,
+          declared: validatorPolicy?.validators.join(",") ?? "",
+        });
+        await failVendorDocumentInternal(ctx, reason, [reason]);
+        return { finished: true };
+      }
+
       await writeValidationToLatestExtraction(
         ctx.run.document.id,
         validation?.rules ?? [],
@@ -632,6 +703,13 @@ export function buildVendorDocTools(ctx: DocRunToolContext) {
         ctx.terminalWritten = true;
         return { finished: true };
       }
+      // SPEC §19.4: the referee boundary is NOT applied here. This row records
+      // what the DOCUMENT evidenced — a truthful, policy-independent fact — and
+      // the fold (`deriveRequirementEvidence`, via the recompute below) decides
+      // what is granted and what is withheld for an officer. Gating here was
+      // wrong twice over: it froze a policy decision into an append-only row,
+      // and it was inert for the coverage categories, which never grant from a
+      // document row in the first place.
       await updateLatestExtractionRequirements(
         ctx.run.document.id,
         requirements.satisfiedCategories,
@@ -662,14 +740,19 @@ export function buildVendorDocTools(ctx: DocRunToolContext) {
       //    kick is deliberately deferred to the route's run-settle finally
       //    (after the semaphore slot is released, §6.3).
       const recomputeStartedAt = Date.now();
+      let referredCategories: RequirementCategoryType[] = [];
       try {
         const cross = await recomputeCrossDocumentRequirementsForVendor(
           ctx.run.vendor.id,
         );
+        referredCategories = cross.referredCategories;
         vendraLog("process.recompute", {
           doc: ctx.run.document.uuid,
           vendor: ctx.run.vendor.id,
           crossGranted: cross.grantedCategories.length,
+          ...(cross.referredCategories.length > 0
+            ? { referred: cross.referredCategories.join(",") }
+            : {}),
           ms: Date.now() - recomputeStartedAt,
         });
       } catch (err) {
@@ -682,12 +765,17 @@ export function buildVendorDocTools(ctx: DocRunToolContext) {
         });
       }
 
+      // What the document evidenced, plus what the fold withheld for an officer —
+      // so a referred category never renders as a plain missing requirement.
       writeTerminal(ctx, {
         status: "COMPLETED",
         documentType: docType,
         documentSubtype: classification.documentSubtype ?? null,
         validUploadType: uploadType,
         requirementsGranted: requirements.satisfiedCategories,
+        ...(referredCategories.length > 0
+          ? { requirementsReferred: referredCategories }
+          : {}),
       });
       return {
         finished: true,
@@ -695,6 +783,9 @@ export function buildVendorDocTools(ctx: DocRunToolContext) {
           documentType: docType,
           validUploadType: uploadType,
           requirementsGranted: requirements.satisfiedCategories,
+          ...(referredCategories.length > 0
+            ? { requirementsReferred: referredCategories }
+            : {}),
         },
       };
     },

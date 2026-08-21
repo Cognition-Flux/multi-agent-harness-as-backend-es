@@ -53,6 +53,22 @@ function CategoryRow({
       <MinusIcon className="h-3.5 w-3.5 text-muted-foreground" />
     ) : category.state === "DETERMINING" ? (
       <Loader className="h-3.5 w-3.5 text-agent" />
+    ) : category.state === "REFERRED" ? (
+      // SPEC §19.4: proved, but a compliance officer must ratify it. Deliberately
+      // NOT the warning half-ring — nothing here is the vendor's move.
+      <svg
+        viewBox="0 0 16 16"
+        fill="none"
+        className="h-3.5 w-3.5 text-agent animate-scale-in"
+      >
+        <circle cx="8" cy="8" r="6.25" stroke="currentColor" strokeWidth="1.5" />
+        <path
+          d="M8 4.75v3.5l2.25 1.5"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        />
+      </svg>
     ) : category.state === "PARTIALLY_COMPLETE" ? (
       // Determinate half-ring — "partway there" without font-dependent ◐.
       <svg
@@ -89,6 +105,12 @@ function CategoryRow({
           </p>
           {category.state === "DETERMINING" ? (
             <p className="text-xs text-muted-foreground">Revisando cobertura…</p>
+          ) : null}
+          {category.state === "REFERRED" ? (
+            <p className="text-xs text-muted-foreground">
+              Documentación recibida. Un oficial de cumplimiento debe aprobar
+              este requisito; no necesita hacer nada más.
+            </p>
           ) : null}
           {expired ? <p className="text-xs text-warning">Venció un documento que otorgaba este requisito</p> : null}
           {category.granted && category.expiresAt ? (

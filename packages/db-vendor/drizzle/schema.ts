@@ -67,6 +67,9 @@ export const activityTypeEnum = pgEnum("vendor_activity_type", [
   "API_CHECK_RUN",
   "VENDOR_REGISTERED",
   "ACTIVATION_SUBMITTED",
+  "POLICY_ACTIVATED",
+  "REQUIREMENT_REFERRED",
+  "REQUIREMENT_REFERRAL_RESOLVED",
 ]);
 
 // =============================================================================
@@ -98,6 +101,94 @@ export const vendorRequirementProfile = pgTable("vendor_requirement_profile", {
   maxManualDismissable: integer("max_manual_dismissable").notNull().default(2),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// =============================================================================
+// Governance: per-company document policy (SPEC §19)
+// =============================================================================
+
+/**
+ * One activated policy VERSION per organization — COMPANY-scoped, not
+ * profile-scoped, so a document type has exactly one rule set per company
+ * (§19.3). An org may have several requirement profiles (vendor types); the
+ * activation gate validates the policy against ALL of them.
+ *
+ * Versions are immutable:
+ * activating a new one archives the previous, and a vendor pins the version it
+ * is being judged under (`vendor.company_policy_id`) so activation never
+ * retroactively re-judges an in-flight vendor.
+ */
+export const companyPolicy = pgTable(
+  "company_policy",
+  {
+    id: serial("id").primaryKey(),
+    uuid: uuid("uuid").defaultRandom().notNull().unique(),
+    organizationId: integer("organization_id")
+      .references(() => organization.id)
+      .notNull(),
+    version: integer("version").notNull(),
+    /** "DRAFT" | "ACTIVE" | "ARCHIVED" — a TS union, not a pgEnum. */
+    status: text("status").notNull().default("DRAFT"),
+    /**
+     * RequirementCategory values the AUTOMATED pipeline may keep settling
+     * (§19.4). Anything outside this list is referred to an officer. Note the
+     * direction: the pipeline has always decided everything, so the
+     * behaviour-preserving default is EVERY required category — an empty list
+     * means "refer everything", not "no autonomy yet".
+     */
+    refereeableCategories: text("refereeable_categories")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    createdByUserId: text("created_by_user_id"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    activatedAt: timestamp("activated_at"),
+    activatedByUserId: text("activated_by_user_id"),
+  },
+  (table) => [
+    uniqueIndex("company_policy_org_version_uq").on(
+      table.organizationId,
+      table.version,
+    ),
+    // At most one ACTIVE policy per org — the partial-unique pattern already
+    // used by manual_requirement_grant_active_uq.
+    uniqueIndex("company_policy_active_uq")
+      .on(table.organizationId)
+      .where(sql`status = 'ACTIVE'`),
+  ],
+);
+
+/**
+ * The company's rule set for ONE document type (§19.3): which fields the agent
+ * is asked to extract, and which validators' rules COUNT. Exactly one row per
+ * (policy, document type) — the spec's "a single set of rules per document".
+ */
+export const companyPolicyDocument = pgTable(
+  "company_policy_document",
+  {
+    id: serial("id").primaryKey(),
+    companyPolicyId: integer("company_policy_id")
+      .references(() => companyPolicy.id, { onDelete: "cascade" })
+      .notNull(),
+    /** A VendorDocumentType value; UNKNOWN is never selectable. */
+    documentType: text("document_type").notNull(),
+    /** Extraction field names; empty = every field in the type's schema. */
+    extractFields: text("extract_fields")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    /** VendorValidatorId values whose rules count. Never empty (§19.5). */
+    validators: text("validators")
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+  },
+  (table) => [
+    uniqueIndex("company_policy_document_uq").on(
+      table.companyPolicyId,
+      table.documentType,
+    ),
+  ],
+);
 
 // =============================================================================
 // Vendors
@@ -134,6 +225,15 @@ export const vendor = pgTable("vendor", {
   requirementProfileId: integer("requirement_profile_id")
     .references(() => vendorRequirementProfile.id)
     .notNull(),
+  /**
+   * The governance policy version this vendor is judged under (§19.3). Pinned
+   * exactly like requirementProfileId: activating a new version leaves
+   * in-flight vendors on the version they started under. Nullable only for the
+   * migration window; the backfill sets it for every existing row.
+   */
+  companyPolicyId: integer("company_policy_id").references(
+    () => companyPolicy.id,
+  ),
   signoffUserId: text("signoff_user_id"),
   signoffAt: timestamp("signoff_at"),
   /** Denormalized roster/sweep column, maintained by the recompute (§6.7). */
@@ -191,6 +291,16 @@ export const vendorDocumentExtraction = pgTable(
     /** TIN pre-masked at persist time (§10 defense in depth). */
     extractedData: jsonb("extracted_data").notNull(),
     fieldConfidences: jsonb("field_confidences"),
+    /**
+     * The governance policy version that judged this extraction (SPEC §19.3).
+     * `vendor.company_policy_id` can be repointed, so without this an officer
+     * reading an old row cannot tell whether a validator is absent because the
+     * document lacked it or because the then-active policy deselected it.
+     * Nullable: rows written before the governance layer have no policy.
+     */
+    companyPolicyId: integer("company_policy_id").references(
+      () => companyPolicy.id,
+    ),
     /** ValidationRule[] */
     validationRules: jsonb("validation_rules"),
     validationValid: boolean("validation_valid"),
@@ -333,6 +443,56 @@ export const documentConfirmation = pgTable(
     outcome: text("outcome"),
   },
   (table) => [index("document_confirmation_doc_idx").on(table.documentId)],
+);
+
+/**
+ * A requirement the harness was NOT allowed to settle (SPEC §19.4): the host
+ * computed a verdict, policy withheld ratification, and an officer must decide.
+ *
+ * Deliberately NOT a document_confirmation. That table carries
+ * `default_answer`/`expires_at` and the run FAILS OPEN on timeout — right for
+ * "is this your company?", unacceptable for "may this category be granted?".
+ * A referral has no expiry and no default: it waits for a human.
+ */
+export const requirementReferral = pgTable(
+  "requirement_referral",
+  {
+    id: serial("id").primaryKey(),
+    uuid: uuid("uuid").defaultRandom().notNull().unique(),
+    vendorId: integer("vendor_id")
+      .references(() => vendor.id, { onDelete: "cascade" })
+      .notNull(),
+    /** The document whose evidence prompted it; null for vendor-level referrals. */
+    documentId: integer("document_id").references(() => vendorDocument.id, {
+      onDelete: "cascade",
+    }),
+    /** A RequirementCategory value. */
+    category: text("category").notNull(),
+    /** "GRANT" | "REJECT" — the host verdict awaiting ratification. */
+    proposedVerdict: text("proposed_verdict").notNull(),
+    /** "AGENT" today; the column exists so a future proposer is auditable. */
+    proposedBy: text("proposed_by").notNull().default("AGENT"),
+    /** The validation rules / extraction facts behind the proposal. */
+    evidence: jsonb("evidence"),
+    raisedAt: timestamp("raised_at").defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at"),
+    resolvedByUserId: text("resolved_by_user_id"),
+    /**
+     * "GRANTED" | "REJECTED" set by an officer; "SUPERSEDED" set by the fold
+     * when the category stopped needing ratification (granted elsewhere, or the
+     * evidence changed) — see reconcileRequirementReferrals.
+     */
+    resolution: text("resolution"),
+    note: text("note"),
+  },
+  (table) => [
+    index("requirement_referral_vendor_idx").on(table.vendorId),
+    // One OPEN referral per (vendor, category) — a re-run must not queue a
+    // second copy of a question nobody has answered yet.
+    uniqueIndex("requirement_referral_open_uq")
+      .on(table.vendorId, table.category)
+      .where(sql`resolved_at IS NULL`),
+  ],
 );
 
 // =============================================================================

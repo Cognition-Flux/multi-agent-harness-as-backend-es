@@ -22,6 +22,8 @@ export interface InsertExtractionVersionInput {
   fieldConfidences?: Record<string, unknown> | null;
   model?: string | null;
   source?: string;
+  /** The governance policy version in force for this run (SPEC §19.3). */
+  companyPolicyId?: number | null;
 }
 
 /** Insert the next extraction version for a document; returns the version. */
@@ -47,6 +49,8 @@ export async function insertExtractionVersion(
     fieldConfidences: input.fieldConfidences ?? null,
     model: input.model ?? null,
     source: input.source ?? "harness",
+    // SPEC §19.3 provenance: which policy version judged THIS extraction.
+    companyPolicyId: input.companyPolicyId ?? null,
   });
   return version;
 }

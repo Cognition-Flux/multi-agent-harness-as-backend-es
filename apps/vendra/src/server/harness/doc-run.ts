@@ -26,7 +26,11 @@ import {
 import { readDocumentBytes } from "@/server/storage";
 import { toRequirementProfile, toThresholds, toWorkProfile } from "@/server/profile";
 
-import { deriveAllowedDocumentTypes, type VendorDocumentType } from "@vendra/workflow/vendor";
+import {
+  deriveAllowedDocumentTypes,
+  effectiveAllowedDocumentTypes,
+  type VendorDocumentType,
+} from "@vendra/workflow/vendor";
 
 import { CONFIRMATION_WINDOW_MS } from "./confirmations";
 import type { DocumentRunContext } from "./db/documents";
@@ -98,6 +102,7 @@ export function minimalDocRunFailContext(
   return {
     writer: noopDocRunWriter,
     run,
+    policy: run.policy,
     allowedTypes: new Set(),
     vendorContext: { legalName: run.vendor.legalName },
     thresholds: toThresholds(run.profile),
@@ -180,10 +185,22 @@ export function buildVendorDocRunContext(
   const { run, startedAt } = prepared;
   const profile = toRequirementProfile(run.profile);
   const workProfile = toWorkProfile(run.vendor.workProfile);
+  // SPEC §19.6: the company policy is an UPPER BOUND and the vendor's profile
+  // still scopes it, so the default policy reproduces the pre-governance set
+  // exactly while a narrowed policy can restrict it further.
+  const profileDerived = deriveAllowedDocumentTypes(
+    profile.required,
+  ) as ReadonlySet<VendorDocumentType>;
   return {
     writer: writer ?? noopDocRunWriter,
     run,
-    allowedTypes: deriveAllowedDocumentTypes(profile.required) as ReadonlySet<VendorDocumentType>,
+    policy: run.policy,
+    allowedTypes: run.policy
+      ? (effectiveAllowedDocumentTypes(
+          run.policy,
+          profileDerived,
+        ) as ReadonlySet<VendorDocumentType>)
+      : profileDerived,
     vendorContext: {
       legalName: run.vendor.legalName,
       dbaName: run.vendor.dbaName,

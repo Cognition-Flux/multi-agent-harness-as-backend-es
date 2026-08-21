@@ -17,6 +17,7 @@ export {
   type NameComparisonResult,
   type NameMatchConfidence,
 } from "./name-matching";
+export * from "./policy";
 export * from "./requirement-profile";
 export * from "./requirements";
 export * from "./schemas";

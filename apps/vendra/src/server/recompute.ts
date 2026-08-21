@@ -25,6 +25,7 @@ import {
   computeCoverageSignature,
   deriveAutoDismissedCategories,
   deriveRequirementEvidence,
+  type CompanyPolicy,
   evaluateCoverageFreshness,
   isInsuranceDocumentType,
   parseCoverageDetermination,
@@ -39,6 +40,8 @@ import {
 } from "@vendra/workflow/vendor";
 
 import { parseWaiver } from "@/server/harness/db/page-load";
+import { loadVendorCompanyPolicy } from "@/server/company-policy";
+import { reconcileRequirementReferrals } from "@/server/harness/db/referrals";
 import { toRequirementProfile, toThresholds, toWorkProfile } from "@/server/profile";
 
 const {
@@ -55,6 +58,8 @@ type Executor = VendorDb | Parameters<Parameters<VendorDb["transaction"]>[0]>[0]
 
 export interface RecomputeResult {
   grantedCategories: RequirementCategoryType[];
+  /** Categories an automated source proved but policy withheld (§19.4). */
+  referredCategories: RequirementCategoryType[];
   coverageFresh: boolean;
   coverageDetermining: boolean;
   coverageSignature: string;
@@ -82,6 +87,8 @@ export async function loadVendorEvidence(
   determinationFresh: boolean;
   evidence: RequirementEvidenceResult;
   gate: ActivationGateResult;
+  /** The governance policy the fold was evaluated under (§19.4); null = none. */
+  policy: CompanyPolicy | null;
 }> {
   const [vendorRow] = await executor
     .select()
@@ -190,6 +197,13 @@ export async function loadVendorEvidence(
   const determinationFresh =
     evaluateCoverageFreshness(determination, signature) === "fresh";
 
+  const profile = toRequirementProfile(profileRow);
+  // SPEC §19.4: the referee boundary is applied by the FOLD, because the fold is
+  // the single authority on what is granted — the document persist site is not
+  // (coverage categories never grant from it). A vendor with no policy passes
+  // `undefined`, which the fold reads as full autonomy.
+  const policy = await loadVendorCompanyPolicy(vendorRow);
+
   const evidence = deriveRequirementEvidence({
     docs,
     determination,
@@ -202,9 +216,14 @@ export async function loadVendorEvidence(
       expiresAt: c.expiresAt?.toISOString().slice(0, 10) ?? null,
     })),
     now,
+    ...(policy
+      ? {
+          refereeableCategories: policy.refereeableCategories,
+          requiredCategories: profile.required,
+        }
+      : {}),
   });
 
-  const profile = toRequirementProfile(profileRow);
   const gate = calculateActivationGate({
     profile,
     granted: evidence.granted,
@@ -229,6 +248,7 @@ export async function loadVendorEvidence(
     determinationFresh,
     evidence,
     gate,
+    policy,
   };
 }
 
@@ -254,6 +274,21 @@ async function recomputeOnExecutor(
     (entry) => entry.determining,
   );
   const coverageDetermining = determiningLines.length > 0;
+
+  // SPEC §19.4: the fold is the single authority on what is granted, so it is
+  // also the single writer of referrals. Reconciling here — inside the same
+  // transaction and row lock as the metadata write — means a withheld grant and
+  // its officer question can never disagree, and a category the fold now grants
+  // (an officer ratified it, or new evidence arrived) has its stale question
+  // closed rather than left sitting in the queue.
+  const referredCategories = [...evidence.byCategory.values()]
+    .filter((entry) => entry.referred)
+    .map((entry) => entry.category);
+  await reconcileRequirementReferrals(executor, {
+    vendorId,
+    organizationId: vendorRow.organizationId,
+    evidenceByCategory: evidence.byCategory,
+  });
 
   // Single-statement jsonb sibling-merge touching only our own keys.
   const fold = {
@@ -299,6 +334,7 @@ async function recomputeOnExecutor(
 
   const result: RecomputeResult = {
     grantedCategories,
+    referredCategories,
     coverageFresh: determinationFresh,
     coverageDetermining,
     coverageSignature: signature,

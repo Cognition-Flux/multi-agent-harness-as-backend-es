@@ -68,6 +68,21 @@ export interface RequirementEvidenceInput {
   determinationFresh: boolean;
   apiChecks: ApiCheckInput[];
   now: Date;
+  /**
+   * The governance referee boundary (SPEC §19.4). Categories the AUTOMATED
+   * pipeline may keep settling; anything else that an automated source would
+   * grant is withheld and marked `referred` for an officer.
+   *
+   * Optional and defaulting to "everything" so pre-governance callers — and a
+   * vendor whose org has no policy yet — fold exactly as they always did.
+   */
+  refereeableCategories?: readonly RequirementCategoryType[];
+  /**
+   * The vendor profile's required categories. Only a REQUIRED category can gate
+   * activation, so only those are ever withheld — referring anything else would
+   * queue a question whose answer changes nothing.
+   */
+  requiredCategories?: readonly RequirementCategoryType[];
 }
 
 // =============================================================================
@@ -80,6 +95,19 @@ export interface CategoryEvidence {
   granted: boolean;
   /** Coverage categories only: the lane has not converged on current inputs. */
   determining: boolean;
+  /**
+   * An automated source proved this category, but policy withholds ratification
+   * (SPEC §19.4) — an officer must decide. NOT the same as ungranted-for-lack-of-
+   * evidence, and mutually exclusive with both `granted` and `determining`.
+   */
+  referred: boolean;
+  /**
+   * Evidence an automated source produced that policy WITHHELD (§19.4). Kept
+   * out of `sources` deliberately: `sources` is what counts, and the activation
+   * gate is derived from it — a withheld source in there would clear the very
+   * gate the referral exists to hold. This array is what an officer ratifies.
+   */
+  referredSources: GrantSource[];
   sources: GrantSource[];
   grantingDocumentUuids: string[];
   /** Granting docs whose own expiration has lapsed (yellow-cascade rollup). */
@@ -130,6 +158,8 @@ export function deriveRequirementEvidence(
       label: requirementCategoryLabel(category),
       granted: false,
       determining: false,
+      referred: false,
+      referredSources: [],
       sources: [],
       grantingDocumentUuids: [],
       expiredGrantingDocumentUuids: [],
@@ -142,12 +172,40 @@ export function deriveRequirementEvidence(
   }
   const unclassifiedDocumentUuids: string[] = [];
 
+  // SPEC §19.4. `undefined` means "no policy" and therefore full autonomy, which
+  // is what every caller did before the governance layer existed.
+  const refereeable = input.refereeableCategories
+    ? new Set<string>(input.refereeableCategories)
+    : null;
+  const required = new Set<string>(input.requiredCategories ?? []);
+
+  /**
+   * Is this grant the automated pipeline settling a category policy says a human
+   * must settle? Officer sources (`manual_grant`, `waiver`) are the human
+   * decision itself and are never withheld — withholding them would make the
+   * officer's rescue path unreachable.
+   */
+  const withheldByPolicy = (
+    category: RequirementCategoryType,
+    kind: GrantSource["kind"],
+  ): boolean => {
+    if (!refereeable) return false;
+    if (kind === "manual_grant" || kind === "waiver") return false;
+    return required.has(category) && !refereeable.has(category);
+  };
+
   const addSource = (
     category: RequirementCategoryType,
     source: GrantSource,
   ): void => {
     const entry = byCategory.get(category);
     if (!entry) return;
+    if (withheldByPolicy(category, source.kind)) {
+      // Recorded, but NOT in `sources` — see the note on `referredSources`.
+      entry.referredSources.push(source);
+      entry.referred = true;
+      return;
+    }
     entry.sources.push(source);
     entry.granted = true;
     if (source.expiresAt) {
@@ -310,7 +368,8 @@ export function deriveRequirementEvidence(
   }
 
   // API-check evidence (SANCTIONS_SCREENING et al.) renders identically to
-  // documents (§6.9).
+  // documents (§6.9). NB this runs AFTER the determining pass, so the
+  // exclusivity fixup below is what keeps the three flags coherent.
   for (const check of apiChecks) {
     if (!(REQUIREMENT_CATEGORY_VALUES as readonly string[]).includes(check.category)) {
       continue;
@@ -321,6 +380,15 @@ export function deriveRequirementEvidence(
         expiresAt: check.expiresAt,
       });
     }
+  }
+
+  // Flag coherence (§19.4): the three states are mutually exclusive. A category
+  // an officer has since granted is no longer pending, and a withheld coverage
+  // category must not also advertise "determining" — the bug this fold replaced
+  // rendered both at once.
+  for (const entry of byCategory.values()) {
+    if (entry.granted) entry.referred = false;
+    if (entry.referred) entry.determining = false;
   }
 
   const granted = new Map<RequirementCategoryType, GrantSource[]>();

@@ -31,8 +31,111 @@ export type VendorValidatorId =
   | "report_recent"
   | "jurisdiction_match"
   | "certificate_holder_correct"
-  | "expiration_valid"
   | "field_present";
+
+/**
+ * The validator ids each document type can emit (SPEC §19.2) — the set a company
+ * chooses from in the governance console.
+ *
+ * `ValidationResult.validators_array` is per-INPUT (the ids that actually fired
+ * for one document), so it can never serve as this catalog. This map is declared
+ * and kept honest by enumeration: `assertValidatorCatalogCovers` proves the
+ * emitted ids are a subset of the declared ones for every type.
+ */
+export const VALIDATORS_BY_DOCUMENT_TYPE: Record<
+  VendorDocumentType,
+  readonly VendorValidatorId[]
+> = {
+  ACORD_25_COI: [
+    "entity_name_match",
+    "policy_in_force",
+    "limit_meets_threshold",
+    "endorsement_present",
+    "certificate_holder_correct",
+    "is_signed",
+    "field_present",
+  ],
+  INSURANCE_POLICY_DEC_PAGE: [
+    "entity_name_match",
+    "policy_in_force",
+    "limit_meets_threshold",
+    "field_present",
+  ],
+  UMBRELLA_POLICY: [
+    "entity_name_match",
+    "policy_in_force",
+    "limit_meets_threshold",
+    "field_present",
+  ],
+  CYBER_POLICY: [
+    "entity_name_match",
+    "policy_in_force",
+    "limit_meets_threshold",
+    "field_present",
+  ],
+  W9: ["entity_name_match", "is_signed", "tin_present_and_masked"],
+  W8_BEN_E: ["entity_name_match", "is_signed", "field_present"],
+  BUSINESS_LICENSE: ["entity_name_match", "policy_in_force", "jurisdiction_match"],
+  DIVERSITY_CERT: ["entity_name_match", "policy_in_force", "field_present"],
+  EMR_LETTER: ["entity_name_match", "emr_within_bound", "report_recent"],
+  OSHA_300A: ["entity_name_match", "is_signed", "report_recent"],
+  SOC2_REPORT: ["entity_name_match", "report_recent", "field_present"],
+  ISO_27001_CERT: ["entity_name_match", "policy_in_force"],
+  BANK_LETTER: [
+    "entity_name_match",
+    "is_signed",
+    "report_recent",
+    "field_present",
+  ],
+  VOID_CHECK: ["entity_name_match", "field_present"],
+  MSA_SIGNED: ["entity_name_match", "is_signed"],
+  NDA_SIGNED: ["entity_name_match", "is_signed"],
+  UNKNOWN: [],
+};
+
+/** Vendor-facing labels for the governance console (Spanish, trato de usted). */
+export const VALIDATOR_LABELS: Record<VendorValidatorId, string> = {
+  entity_name_match: "El nombre de la empresa coincide",
+  is_signed: "El documento está firmado",
+  tin_present_and_masked: "Identificación fiscal presente y enmascarada",
+  limit_meets_threshold: "El límite alcanza el mínimo exigido",
+  endorsement_present: "Endosos requeridos presentes",
+  policy_in_force: "La vigencia cubre la fecha actual",
+  emr_within_bound: "El EMR está dentro del máximo",
+  report_recent: "El informe es suficientemente reciente",
+  jurisdiction_match: "La jurisdicción corresponde",
+  certificate_holder_correct: "El titular del certificado es correcto",
+  field_present: "Campos obligatorios presentes",
+};
+
+export interface ValidatorCatalogEntry {
+  id: VendorValidatorId;
+  label: string;
+  /** Document types this validator can run against. */
+  documentTypes: VendorDocumentType[];
+}
+
+/** The validator superset, for the governance console. */
+export function listValidatorCatalog(): ValidatorCatalogEntry[] {
+  const ids = Object.keys(VALIDATOR_LABELS) as VendorValidatorId[];
+  return ids.map((id) => ({
+    id,
+    label: VALIDATOR_LABELS[id],
+    documentTypes: (
+      Object.keys(VALIDATORS_BY_DOCUMENT_TYPE) as VendorDocumentType[]
+    ).filter((type) => VALIDATORS_BY_DOCUMENT_TYPE[type].includes(id)),
+  }));
+}
+
+/** Is this validator applicable to this document type? (admissibility input) */
+export function isValidatorApplicable(
+  documentType: VendorDocumentType,
+  validatorId: string,
+): boolean {
+  return (
+    VALIDATORS_BY_DOCUMENT_TYPE[documentType] as readonly string[]
+  ).includes(validatorId);
+}
 
 export interface ValidationRule {
   validatorId: VendorValidatorId;

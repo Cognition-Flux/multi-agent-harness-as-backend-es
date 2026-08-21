@@ -1,0 +1,2 @@
+ALTER TABLE "vendor_document_extraction" ADD COLUMN "company_policy_id" integer;--> statement-breakpoint
+ALTER TABLE "vendor_document_extraction" ADD CONSTRAINT "vendor_document_extraction_company_policy_id_company_policy_id_fk" FOREIGN KEY ("company_policy_id") REFERENCES "public"."company_policy"("id") ON DELETE no action ON UPDATE no action;

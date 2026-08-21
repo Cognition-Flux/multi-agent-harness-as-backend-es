@@ -667,22 +667,46 @@ const GENERIC_EXTRACTION_PROMPT =
  * (getSchema / getJsonSchema / getSystemPrompt).
  */
 export class SchemaRegistry {
-  static getSchema(documentType: VendorDocumentType): z.ZodObject<z.ZodRawShape> {
+  /**
+   * The extraction schema for a type, optionally PROJECTED onto a company's
+   * configured field subset (SPEC §19.1). An empty/absent `fields` list means
+   * "every field", so existing callers keep the full schema.
+   */
+  static getSchema(
+    documentType: VendorDocumentType,
+    fields?: readonly string[],
+  ): z.ZodObject<z.ZodRawShape> {
     if (documentType === VendorDocumentTypeEnum.UNKNOWN) {
       return z.object({});
     }
-    return EXTRACTION_SCHEMAS[documentType];
+    const full = EXTRACTION_SCHEMAS[documentType];
+    if (!fields || fields.length === 0) return full;
+    const mask: Record<string, true> = {};
+    for (const field of fields) {
+      // hasOwn, not `in`: `in` walks the prototype, so "__proto__" or
+      // "constructor" would mask a key the schema does not have.
+      if (Object.hasOwn(full.shape, field)) mask[field] = true;
+    }
+    // Structural fields are re-added unconditionally: a policy that dropped one
+    // would silently change grants or expiry rather than fail a check (§19.1).
+    for (const field of structuralExtractionFields(documentType)) {
+      mask[field] = true;
+    }
+    // A mask that matched nothing would hand the agent an empty contract —
+    // fall back to the full schema and let admissibility catch the bad config.
+    if (Object.keys(mask).length === 0) return full;
+    return full.pick(mask) as z.ZodObject<z.ZodRawShape>;
   }
 
   static getJsonSchema(
     documentType: VendorDocumentType,
+    fields?: readonly string[],
   ): Record<string, unknown> {
     // zod 4's native converter (flat schemas — no refs emitted); replaces
     // the zod-3-only zod-to-json-schema dependency.
-    return z.toJSONSchema(SchemaRegistry.getSchema(documentType)) as Record<
-      string,
-      unknown
-    >;
+    return z.toJSONSchema(
+      SchemaRegistry.getSchema(documentType, fields),
+    ) as Record<string, unknown>;
   }
 
   static getSystemPrompt(documentType: VendorDocumentType): string {
@@ -691,6 +715,47 @@ export class SchemaRegistry {
       ? `${GENERIC_EXTRACTION_PROMPT} ${specific}`
       : GENERIC_EXTRACTION_PROMPT;
   }
+}
+
+// =============================================================================
+// The document superset, for the governance console (SPEC §19.1)
+// =============================================================================
+
+/** Every extraction field this document type can produce. */
+export function extractionFieldNames(
+  documentType: VendorDocumentType,
+): string[] {
+  if (documentType === VendorDocumentTypeEnum.UNKNOWN) return [];
+  return Object.keys(EXTRACTION_SCHEMAS[documentType].shape);
+}
+
+export interface DocumentCatalogEntry {
+  type: VendorDocumentType;
+  /** Vendor-facing title (Spanish). */
+  title: string;
+  /** Officer-facing English display name from the classification catalog. */
+  displayName: string;
+  fields: string[];
+  /** Fields the console must render locked — see `structuralExtractionFields`. */
+  structuralFields: string[];
+}
+
+/**
+ * The document superset a company selects from. UNKNOWN is excluded — it is the
+ * classifier's "not one of these" terminal, never a selectable type.
+ */
+export function listDocumentTypeCatalog(): DocumentCatalogEntry[] {
+  return VENDOR_DOCUMENT_TYPE_VALUES.filter(
+    (type) => type !== VendorDocumentTypeEnum.UNKNOWN,
+  ).map((type) => ({
+    type,
+    title: VENDOR_DOCUMENT_TYPE_TITLES[type],
+    // UNKNOWN is filtered above, so a definition always exists; the fallback
+    // keeps the type honest rather than asserting non-null.
+    displayName: getDocumentPromptDefinition(type)?.displayName ?? type,
+    fields: extractionFieldNames(type),
+    structuralFields: structuralExtractionFields(type),
+  }));
 }
 
 // =============================================================================
@@ -791,6 +856,59 @@ export function enforceMaskedFields(
     const digits = value.replace(/\D/g, "");
     extractedData[field] = digits.length >= 4 ? digits.slice(-4) : digits || null;
   }
+}
+
+// =============================================================================
+// Structural extraction fields — never deselectable (SPEC §19.1)
+// =============================================================================
+
+/**
+ * Fields the HOST reads by name — derivations and HITL gates. A company may not
+ * deselect these, because the failure mode is silent rather than loud:
+ *
+ *   - deselect a validator's input  → that check fails, visibly, with copy;
+ *   - deselect a derivation's input → the derivation quietly returns nothing and
+ *     grants/expiry change with no error anywhere.
+ *
+ * `coverage_lines` is the sharpest case: `readCoverageLines` degrades to `[]`,
+ * so an ACORD-25 would stop granting general liability while every check still
+ * passed. Field selection is also TOP-LEVEL only — `coverage_lines` is an array
+ * of objects and its sub-fields cannot be deselected at all.
+ */
+const DERIVATION_FIELDS = [
+  // deriveExtractedExpirationDate
+  "coverage_lines",
+  "expiration_date",
+  "period_end",
+  // The blanket-additional-insured HITL gate in finalizeDocument keys on
+  // `additional_insured === null`. An ABSENT field is `undefined`, not `null`, so
+  // deselecting it does not "leave the question open" — it deletes the question,
+  // and the vendor never gets the chance to confirm the endorsement. Silent, so
+  // protected. (`waiver_of_subrogation` / `primary_and_noncontributory` are read
+  // only by validators, which fail loudly, so they stay selectable.)
+  "additional_insured",
+  // enforceMaskedFields (PII masking, §10)
+  ...LAST4_FIELDS,
+  // readCoverageLines / validatePolicyDoc, for the single-policy types
+  "line",
+  "occurrence_limit_usd",
+  "aggregate_limit_usd",
+  "effective_date",
+] as const;
+
+/** The non-deselectable fields for a type: derivation inputs + its entity name. */
+export function structuralExtractionFields(
+  documentType: VendorDocumentType,
+): string[] {
+  if (documentType === VendorDocumentTypeEnum.UNKNOWN) return [];
+  const shape = EXTRACTION_SCHEMAS[documentType].shape;
+  const structural = new Set<string>();
+  for (const field of DERIVATION_FIELDS) {
+    if (Object.hasOwn(shape, field)) structural.add(field);
+  }
+  const entityField = ENTITY_NAME_FIELD[documentType];
+  if (entityField && Object.hasOwn(shape, entityField)) structural.add(entityField);
+  return [...structural];
 }
 
 /** Normalize the multi-entity advisory list (dedup, trim, cap). */

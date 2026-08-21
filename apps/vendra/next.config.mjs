@@ -11,6 +11,14 @@ const nextConfig = {
   output: "standalone",
   outputFileTracingRoot: path.join(__dirname, "../../"),
   transpilePackages: ["@vendra/workflow", "@vendra/db-vendor"],
+  // The governance admissibility gate reads a committed Wasm artifact at
+  // runtime (SPEC §19.5). Nothing imports it, so tracing cannot infer it —
+  // without this the standalone image would 404 on activation.
+  outputFileTracingIncludes: {
+    "/api/**": ["../../policy/company-policy.wasm"],
+    "/(officer)/**": ["../../policy/company-policy.wasm"],
+    "/(superadmin)/**": ["../../policy/company-policy.wasm"],
+  },
   serverExternalPackages: [
     "pg",
     // The Claude Code harness family opens sockets, spawns processes, and
