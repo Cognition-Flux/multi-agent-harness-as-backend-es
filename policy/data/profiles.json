@@ -1,0 +1,64 @@
+{
+  "vendra": {
+    "catalog": [
+      "TAX_IDENTITY", "INSURANCE_GENERAL_LIABILITY", "INSURANCE_WORKERS_COMP",
+      "INSURANCE_AUTO", "BUSINESS_LICENSE", "DIVERSITY_CERTIFICATION",
+      "SAFETY_RECORD", "BANKING_VERIFICATION", "DATA_SECURITY",
+      "SIGNED_AGREEMENTS", "SANCTIONS_SCREENING"
+    ],
+    "coverage_categories": [
+      "INSURANCE_GENERAL_LIABILITY", "INSURANCE_WORKERS_COMP", "INSURANCE_AUTO"
+    ],
+    "insurance_document_types": [
+      "ACORD_25_COI", "INSURANCE_POLICY_DEC_PAGE", "UMBRELLA_POLICY"
+    ],
+    "requirement_map": {
+      "ACORD_25_COI": ["INSURANCE_GENERAL_LIABILITY", "INSURANCE_WORKERS_COMP", "INSURANCE_AUTO"],
+      "INSURANCE_POLICY_DEC_PAGE": ["INSURANCE_GENERAL_LIABILITY", "INSURANCE_WORKERS_COMP", "INSURANCE_AUTO"],
+      "UMBRELLA_POLICY": ["INSURANCE_GENERAL_LIABILITY", "INSURANCE_AUTO"],
+      "W9": ["TAX_IDENTITY"],
+      "W8_BEN_E": ["TAX_IDENTITY"],
+      "BUSINESS_LICENSE": ["BUSINESS_LICENSE"],
+      "DIVERSITY_CERT": ["DIVERSITY_CERTIFICATION"],
+      "EMR_LETTER": ["SAFETY_RECORD"],
+      "OSHA_300A": ["SAFETY_RECORD"],
+      "SOC2_REPORT": ["DATA_SECURITY"],
+      "ISO_27001_CERT": ["DATA_SECURITY"],
+      "CYBER_POLICY": ["DATA_SECURITY"],
+      "BANK_LETTER": ["BANKING_VERIFICATION"],
+      "VOID_CHECK": ["BANKING_VERIFICATION"],
+      "MSA_SIGNED": ["SIGNED_AGREEMENTS"],
+      "NDA_SIGNED": ["SIGNED_AGREEMENTS"],
+      "UNKNOWN": []
+    },
+    "automated_grant_paths": {
+      "api_check": {"implemented": false, "categories": ["SANCTIONS_SCREENING"]}
+    },
+    "profiles": [
+      {
+        "name": "construction-sub",
+        "required": [
+          "TAX_IDENTITY", "INSURANCE_GENERAL_LIABILITY", "INSURANCE_WORKERS_COMP",
+          "INSURANCE_AUTO", "BUSINESS_LICENSE", "SAFETY_RECORD",
+          "BANKING_VERIFICATION", "SIGNED_AGREEMENTS", "DIVERSITY_CERTIFICATION"
+        ],
+        "mandatory": ["TAX_IDENTITY", "INSURANCE_GENERAL_LIABILITY"],
+        "dismissible": [
+          "DIVERSITY_CERTIFICATION", "INSURANCE_AUTO",
+          "INSURANCE_WORKERS_COMP", "SAFETY_RECORD"
+        ],
+        "max_manual_dismissable": 2
+      },
+      {
+        "name": "general-supplier",
+        "required": [
+          "TAX_IDENTITY", "BANKING_VERIFICATION", "SIGNED_AGREEMENTS",
+          "INSURANCE_GENERAL_LIABILITY", "DATA_SECURITY"
+        ],
+        "mandatory": ["TAX_IDENTITY"],
+        "dismissible": ["DATA_SECURITY"],
+        "max_manual_dismissable": 1
+      }
+    ]
+  }
+}

@@ -1,0 +1,277 @@
+{
+  "thresholds": {
+    "glOccurrenceUsd": 1000000,
+    "glAggregateUsd": 2000000,
+    "autoLimitUsd": 1000000,
+    "wcLimitUsd": 500000,
+    "cyberLimitUsd": 1000000,
+    "emrMax": 1.0,
+    "soc2MaxAgeMonths": 12,
+    "requireAdditionalInsured": true,
+    "requireWaiverOfSubrogation": false,
+    "requirePrimaryNoncontributory": false
+  },
+  "allowed": [
+    "doc-a",
+    "doc-b"
+  ],
+  "cases": [
+    {
+      "name": "clean_meets",
+      "lines": [
+        {
+          "category": "GENERAL_LIABILITY",
+          "effectiveOccurrenceLimitUsd": 1000000,
+          "effectiveAggregateLimitUsd": 2000000,
+          "verdict": "MEETS",
+          "reasoning": "primary",
+          "contributions": [
+            {
+              "documentUuid": "doc-a",
+              "role": "primary",
+              "amountAppliedUsd": 1000000,
+              "reasoning": "coi"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "meets_with_null_limit",
+      "lines": [
+        {
+          "category": "GENERAL_LIABILITY",
+          "effectiveOccurrenceLimitUsd": null,
+          "effectiveAggregateLimitUsd": null,
+          "verdict": "MEETS",
+          "reasoning": "?",
+          "contributions": []
+        }
+      ]
+    },
+    {
+      "name": "below_with_null_limit",
+      "lines": [
+        {
+          "category": "GENERAL_LIABILITY",
+          "effectiveOccurrenceLimitUsd": null,
+          "effectiveAggregateLimitUsd": null,
+          "verdict": "BELOW",
+          "reasoning": "unreadable",
+          "contributions": []
+        }
+      ]
+    },
+    {
+      "name": "rejected_contribution_pays",
+      "lines": [
+        {
+          "category": "AUTO",
+          "effectiveOccurrenceLimitUsd": 1000000,
+          "effectiveAggregateLimitUsd": null,
+          "verdict": "MEETS",
+          "reasoning": "x",
+          "contributions": [
+            {
+              "documentUuid": "doc-a",
+              "role": "primary",
+              "amountAppliedUsd": 1000000,
+              "reasoning": "p"
+            },
+            {
+              "documentUuid": "doc-b",
+              "role": "rejected",
+              "amountAppliedUsd": 500000,
+              "reasoning": "expired"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "b12_below_at_999999",
+      "lines": [
+        {
+          "category": "GENERAL_LIABILITY",
+          "effectiveOccurrenceLimitUsd": 999999,
+          "effectiveAggregateLimitUsd": null,
+          "verdict": "BELOW",
+          "reasoning": "just short",
+          "contributions": [
+            {
+              "documentUuid": "doc-a",
+              "role": "primary",
+              "amountAppliedUsd": 1000000,
+              "reasoning": "p"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "duplicate_lines",
+      "lines": [
+        {
+          "category": "WORKERS_COMP",
+          "effectiveOccurrenceLimitUsd": 500000,
+          "effectiveAggregateLimitUsd": null,
+          "verdict": "MEETS",
+          "reasoning": "a",
+          "contributions": [
+            {
+              "documentUuid": "doc-a",
+              "role": "primary",
+              "amountAppliedUsd": 500000,
+              "reasoning": "p"
+            }
+          ]
+        },
+        {
+          "category": "WORKERS_COMP",
+          "effectiveOccurrenceLimitUsd": 500000,
+          "effectiveAggregateLimitUsd": null,
+          "verdict": "MEETS",
+          "reasoning": "b",
+          "contributions": [
+            {
+              "documentUuid": "doc-b",
+              "role": "primary",
+              "amountAppliedUsd": 500000,
+              "reasoning": "p"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "uuid_not_in_input_set",
+      "lines": [
+        {
+          "category": "AUTO",
+          "effectiveOccurrenceLimitUsd": 1000000,
+          "effectiveAggregateLimitUsd": null,
+          "verdict": "MEETS",
+          "reasoning": "x",
+          "contributions": [
+            {
+              "documentUuid": "doc-ghost",
+              "role": "primary",
+              "amountAppliedUsd": 1000000,
+              "reasoning": "p"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "empty_lines",
+      "lines": []
+    },
+    {
+      "name": "negative_offsetting_contributions",
+      "lines": [
+        {
+          "category": "GENERAL_LIABILITY",
+          "effectiveOccurrenceLimitUsd": 1000000,
+          "effectiveAggregateLimitUsd": 2000000,
+          "verdict": "MEETS",
+          "reasoning": "stacked",
+          "contributions": [
+            {
+              "documentUuid": "doc-a",
+              "role": "primary",
+              "amountAppliedUsd": 2000000,
+              "reasoning": "p"
+            },
+            {
+              "documentUuid": "doc-b",
+              "role": "excess",
+              "amountAppliedUsd": -1000000,
+              "reasoning": "netting"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "aggregate_below_occurrence",
+      "lines": [
+        {
+          "category": "GENERAL_LIABILITY",
+          "effectiveOccurrenceLimitUsd": 1000000,
+          "effectiveAggregateLimitUsd": 1,
+          "verdict": "MEETS",
+          "reasoning": "x",
+          "contributions": [
+            {
+              "documentUuid": "doc-a",
+              "role": "primary",
+              "amountAppliedUsd": 1000000,
+              "reasoning": "p"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "undetermined_with_sufficient_limit",
+      "lines": [
+        {
+          "category": "GENERAL_LIABILITY",
+          "effectiveOccurrenceLimitUsd": 5000000,
+          "effectiveAggregateLimitUsd": 5000000,
+          "verdict": "UNDETERMINED",
+          "reasoning": "unsure",
+          "contributions": [
+            {
+              "documentUuid": "doc-a",
+              "role": "primary",
+              "amountAppliedUsd": 5000000,
+              "reasoning": "p"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "wc_meets_below_threshold",
+      "lines": [
+        {
+          "category": "WORKERS_COMP",
+          "effectiveOccurrenceLimitUsd": 400000,
+          "effectiveAggregateLimitUsd": null,
+          "verdict": "MEETS",
+          "reasoning": "x",
+          "contributions": [
+            {
+              "documentUuid": "doc-a",
+              "role": "primary",
+              "amountAppliedUsd": 400000,
+              "reasoning": "p"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "gl_aggregate_short_below",
+      "lines": [
+        {
+          "category": "GENERAL_LIABILITY",
+          "effectiveOccurrenceLimitUsd": 1000000,
+          "effectiveAggregateLimitUsd": 1000000,
+          "verdict": "BELOW",
+          "reasoning": "occurrence clears but the aggregate falls short of the required 2,000,000",
+          "contributions": [
+            {
+              "documentUuid": "doc-a",
+              "role": "primary",
+              "amountAppliedUsd": 1000000,
+              "reasoning": "coi"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,227 @@
+# METADATA
+# title: vendra repo invariants
+# description: |
+#   The machine-checkable subset of the eight hard rules in .claude/CLAUDE.md,
+#   evaluated against facts extracted from the REAL files on every run
+#   (policy/extract-repo-facts.py) rather than a committed copy.
+#
+#   Package is `vendra.checks.repo` while the data root is `data.repo` — the
+#   two must not collide, or every rule here fails with rego_recursion_error.
+package vendra.checks.repo
+
+import rego.v1
+
+# --- rule 1: external reliance is exactly the Anthropic API + Vercel Sandbox --
+
+expected_egress := ["api.anthropic.com", "*.npmjs.org"]
+
+# Packages that would each add an external host this repo does not own.
+forbidden_deps := {
+	"@mem0/vercel-ai-provider": "Mem0 Platform (cloud) client",
+	"mem0ai": "Mem0 managed cloud by default",
+	"@qdrant/js-client-rest": "points at a Qdrant cluster",
+	"@vercel/ai-gateway": "Vercel AI Gateway",
+	"@ai-sdk/gateway": "Vercel AI Gateway",
+}
+
+violation contains v if {
+	data.repo.harness.egress_allowlist != expected_egress
+	v := {
+		"rule": "R1_egress_allowlist_changed",
+		"detail": sprintf(
+			"SANDBOX_EGRESS_ALLOWLIST is %v, expected %v",
+			[data.repo.harness.egress_allowlist, expected_egress],
+		),
+	}
+}
+
+violation contains v if {
+	not data.repo.harness.network_policy_uses_allowlist
+	v := {
+		"rule": "R1_network_policy_not_wired",
+		"detail": "the sandbox no longer passes SANDBOX_EGRESS_ALLOWLIST to networkPolicy — the allowlist is inert",
+	}
+}
+
+violation contains v if {
+	some manifest, pkg in data.repo.packages
+	some dep in array.concat(pkg.dependencies, pkg.devDependencies)
+	some forbidden, why in forbidden_deps
+	dep == forbidden
+	v := {
+		"rule": "R1_forbidden_dependency",
+		"detail": sprintf("%v declares %v (%v)", [manifest, dep, why]),
+	}
+}
+
+# --- rule 6: this repo owns its database ------------------------------------
+
+# 5435 is a common local-postgres port belonging to another app; this repo's
+# postgres is host-side 5436.
+violation contains v if {
+	some name, service in data.repo.compose.services
+	some port in service.ports
+	contains(port, "5435")
+	v := {
+		"rule": "R6_foreign_database_port",
+		"detail": sprintf("compose service %v publishes %v — 5435 is not this repo's postgres", [name, port]),
+	}
+}
+
+violation contains v if {
+	not "5436:5432" in {p | some p in data.repo.compose.services.postgres.ports}
+	v := {
+		"rule": "R6_postgres_port_moved",
+		"detail": "the postgres service no longer publishes 5436:5432",
+	}
+}
+
+violation contains v if {
+	some name, service in data.repo.compose.services
+	some _, env in service.environment
+	regex.match(`(rds\.amazonaws\.com|\.neon\.tech|\.supabase\.co|\.render\.com)`, env)
+	v := {
+		"rule": "R6_cloud_database_host",
+		"detail": sprintf("compose service %v points at a hosted database", [name]),
+	}
+}
+
+# --- rule 2: the harness pins ------------------------------------------------
+
+violation contains v if {
+	some lane, cfg in data.repo.harness.lanes
+	not cfg.declares_active_tools
+	v := {
+		"rule": "R2_lane_without_active_tools",
+		"detail": sprintf("harness lane %v declares no activeTools — the agent gets the full tool surface", [lane]),
+	}
+}
+
+violation contains v if {
+	some lane, cfg in data.repo.harness.lanes
+	cfg.permission_mode != "allow-reads"
+	v := {
+		"rule": "R2_lane_permission_mode",
+		"detail": sprintf("harness lane %v runs with permissionMode %v, expected allow-reads", [lane, cfg.permission_mode]),
+	}
+}
+
+violation contains v if {
+	some lane, cfg in data.repo.harness.lanes
+	cfg.abort_signal_sites == 0
+	v := {
+		"rule": "R2_lane_without_abort_signal",
+		"detail": sprintf("harness lane %v never references abortSignal", [lane]),
+	}
+}
+
+# --- rule 3: no test files committed ----------------------------------------
+
+violation contains v if {
+	some f in data.repo.sources.committed_test_files
+	v := {
+		"rule": "R3_committed_test_file",
+		"detail": sprintf("%v is a committed test file", [f]),
+	}
+}
+
+# --- rule 7: Drizzle is the only database interaction ------------------------
+
+allowed_pg_clients := {
+	"packages/db-vendor/src/client.ts",
+	"packages/db-vendor/src/migrate.ts",
+}
+
+violation contains v if {
+	some f in data.repo.sources.pg_client_files
+	not f in allowed_pg_clients
+	v := {
+		"rule": "R7_second_pg_client",
+		"detail": sprintf("%v imports the pg driver outside packages/db-vendor/src/{client,migrate}.ts", [f]),
+	}
+}
+
+violation contains v if {
+	some f in data.repo.sources.sql_raw_files
+	v := {
+		"rule": "R7_sql_raw",
+		"detail": sprintf("%v uses sql.raw — the parameterised sql`` tag only", [f]),
+	}
+}
+
+# --- rule 8: auth stays local and seedable ----------------------------------
+
+violation contains v if {
+	not "/sign-up/email" in {p | some p in data.repo.sources.auth_disabled_paths}
+	v := {
+		"rule": "R8_signup_endpoint_reopened",
+		"detail": "/sign-up/email left disabledPaths — registration must flow through /api/vendor/register",
+	}
+}
+
+violation contains v if {
+	not data.repo.sources.auth_rate_limit_enabled
+	v := {
+		"rule": "R8_rate_limiting_disabled",
+		"detail": "better-auth rateLimit.enabled is not true — it stays on in every run mode",
+	}
+}
+
+# --- governance artifact (SPEC §19.5) ---------------------------------------
+
+violation contains v if {
+	not data.repo.governance.wasm_present
+	v := {
+		"rule": "G1_admission_wasm_missing",
+		"detail": "policy/company-policy.wasm is absent — activation would fail closed; run `pnpm --filter vendra policy:build`",
+	}
+}
+
+violation contains v if {
+	data.repo.governance.wasm_stale
+	v := {
+		"rule": "G1_admission_wasm_stale",
+		"detail": "policy/company-policy.wasm was built from a different company-policy.rego — the activation gate is running yesterday's rules; run `pnpm --filter vendra policy:build`",
+	}
+}
+
+violation contains v if {
+	data.repo.governance.wasm_present
+	not data.repo.governance.manifest_present
+	v := {
+		"rule": "G2_admission_manifest_missing",
+		"detail": "company-policy.wasm.json is absent, so artifact integrity cannot be checked at all",
+	}
+}
+
+# The app calls one entrypoint by name; a module that does not export it fails
+# closed at activation, which is exactly when you least want to discover it.
+violation contains v if {
+	entry := data.repo.governance.app_entrypoint
+	entry != null
+	count(data.repo.governance.entrypoints) > 0
+	not entry in {e | some e in data.repo.governance.entrypoints}
+	v := {
+		"rule": "G3_admission_entrypoint_mismatch",
+		"detail": sprintf(
+			"policy-admission.ts calls %v, but the module exports %v",
+			[entry, data.repo.governance.entrypoints],
+		),
+	}
+}
+
+# opa-wasm ships exactly six host built-ins; anything else the module needs
+# throws at evaluation time (opa skill, hard rule 5).
+violation contains v if {
+	some required in data.repo.governance.host_builtins
+	not required in {b | some b in data.repo.governance.sdk_builtins}
+	v := {
+		"rule": "G4_admission_builtin_unavailable",
+		"detail": sprintf(
+			"the module requires host built-in %v, which @open-policy-agent/opa-wasm does not implement",
+			[required],
+		),
+	}
+}
+
+report := {"violations": violation, "count": count(violation)}
