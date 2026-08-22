@@ -1,10 +1,15 @@
 /**
- * Semantic recall (SPEC §22) — the read side of the memory layer.
+ * Semantic recall (SPEC §22, org scope §24.6) — the read side of the memory
+ * layer.
  *
  * This is the change that justifies the whole layer. Before mem0, recall was
  * chronological: the newest N facts under a char budget, so a vendor asking
  * about insurance got whatever they last mentioned, about anything. Now the
  * query drives retrieval and the budget only trims the tail.
+ *
+ * Since §24.6 recall spans TWO scopes under ONE budget: the vendor's own
+ * memories and the company's directive memories (`org:<orgUuid>`), so every
+ * vendor conversation can recall what was approved or rejected for the org.
  *
  * **Fail-soft is the contract, not a nicety.** Every failure path — layer
  * unconfigured, Qdrant down, Ollama down, embedding timeout, zero hits —
@@ -47,11 +52,24 @@ function applyBudget(facts: string[]): string[] {
   return selected;
 }
 
-/** The pre-mem0 path: newest-first, re-emitted oldest-first for the prompt. */
-async function recencyRecall(vendorUuid: string): Promise<RecallResult> {
+/**
+ * The pre-mem0 path: newest-first, re-emitted oldest-first for the prompt.
+ * With an org scope, both scopes' rows are unioned newest-first before the
+ * budget — one budget, never one per scope.
+ */
+async function recencyRecall(
+  vendorUuid: string,
+  orgScope?: string,
+): Promise<RecallResult> {
   try {
-    const rows = await listLiveMemories(vendorUuid, RECALL_MAX_FACTS);
-    const facts = applyBudget(rows.map((row) => row.fact)).reverse();
+    const [vendorRows, orgRows] = await Promise.all([
+      listLiveMemories(vendorUuid, RECALL_MAX_FACTS),
+      orgScope ? listLiveMemories(orgScope, RECALL_MAX_FACTS) : Promise.resolve([]),
+    ]);
+    const merged = [...vendorRows, ...orgRows].sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    );
+    const facts = applyBudget(merged.map((row) => row.fact)).reverse();
     return { facts, mode: facts.length > 0 ? "recency" : "empty" };
   } catch (err) {
     vendraError("memory.recall_fallback_failed", {
@@ -62,19 +80,28 @@ async function recencyRecall(vendorUuid: string): Promise<RecallResult> {
   }
 }
 
+interface ScoredHit {
+  fact: string;
+  score: number;
+  /** Vendor-scope hits win score ties — the vendor's own words come first. */
+  vendorScope: boolean;
+}
+
 /**
  * Recall facts relevant to `query`, falling back to recency on any failure.
  *
  * `query` is the vendor's own turn text. An empty query has nothing to be
  * relevant to, so it takes the recency path directly rather than asking the
- * index to rank against nothing.
+ * index to rank against nothing. `orgScope` (`org:<orgUuid>`) adds the
+ * company's directive memories to the same ranked pool (§24.6).
  */
 export async function recallRelevant(
   vendorUuid: string,
   query: string,
+  orgScope?: string,
 ): Promise<RecallResult> {
   const trimmed = query.trim();
-  if (trimmed.length === 0) return recencyRecall(vendorUuid);
+  if (trimmed.length === 0) return recencyRecall(vendorUuid, orgScope);
 
   let client;
   try {
@@ -85,27 +112,49 @@ export async function recallRelevant(
     });
     client = null;
   }
-  if (!client) return recencyRecall(vendorUuid);
+  if (!client) return recencyRecall(vendorUuid, orgScope);
 
   try {
-    const result = await client.search(trimmed, {
-      topK: RECALL_SEARCH_LIMIT,
-      // Scoping is snake_case on search (camelCase on add) — see mem0-client.ts.
-      filters: { user_id: vendorUuid, agent_id: MEMORY_AGENT_ID },
-    });
-    // Redact on the way out as well as the way in. Semantic recall reads the
-    // INDEX's text (Qdrant payload), not the vetted assistant_memory row — so
-    // this is the last gate before a fact re-enters a prompt, and it also
-    // cleans entries indexed before redaction-at-enqueue existed.
+    const searchScope = async (
+      userId: string,
+      vendorScope: boolean,
+    ): Promise<ScoredHit[]> => {
+      const result = await client.search(trimmed, {
+        topK: RECALL_SEARCH_LIMIT,
+        // Scoping is snake_case on search (camelCase on add) — see mem0-client.ts.
+        filters: { user_id: userId, agent_id: MEMORY_AGENT_ID },
+      });
+      return (result.results ?? []).flatMap((item) => {
+        // Redact on the way out as well as the way in. Semantic recall reads
+        // the INDEX's text (Qdrant payload), not the vetted assistant_memory
+        // row — the last gate before a fact re-enters a prompt, and it also
+        // cleans entries indexed before redaction-at-enqueue existed.
+        const fact = item.memory ? redactMemoryFact(item.memory) : "";
+        if (fact.length === 0) return [];
+        const score =
+          typeof (item as { score?: unknown }).score === "number"
+            ? ((item as { score: number }).score)
+            : 0;
+        return [{ fact, score, vendorScope }];
+      });
+    };
+    const [vendorHits, orgHits] = await Promise.all([
+      searchScope(vendorUuid, true),
+      orgScope ? searchScope(orgScope, false) : Promise.resolve([]),
+    ]);
     const facts = applyBudget(
-      (result.results ?? [])
-        .map((item) => (item.memory ? redactMemoryFact(item.memory) : ""))
-        .filter((fact): fact is string => fact.length > 0),
+      [...vendorHits, ...orgHits]
+        .sort((a, b) =>
+          b.score !== a.score
+            ? b.score - a.score
+            : Number(b.vendorScope) - Number(a.vendorScope),
+        )
+        .map((hit) => hit.fact),
     );
     if (facts.length === 0) {
       // An empty index is normal for a new vendor; an empty index with rows in
       // Postgres means the drain has not caught up or the index was lost.
-      return recencyRecall(vendorUuid);
+      return recencyRecall(vendorUuid, orgScope);
     }
     vendraLog("memory.recall", {
       vendor: vendorUuid,
@@ -118,6 +167,6 @@ export async function recallRelevant(
       vendor: vendorUuid,
       err: err instanceof Error ? err.message : String(err),
     });
-    return recencyRecall(vendorUuid);
+    return recencyRecall(vendorUuid, orgScope);
   }
 }

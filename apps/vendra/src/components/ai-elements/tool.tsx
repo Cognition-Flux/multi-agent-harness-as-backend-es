@@ -136,7 +136,7 @@ export function ToolHeader({ type, state, title, className, ...props }: ToolHead
         type="button"
         data-slot="tool-header"
         className={cn(
-          "flex w-full items-center gap-2 rounded-md border-l-2 px-2.5 py-1.5 text-xs transition-colors hover:bg-accent/60",
+          "flex w-full items-center gap-2 rounded-md border-l-2 px-2.5 py-1.5 text-xs transition-colors hover:bg-accent/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
           STATE_ACCENT[state],
           className,
         )}

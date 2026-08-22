@@ -20,18 +20,23 @@ import {
 // Shapes
 // =============================================================================
 
-export type VendorValidatorId =
-  | "entity_name_match"
-  | "is_signed"
-  | "tin_present_and_masked"
-  | "limit_meets_threshold"
-  | "endorsement_present"
-  | "policy_in_force"
-  | "emr_within_bound"
-  | "report_recent"
-  | "jurisdiction_match"
-  | "certificate_holder_correct"
-  | "field_present";
+/** The closed validator vocabulary as a value — zod enums and the admission
+ * facts derive from it, so it can never drift from the type (SPEC §23.7). */
+export const VENDOR_VALIDATOR_ID_VALUES = [
+  "entity_name_match",
+  "is_signed",
+  "tin_present_and_masked",
+  "limit_meets_threshold",
+  "endorsement_present",
+  "policy_in_force",
+  "emr_within_bound",
+  "report_recent",
+  "jurisdiction_match",
+  "certificate_holder_correct",
+  "field_present",
+] as const;
+
+export type VendorValidatorId = (typeof VENDOR_VALIDATOR_ID_VALUES)[number];
 
 /**
  * The validator ids each document type can emit (SPEC §19.2) — the set a company

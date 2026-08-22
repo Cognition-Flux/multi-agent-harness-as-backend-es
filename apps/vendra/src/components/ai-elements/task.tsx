@@ -35,7 +35,7 @@ export function TaskTrigger({ title, icon, done, total, className, ...props }: T
         type="button"
         data-slot="task-trigger"
         className={cn(
-          "group flex w-full items-center gap-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground",
+          "group flex w-full items-center gap-2 rounded-sm text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
           className,
         )}
         {...props}

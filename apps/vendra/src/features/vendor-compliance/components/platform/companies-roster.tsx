@@ -8,8 +8,13 @@
  * policy version governs them, is a draft pending) rather than a compliance
  * verdict. No status badge, because a company has no compliance status.
  */
-import { useQuery } from "@tanstack/react-query";
-import { BuildingIcon, ChevronRightIcon, PlusIcon } from "lucide-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import {
+  BuildingIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  ShieldCheckIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -18,6 +23,7 @@ import {
   Button,
   Card,
   CardContent,
+  Loader,
   Shimmer,
 } from "@/components/ui/primitives";
 import { authClient } from "@/lib/auth-client";
@@ -30,6 +36,11 @@ export function CompaniesRoster() {
   const trpc = useTRPC();
   const [creating, setCreating] = useState(false);
   const companiesQuery = useQuery(trpc.platform.listCompanies.queryOptions());
+  // SPEC §23.6: the gate runs at activation; an engine upgrade can strand an
+  // ACTIVE policy. This re-runs it over every company and reports per-company.
+  const recheck = useMutation(trpc.platform.recheckActivePolicies.mutationOptions());
+  const recheckResults = recheck.data ?? null;
+  const recheckBad = (recheckResults ?? []).filter((r) => !r.admissible);
 
   return (
     <main className="mx-auto flex max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
@@ -45,6 +56,18 @@ export function CompaniesRoster() {
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            disabled={recheck.isPending}
+            onClick={() => recheck.mutate()}
+          >
+            {recheck.isPending ? (
+              <Loader className="mr-1.5 h-4 w-4" />
+            ) : (
+              <ShieldCheckIcon className="mr-1.5 h-4 w-4" />
+            )}
+            Reevaluar políticas activas
+          </Button>
           <Button onClick={() => setCreating(true)}>
             <PlusIcon className="mr-1.5 h-4 w-4" />
             Nueva empresa
@@ -57,6 +80,47 @@ export function CompaniesRoster() {
           </Button>
         </div>
       </header>
+
+      {recheck.isError ? (
+        <Card>
+          <CardContent className="py-4 text-sm text-muted-foreground">
+            No se pudieron reevaluar las políticas activas.
+          </CardContent>
+        </Card>
+      ) : recheckResults ? (
+        <Card>
+          <CardContent className="flex flex-col gap-2 py-4 text-sm">
+            {recheckBad.length === 0 ? (
+              <p className="text-emerald-600 dark:text-emerald-400">
+                Todas las políticas activas siguen siendo admisibles (
+                {recheckResults.length} revisada
+                {recheckResults.length === 1 ? "" : "s"}).
+              </p>
+            ) : (
+              <>
+                <p className="font-medium text-destructive">
+                  {recheckBad.length} política(s) activa(s) ya no son admisibles:
+                </p>
+                <ul className="flex flex-col gap-1">
+                  {recheckBad.map((r) => (
+                    <li key={r.uuid} className="text-xs">
+                      <span className="font-medium">{r.name}</span>{" "}
+                      <span className="text-muted-foreground">v{r.version}</span>
+                      <ul className="mt-0.5 list-disc pl-5 text-muted-foreground">
+                        {r.violations.map((v, i) => (
+                          <li key={i}>
+                            <span className="font-mono">{v.rule}</span>: {v.detail}
+                          </li>
+                        ))}
+                      </ul>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
 
       {companiesQuery.isPending ? (
         <div className="flex flex-col gap-2">
@@ -104,6 +168,11 @@ export function CompaniesRoster() {
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
+                    {company.openProposalCount > 0 ? (
+                      <Badge variant="warning">
+                        Propuestas pendientes ({company.openProposalCount})
+                      </Badge>
+                    ) : null}
                     {company.officerCount === 0 ? (
                       <Badge variant="warning">Sin oficiales</Badge>
                     ) : null}

@@ -26,7 +26,7 @@ function PanelHeader({ onClose }: { onClose: () => void }) {
         <div className="leading-tight">
           <p className="text-sm font-semibold text-foreground">Asistente</p>
           <p className="text-xs text-muted-foreground">
-            Conoce su registro de cumplimiento
+            Con acceso a su registro de cumplimiento
           </p>
         </div>
       </div>
@@ -49,11 +49,23 @@ export function AssistantPanel() {
   const [open, setOpen] = useState(false);
   const [everOpened, setEverOpened] = useState(false);
   const panelRef = useRef<HTMLElement>(null);
+  const openerRef = useRef<HTMLButtonElement>(null);
 
   const show = () => {
     setEverOpened(true);
     setOpen(true);
   };
+
+  const close = () => setOpen(false);
+
+  // Symmetric to the focus-in on open: `inert` force-blurs whatever is
+  // focused inside the drawer, so closing would dump keyboard focus on
+  // <body>. Runs AFTER the close re-render — focusing synchronously would
+  // target the opener while it still carries aria-hidden/tabIndex=-1, and
+  // SRs would miss the move.
+  useEffect(() => {
+    if (!open && everOpened) openerRef.current?.focus();
+  }, [open, everOpened]);
 
   // Move focus into the drawer on open — the Escape handler lives on the
   // <aside>, so without this the key does nothing until the user clicks in.
@@ -95,6 +107,7 @@ export function AssistantPanel() {
           open ? "pointer-events-none scale-90 opacity-0" : "scale-100 opacity-100",
         )}
         onClick={show}
+        ref={openerRef}
         tabIndex={open ? -1 : undefined}
         type="button"
       >
@@ -120,11 +133,13 @@ export function AssistantPanel() {
         )}
         inert={!open || undefined}
         onKeyDown={(e) => {
-          if (e.key === "Escape") setOpen(false);
+          // isComposing: Escape cancelling an IME composition in the
+          // composer must not collapse the whole drawer.
+          if (e.key === "Escape" && !e.nativeEvent.isComposing) close();
         }}
       >
         <div className="flex h-full w-full min-w-0 flex-col">
-          <PanelHeader onClose={() => setOpen(false)} />
+          <PanelHeader onClose={close} />
           {everOpened && <AssistantChat />}
         </div>
       </aside>

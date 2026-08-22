@@ -173,3 +173,27 @@ test_undetermined_despite_sufficient_limit_is_denied if {
 	})])
 	fires(coverage.deny, "undetermined_despite_sufficient_limit") with input as payload
 }
+
+# --- the curated case table (policy/data/coverage-cases.json, SPEC §23.12) ----
+
+# The data file is passed by run-checks.sh; if it stops being passed, the
+# `every` below goes undefined and the test FAILS rather than passing on
+# nothing. The count pins the table so a truncated file cannot pass either.
+
+test_data_case_table_is_loaded if {
+	count(data.coverage_cases.cases) >= 13
+}
+
+test_data_cases_match_expectations if {
+	every case in data.coverage_cases.cases {
+		got := {prefix |
+			some msg in coverage.deny
+			prefix := split(msg, ":")[0]
+		} with input as {
+			"payload": {"lines": case.lines, "conflicts": [], "narrative": "n"},
+			"thresholds": data.coverage_cases.thresholds,
+			"allowed_document_uuids": data.coverage_cases.allowed,
+		}
+		got == {e | some e in case.expect}
+	}
+}

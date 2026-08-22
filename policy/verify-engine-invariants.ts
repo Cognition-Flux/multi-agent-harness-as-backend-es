@@ -16,7 +16,9 @@ import {
   SchemaRegistry,
   VALIDATORS_BY_DOCUMENT_TYPE,
   VENDOR_DOCUMENT_TYPE_VALUES,
+  applyDirectiveDiff,
   applyValidatorPolicy,
+  assistantToolNamesForPrivilege,
   deriveAllowedDocumentTypes,
   deriveExtractedExpirationDate,
   deriveTinLast4,
@@ -216,6 +218,7 @@ const defaultPolicy: CompanyPolicy = {
   id: 0,
   version: 0,
   refereeableCategories: [],
+  assistantPrivilege: "CONVERSATIONAL",
   documents: defaultDocs,
 };
 
@@ -325,6 +328,92 @@ head("§6.6  the coverage gates always leave a legal verdict");
   // Sanity: the thresholds the loop assumes are the ones the engine uses.
   if (requiredOccurrenceLimit("GENERAL_LIABILITY", thresholds) !== thresholds.glOccurrenceUsd) {
     bad("requiredOccurrenceLimit disagrees with the thresholds it was given");
+  }
+}
+
+head("§24  assistant privilege tiers");
+{
+  // §24.1: CONVERSATIONAL is a strict no-op — byte-identical to the §22 roster.
+  const conversational = assistantToolNamesForPrivilege("CONVERSATIONAL");
+  const expected = ["getComplianceState", "getDocumentDetails", "rememberFacts"];
+  if (JSON.stringify(conversational) === JSON.stringify(expected)) {
+    ok("CONVERSATIONAL roster is exactly the §22 assistant");
+  } else {
+    bad("CONVERSATIONAL roster drifted", JSON.stringify(conversational));
+  }
+  // §24.1: EMPOWERED only ever ADDS — the conversational roster is a prefix.
+  const empowered = assistantToolNamesForPrivilege("EMPOWERED");
+  const addsOnly =
+    JSON.stringify(empowered.slice(0, expected.length)) === JSON.stringify(expected) &&
+    JSON.stringify(empowered.slice(expected.length)) ===
+      JSON.stringify(["proposeDirectiveChange", "getDirectiveProposals"]);
+  if (addsOnly) ok("EMPOWERED adds exactly the two proposal tools");
+  else bad("EMPOWERED roster drifted", JSON.stringify(empowered));
+
+  // §24.2: applyDirectiveDiff is pure, identity on the empty diff, idempotent.
+  const catalog = {
+    fieldsOf: (type: string) => extractionFieldNames(type as VendorDocumentType),
+    validatorsOf: (type: string) => [
+      ...VALIDATORS_BY_DOCUMENT_TYPE[type as VendorDocumentType],
+    ],
+  };
+  const canonical = (p: ReturnType<typeof applyDirectiveDiff>) =>
+    JSON.stringify({
+      ...p,
+      refereeableCategories: [...p.refereeableCategories].sort(),
+    });
+  const baseSnapshot = JSON.stringify(defaultPolicy);
+  const identity = applyDirectiveDiff(defaultPolicy, {}, catalog);
+  const identityBack = canonical(identity);
+  const baseAsResult = canonical({
+    assistantPrivilege: defaultPolicy.assistantPrivilege,
+    refereeableCategories: [...defaultPolicy.refereeableCategories],
+    documents: [...defaultPolicy.documents].sort((a, b) =>
+      a.documentType.localeCompare(b.documentType),
+    ),
+  });
+  if (identityBack === baseAsResult) ok("empty diff is the identity");
+  else bad("empty diff changed the policy");
+  if (JSON.stringify(defaultPolicy) === baseSnapshot) ok("base never mutated");
+  else bad("applyDirectiveDiff mutated its input");
+
+  const diff = {
+    dropDocumentTypes: ["W9"],
+    acceptDocumentTypes: ["EMR_LETTER"],
+    fieldChanges: [{ documentType: "EMR_LETTER", removeFields: ["emr_rate"] }],
+    makeReferred: ["TAX_IDENTITY"],
+  };
+  const once = canonical(applyDirectiveDiff(defaultPolicy, diff, catalog));
+  const twice = canonical(
+    applyDirectiveDiff(applyDirectiveDiff(defaultPolicy, diff, catalog), diff, catalog),
+  );
+  if (once === twice) ok("applying the same diff twice equals once");
+  else bad("applyDirectiveDiff is not idempotent");
+
+  // Drop + re-accept round-trips a type to its full catalog defaults.
+  const dropped = applyDirectiveDiff(
+    defaultPolicy,
+    { dropDocumentTypes: ["W9"] },
+    catalog,
+  );
+  const restored = applyDirectiveDiff(
+    { ...defaultPolicy, ...dropped },
+    { acceptDocumentTypes: ["W9"] },
+    catalog,
+  );
+  const w9 = restored.documents.find((d) => d.documentType === "W9");
+  const fullW9 = {
+    fields: JSON.stringify(extractionFieldNames("W9")),
+    validators: JSON.stringify([...VALIDATORS_BY_DOCUMENT_TYPE.W9]),
+  };
+  if (
+    w9 &&
+    JSON.stringify(w9.extractFields) === fullW9.fields &&
+    JSON.stringify(w9.validators) === fullW9.validators
+  ) {
+    ok("drop + re-accept restores catalog defaults");
+  } else {
+    bad("drop + re-accept did not round-trip");
   }
 }
 

@@ -24,6 +24,8 @@ export function HitlPrompt({
   /** Which button was clicked (visual only) — shows the Loader in that button. */
   const [pendingAnswer, setPendingAnswer] = useState<boolean | null>(null);
   const [answered, setAnswered] = useState(false);
+  /** 404: the window settled before the click landed — nothing was recorded. */
+  const [settledRemotely, setSettledRemotely] = useState(false);
   const [answerError, setAnswerError] = useState<string | null>(null);
   const [remainingMs, setRemainingMs] = useState(() =>
     Math.max(0, new Date(confirmation.expiresAt).getTime() - Date.now()),
@@ -64,10 +66,13 @@ export function HitlPrompt({
           confirmed,
         }),
       });
-      // 200 = answered; 404 = already settled (fail-open raced the click) —
-      // either way the server's re-written part clears the prompt.
-      if (res.ok || res.status === 404) {
+      // 200 = answered. 404 = already settled (the fail-open raced the
+      // click): the answer was NOT recorded, so it must not render as if it
+      // were — either way the server's re-written part clears the prompt.
+      if (res.ok) {
         setAnswered(true);
+      } else if (res.status === 404) {
+        setSettledRemotely(true);
       } else {
         setAnswerError("No se pudo registrar su respuesta — intente de nuevo.");
       }
@@ -77,6 +82,19 @@ export function HitlPrompt({
       setSubmitting(false);
       setPendingAnswer(null);
     }
+  }
+
+  if (settledRemotely) {
+    return (
+      <div
+        role="status"
+        className="flex animate-fade-in items-center gap-2 rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground"
+      >
+        <Clock aria-hidden className="h-4 w-4 shrink-0 text-muted-foreground" />
+        La ventana de confirmación ya se había cerrado — el procesamiento continúa
+        automáticamente.
+      </div>
+    );
   }
 
   if (answered) {
@@ -106,11 +124,13 @@ export function HitlPrompt({
   }
 
   return (
-    <div
-      role="alert"
-      className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/10 p-3"
-    >
-      <p className="text-sm font-medium">{confirmation.question}</p>
+    <div className="flex flex-col gap-2 rounded-md border border-warning/40 bg-warning/10 p-3">
+      {/* The alert is the question alone — role=alert is implicitly
+          assertive + atomic, so the ticking countdown below must stay
+          outside the live region or SRs re-announce the card every second. */}
+      <p className="text-sm font-medium" role="alert">
+        {confirmation.question}
+      </p>
       <div aria-hidden className="h-1 w-full overflow-hidden rounded-full bg-warning/20">
         <div
           className={

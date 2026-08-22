@@ -39,13 +39,16 @@ export { redactMemoryFact };
  *
  * `query` is the vendor's turn text; pass it whenever it is available, because
  * it is what makes recall semantic. Omitting it is valid and degrades to the
- * recency list — the caller keeps working either way.
+ * recency list — the caller keeps working either way. `orgScope`
+ * (`org:<orgUuid>`, see `orgScopeKey`) merges the company's directive
+ * memories into the same budget (SPEC §24.6).
  */
 export async function recallMemory(
   vendorUuid: string,
   query = "",
+  orgScope?: string,
 ): Promise<string[]> {
-  const { facts } = await recallRelevant(vendorUuid, query);
+  const { facts } = await recallRelevant(vendorUuid, query, orgScope);
   return facts;
 }
 

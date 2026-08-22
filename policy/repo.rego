@@ -290,6 +290,18 @@ violation contains v if {
 	}
 }
 
+# The BINARY itself, not just the source it claims to come from: a swapped or
+# truncated .wasm with an intact manifest passes G1/G2 and would load
+# unverified. The runtime loader makes the same comparison and fails closed
+# (SPEC §23.1).
+violation contains v if {
+	data.repo.governance.wasm_binary_stale
+	v := {
+		"rule": "G1_admission_wasm_binary_stale",
+		"detail": "policy/company-policy.wasm does not hash to the manifest's wasm_sha256 — the committed artifact was edited or half-rebuilt; run `pnpm --filter vendra policy:build`",
+	}
+}
+
 violation contains v if {
 	data.repo.governance.wasm_present
 	not data.repo.governance.manifest_present
@@ -326,6 +338,17 @@ violation contains v if {
 			"the module requires host built-in %v, which @open-policy-agent/opa-wasm does not implement",
 			[required],
 		),
+	}
+}
+
+# The assistant's tool surface is governed policy data (SPEC §24.5): the lease
+# derives activeTools from the vendor's privilege tier, so a hardcoded roster
+# in session.ts would silently disconnect the tier from what the model can do.
+violation contains v if {
+	not data.repo.harness.assistant_active_tools_derived
+	v := {
+		"rule": "G5_assistant_tools_not_policy_derived",
+		"detail": "assistant session.ts must pass the lease's activeTools through (derived from the privilege tier), never a hardcoded tool list",
 	}
 }
 

@@ -65,7 +65,9 @@ export type PromptInputSubmitProps = ComponentProps<typeof Button> & {
 
 // One button, two states: the send arrow cross-fades into the stop square
 // (no variant flip), and a pulsing agent-accent ring marks the live-streaming
-// state. Submit vs stop semantics (type/onClick/aria-label) are unchanged.
+// state. The idle "nothing to send" state is aria-disabled, never disabled —
+// a hard disabled landing at stream end would eject focus to <body> for
+// whoever activated the stop square; the form's submit guard already no-ops.
 export const PromptInputSubmit = ({
   className,
   status,
@@ -74,14 +76,16 @@ export const PromptInputSubmit = ({
   ...props
 }: PromptInputSubmitProps) => {
   const busy = status === "submitted" || status === "streaming";
+  const inactive = !busy && !!disabled;
   return (
     <Button
+      aria-disabled={inactive || undefined}
       aria-label={busy ? "Detener la generación" : "Enviar mensaje"}
       className={cn(
         "relative h-9 w-9 shrink-0 rounded-md p-0 transition-all duration-300",
+        "aria-disabled:pointer-events-none aria-disabled:opacity-50",
         className,
       )}
-      disabled={busy ? undefined : disabled}
       onClick={busy ? onStop : undefined}
       size="sm"
       type={busy ? "button" : "submit"}

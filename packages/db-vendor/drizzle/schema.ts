@@ -70,6 +70,8 @@ export const activityTypeEnum = pgEnum("vendor_activity_type", [
   "POLICY_ACTIVATED",
   "REQUIREMENT_REFERRED",
   "REQUIREMENT_REFERRAL_RESOLVED",
+  "DIRECTIVE_PROPOSED",
+  "DIRECTIVE_PROPOSAL_RESOLVED",
 ]);
 
 // =============================================================================
@@ -139,6 +141,15 @@ export const companyPolicy = pgTable(
       .array()
       .notNull()
       .default(sql`'{}'::text[]`),
+    /**
+     * "CONVERSATIONAL" | "EMPOWERED" — a TS union like `status`, not a pgEnum
+     * (SPEC §24.1). CONVERSATIONAL is the behaviour-preserving default: the
+     * assistant only explains. EMPOWERED lets it DRAFT directive-change
+     * proposals, HITL-gated on the superadmin (§24.3).
+     */
+    assistantPrivilege: text("assistant_privilege")
+      .notNull()
+      .default("CONVERSATIONAL"),
     createdByUserId: text("created_by_user_id"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     activatedAt: timestamp("activated_at"),
@@ -186,6 +197,58 @@ export const companyPolicyDocument = pgTable(
     uniqueIndex("company_policy_document_uq").on(
       table.companyPolicyId,
       table.documentType,
+    ),
+  ],
+);
+
+/**
+ * Every admission-gate decision and platform governance action, as a record
+ * (SPEC §23.8). One row per CHECK / ACTIVATE / ACTIVATE_REFUSED / PROVISION /
+ * BACKFILL / DRAFT_SAVE / DRAFT_DISCARD / RECHECK (and §24's PROPOSAL_*),
+ * carrying the full findings and the artifact hashes the decision was made
+ * under — "who decided, when, under which policy version, and what did the
+ * gate say" must never depend on log retention.
+ */
+export const companyPolicyDecision = pgTable(
+  "company_policy_decision",
+  {
+    id: serial("id").primaryKey(),
+    uuid: uuid("uuid").defaultRandom().notNull().unique(),
+    organizationId: integer("organization_id")
+      .references(() => organization.id)
+      .notNull(),
+    /** Null when no policy row is implicated (a CHECK, a refused activation). */
+    companyPolicyId: integer("company_policy_id").references(
+      () => companyPolicy.id,
+      { onDelete: "set null" },
+    ),
+    policyVersion: integer("policy_version"),
+    /**
+     * "CHECK" | "ACTIVATE" | "ACTIVATE_REFUSED" | "PROVISION" | "BACKFILL"
+     * | "DRAFT_SAVE" | "DRAFT_DISCARD" | "RECHECK" | "PROPOSAL_CHECK"
+     * | "PROPOSAL_APPROVE" | "PROPOSAL_REJECT" — a TS union, not a pgEnum
+     * (the vendor_status_transition.source precedent), so new actions need no
+     * migration.
+     */
+    action: text("action").notNull(),
+    /** Null for unattended writers (the boot backfill, the CLI). */
+    actorUserId: text("actor_user_id"),
+    /** Null when the gate was not evaluated (DRAFT_SAVE / DRAFT_DISCARD). */
+    admissible: boolean("admissible"),
+    /** AdmissionFinding[] — rule ids + enum-precise details, never prose. */
+    violations: jsonb("violations").notNull().default(sql`'[]'::jsonb`),
+    warnings: jsonb("warnings").notNull().default(sql`'[]'::jsonb`),
+    /** The RequirementThresholds the gate evaluated under. */
+    thresholds: jsonb("thresholds"),
+    regoSha256: text("rego_sha256"),
+    wasmSha256: text("wasm_sha256"),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("company_policy_decision_org_idx").on(
+      table.organizationId,
+      table.createdAt,
     ),
   ],
 );
@@ -495,6 +558,59 @@ export const requirementReferral = pgTable(
   ],
 );
 
+/**
+ * A directive-change proposal drafted by an EMPOWERED assistant (SPEC §24.2) —
+ * requirement_referral's shape at the ORG grain: no expiry, no default answer,
+ * it waits for a superadmin. The row is the audit record: what was asked
+ * (diff + redacted rationale), against which base, what the gate said at
+ * proposal time, who resolved it and what activation resulted.
+ */
+export const directiveProposal = pgTable(
+  "directive_proposal",
+  {
+    id: serial("id").primaryKey(),
+    uuid: uuid("uuid").defaultRandom().notNull().unique(),
+    organizationId: integer("organization_id")
+      .references(() => organization.id)
+      .notNull(),
+    /** The vendor whose conversation raised it. */
+    vendorId: integer("vendor_id").references(() => vendor.id, {
+      onDelete: "cascade",
+    }),
+    /** The ACTIVE version the diff was computed against (§24.4 base drift). */
+    basePolicyId: integer("base_policy_id")
+      .references(() => companyPolicy.id)
+      .notNull(),
+    /** requirement_referral.proposed_by's promise, exercised (§24.2). */
+    proposedBy: text("proposed_by").notNull().default("ASSISTANT"),
+    /** The structured DirectiveDiff the vendor asked for. */
+    diff: jsonb("diff").notNull(),
+    /** The FULL proposed-policy snapshot (applyDirectiveDiff over the base). */
+    proposedPolicy: jsonb("proposed_policy").notNull(),
+    /** Vendor-visible, redacted BEFORE persisting (redactMemoryFact). */
+    rationale: text("rationale").notNull(),
+    /** The admission gate's advisory dry-run at proposal time. */
+    gateVerdict: jsonb("gate_verdict"),
+    raisedAt: timestamp("raised_at").defaultNow().notNull(),
+    resolvedAt: timestamp("resolved_at"),
+    resolvedByUserId: text("resolved_by_user_id"),
+    /** "APPROVED" | "REJECTED" by a superadmin; "SUPERSEDED" on base drift. */
+    resolution: text("resolution"),
+    resolutionNote: text("resolution_note"),
+    /** The version approval activated, when APPROVED. */
+    appliedPolicyId: integer("applied_policy_id").references(
+      () => companyPolicy.id,
+    ),
+  },
+  (table) => [
+    index("directive_proposal_org_idx").on(table.organizationId),
+    // One OPEN proposal per raising vendor — "una a la vez" (§24.2).
+    uniqueIndex("directive_proposal_open_uq")
+      .on(table.vendorId)
+      .where(sql`resolved_at IS NULL`),
+  ],
+);
+
 // =============================================================================
 // API-check evidence + renewal notifications (§6.9, §6.8)
 // =============================================================================
@@ -596,17 +712,35 @@ export const assistantMemory = pgTable(
   {
     id: serial("id").primaryKey(),
     uuid: uuid("uuid").defaultRandom().notNull().unique(),
-    vendorId: integer("vendor_id")
-      .references(() => vendor.id, { onDelete: "cascade" })
-      .notNull(),
-    /** The scope key handed to mem0 as `userId` — stable across sessions. */
+    /** Null for ORG-scoped rows (SPEC §24.6) — then organizationId is set. */
+    vendorId: integer("vendor_id").references(() => vendor.id, {
+      onDelete: "cascade",
+    }),
+    /** The org an org-scoped (directive) memory belongs to (§24.6). */
+    organizationId: integer("organization_id").references(
+      () => organization.id,
+    ),
+    /**
+     * The SCOPE KEY handed to mem0 as `userId` — a vendor uuid, or
+     * `org:<orgUuid>` for org-scoped rows (§24.6). Stable across sessions.
+     */
     vendorUuid: text("vendor_uuid").notNull(),
     /** mem0's own id for the indexed memory; null until the drain indexes it. */
     mem0MemoryId: text("mem0_memory_id"),
     /** Already redacted at write time (assistant/memory.ts `redactMemoryFact`). */
     fact: text("fact").notNull(),
-    /** 'tool' — the agent chose it · 'extracted' — mem0 derived it from a turn. */
+    /**
+     * 'tool' — the agent chose it · 'extracted' — mem0 derived it from a turn
+     * · 'directive' — a resolved directive proposal, consolidated (§24.6).
+     */
     source: text("source").notNull(),
+    /**
+     * Which directive knob a 'directive' fact settles (`doc:<TYPE>` /
+     * `field:<TYPE>` / `cat:<CATEGORY>` / `privilege`); approving a change
+     * supersedes the prior live fact with the same knob. Null elsewhere and on
+     * rejection facts (they never supersede anything).
+     */
+    knobKey: text("knob_key"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     /** Set when consolidation replaced this fact with a better one. */
     supersededAt: timestamp("superseded_at"),
@@ -634,10 +768,12 @@ export const assistantMemory = pgTable(
     uniqueIndex("assistant_memory_mem0_id_uq")
       .on(table.mem0MemoryId)
       .where(sql`deleted_at IS NULL AND superseded_at IS NULL`),
-    // One live copy of a given fact per vendor. Exact-match only — semantic
-    // duplicates are consolidation's job, not a constraint's.
-    uniqueIndex("assistant_memory_vendor_fact_live_uq")
-      .on(table.vendorId, table.fact)
+    // One live copy of a given fact per SCOPE. Keyed on vendor_uuid (the scope
+    // key), not vendor_id — equivalent for vendor rows (1:1) and required for
+    // org rows, whose vendor_id is NULL and would never dedupe (§24.6).
+    // Exact-match only — semantic duplicates are consolidation's job.
+    uniqueIndex("assistant_memory_scope_fact_live_uq")
+      .on(table.vendorUuid, table.fact)
       .where(sql`deleted_at IS NULL AND superseded_at IS NULL`),
   ],
 );
@@ -653,9 +789,14 @@ export const memoryIngestQueue = pgTable(
   "memory_ingest_queue",
   {
     id: serial("id").primaryKey(),
-    vendorId: integer("vendor_id")
-      .references(() => vendor.id, { onDelete: "cascade" })
-      .notNull(),
+    /** Null for ORG-scoped fact work (SPEC §24.6). */
+    vendorId: integer("vendor_id").references(() => vendor.id, {
+      onDelete: "cascade",
+    }),
+    organizationId: integer("organization_id").references(
+      () => organization.id,
+    ),
+    /** The mem0 scope key (`userId`) — vendor uuid or `org:<orgUuid>`. */
     vendorUuid: text("vendor_uuid").notNull(),
     /** The assistant thread — handed to mem0 as `runId`. */
     threadId: text("thread_id").notNull(),

@@ -1,6 +1,6 @@
 {
-  "rego_sha256": "1422f285633dc511bc4494f964277a984a22fbb08ef5c0282a2a02e1e72fb8bd",
-  "wasm_sha256": "6911173577a7dd988702c9fe2329a83b0c0fef6de7486df36ae8be7c2e3cbd9d",
+  "rego_sha256": "00cb001fd24f8ac641958180c18291e6c940c7abadd4a4167c36e646bce330bc",
+  "wasm_sha256": "ec813ece872491e62a4d452b97e0a4c7d9bd87064f2e162719d527042adcb29a",
   "entrypoints": [
     "vendra/policy/admission/decision"
   ],

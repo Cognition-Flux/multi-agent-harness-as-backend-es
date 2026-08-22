@@ -38,6 +38,38 @@ head_ "Lint + compile (strict, capability-pinned, no error cap)"
 run "opa fmt"    "$OPA" fmt --fail --list "$DIR"
 run "opa check"  "$OPA" check --strict -m 0 --capabilities "$CAPS" "$DIR"
 
+# The pin must stay honest against the installed binary (SPEC §23.12): a pin
+# that references built-ins or ABI versions the binary lacks breaks every suite
+# silently on the next opa upgrade. The pin remaining a deliberate SUBSET
+# (no http.send etc.) stays legal — only pin-not-supported-by-binary fails.
+head_ "Capability pin freshness (pin vs 'opa capabilities --current')"
+check_pin_freshness() {
+  local current
+  current="$(mktemp)" || return 1
+  "$OPA" capabilities --current > "$current" || { rm -f "$current"; return 1; }
+  PIN="$CAPS" CURRENT="$current" python3 - <<'PY'
+import json, os, sys
+pin = json.load(open(os.environ["PIN"]))
+cur = json.load(open(os.environ["CURRENT"]))
+pin_b = {b["name"] for b in pin.get("builtins", [])}
+cur_b = {b["name"] for b in cur.get("builtins", [])}
+missing = sorted(pin_b - cur_b)
+if missing:
+    sys.exit(f"pin declares builtins the binary lacks: {missing}")
+cur_abi = set(cur.get("wasm_abi_versions") and
+              [f"{v['version']}.{v['minor_version']}" for v in cur["wasm_abi_versions"]] or [])
+pin_abi = set(pin.get("wasm_abi_versions") and
+              [f"{v['version']}.{v['minor_version']}" for v in pin["wasm_abi_versions"]] or [])
+unsupported = sorted(pin_abi - cur_abi)
+if unsupported:
+    sys.exit(f"pin declares wasm ABI versions the binary lacks: {unsupported}")
+PY
+  local rc=$?
+  rm -f "$current"
+  return $rc
+}
+run "capability pin" check_pin_freshness
+
 # Repo invariants read the REAL files on every run — never a committed copy.
 head_ "Repo invariants — CLAUDE.md rules 1/2/3/6/7/8 (C4)"
 FACTS="$(mktemp)"; trap 'rm -f "$FACTS"' EXIT
@@ -56,12 +88,12 @@ run "profiles" "$OPA" test --capabilities "$CAPS" --coverage --threshold 99 \
 "$OPA" eval -d "$DIR/profiles.rego" -d "$DATA/profiles.json" --format pretty \
   'data.vendra.checks.profiles.report'
 
-head_ "Coverage-payload adjudication (SPEC §18 D2)"
-run "coverage" "$OPA" test --capabilities "$CAPS" --coverage --threshold 95 \
-    "$DIR/coverage.rego" "$DIR/coverage_test.rego"
+head_ "Coverage-payload adjudication (SPEC §18 D2 + the §23.12 case table)"
+run "coverage" "$OPA" test --capabilities "$CAPS" --coverage --threshold 97 \
+    "$DIR/coverage.rego" "$DIR/coverage_test.rego" "$DATA/coverage-cases.json"
 
 head_ "Company-policy admissibility (SPEC §19.5)"
-run "admissibility" "$OPA" test --capabilities "$CAPS" --coverage --threshold 90 \
+run "admissibility" "$OPA" test --capabilities "$CAPS" --coverage --threshold 98 \
     "$DIR/company-policy.rego" "$DIR/company-policy_test.rego"
 
 head_ "Referee boundary (SPEC §19.4)"
@@ -72,7 +104,7 @@ run "referee boundary" "$OPA" test --capabilities "$CAPS" --coverage --threshold
 
 # 16,384 scenarios — needs the timeout raised off its 5s default (hard rule 11).
 head_ "Activation-gate state space (SPEC §18 D1)"
-run "gate" "$OPA" test --capabilities "$CAPS" --timeout 300s --coverage --threshold 85 \
+run "gate" "$OPA" test --capabilities "$CAPS" --timeout 300s --coverage --threshold 87 \
     "$DIR/gate.rego" "$DIR/gate_test.rego"
 "$OPA" eval -d "$DIR/gate.rego" --format pretty 'data.vendra.checks.gate.summary'
 

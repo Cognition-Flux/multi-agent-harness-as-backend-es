@@ -1,10 +1,12 @@
 # METADATA
 # title: Referee-boundary model (SPEC §19.4)
 # description: |
-#   An order-independent mirror of the gate inside `deriveRequirementEvidence`
-#   (`withheldByPolicy` + the flag-exclusivity fixup), enumerated over the whole
-#   state space: category required or not × refereeable or not × the five grant
-#   source kinds.
+#   An order-independent mirror of the single referee predicate,
+#   `isGrantWithheldByPolicy` in packages/workflow/src/vendor/policy.ts —
+#   applied by `deriveRequirementEvidence` (traceability.ts), which only binds
+#   the required/refereeable sets (SPEC §23.13) — plus the flag-exclusivity
+#   fixup, enumerated over the whole state space: category required or not ×
+#   refereeable or not × the five grant source kinds.
 #
 #   This suite exists because of a specific defect. The first implementation had
 #   the DIRECTION of `refereeable_categories` backwards — it read the list as
@@ -46,7 +48,7 @@ direction := d if {
 	d in {"keeps", "grants"}
 }
 
-# The mirror of `withheldByPolicy` in traceability.ts.
+# The mirror of `isGrantWithheldByPolicy` (policy.ts, via traceability.ts).
 withheld(s) if {
 	not s.kind in officer_kinds
 	s.required

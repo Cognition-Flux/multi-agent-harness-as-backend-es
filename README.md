@@ -179,6 +179,18 @@ Y cuatro credenciales de las dos dependencias remotas:
 
 > **Se puede arrancar sin ellas.** La app igual levanta, sirve las dos interfaces, permite registrarse y aceptar subidas: los documentos quedan en cola y `/api/health` reporta `harness: unconfigured`. Lo que no ocurre es el procesamiento con agentes.
 
+**Para desarrollar** (no hace falta para solo probar la app): active el hook de
+push una vez por clon —
+
+```bash
+pnpm hooks:install   # = git config core.hooksPath .githooks
+```
+
+Cada `git push` corre entonces la especificación ejecutable
+(`policy/run-checks.sh`, también disponible como `pnpm policy:check`) más el
+type-check. Requiere el binario local de OPA (`~/.local/bin/opa`). Escape de
+emergencia: `VENDRA_SKIP_CHECKS=1 git push`.
+
 ### 2.2 Levantar el stack
 
 ```bash

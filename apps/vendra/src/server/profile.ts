@@ -29,7 +29,9 @@ export function toRequirementProfile(row: ProfileRow): RequirementProfile {
   };
 }
 
-export function toThresholds(row: ProfileRow): RequirementThresholds {
+export function toThresholds(
+  row: Pick<ProfileRow, "thresholds">,
+): RequirementThresholds {
   const raw = (row.thresholds ?? {}) as Record<string, unknown>;
   const num = (key: string, fallback: number): number =>
     typeof raw[key] === "number" ? (raw[key] as number) : fallback;
@@ -56,6 +58,45 @@ export function toThresholds(row: ProfileRow): RequirementThresholds {
       DEFAULT_THRESHOLDS.requirePrimaryNoncontributory,
     ),
   };
+}
+
+/**
+ * The per-key STRICTEST thresholds across ALL of an org's profiles — what the
+ * admission gate evaluates under (SPEC §23.3). Numeric keys take the min,
+ * boolean requirements OR. Exact, not approximate: every threshold-reading
+ * admission rule is a monotone floor (`threshold_makes_validator_unsatisfiable`,
+ * `threshold_disables_limit_check`), so min-per-key equals evaluating the gate
+ * once per profile and merging the violations, at one wasm call. If a future
+ * rule ever reads thresholds NON-monotonically, this shortcut stops being exact
+ * and the callers must switch to per-profile evaluation.
+ *
+ * Deterministic regardless of row order (min/OR are commutative); callers still
+ * order profile reads by id so audit rows reproduce.
+ */
+export function strictestThresholds(
+  rows: readonly Pick<ProfileRow, "thresholds">[],
+): RequirementThresholds {
+  if (rows.length === 0) return { ...DEFAULT_THRESHOLDS };
+  const all = rows.map(toThresholds);
+  const first = all[0]!;
+  return all.slice(1).reduce<RequirementThresholds>(
+    (acc, t) => ({
+      glOccurrenceUsd: Math.min(acc.glOccurrenceUsd, t.glOccurrenceUsd),
+      glAggregateUsd: Math.min(acc.glAggregateUsd, t.glAggregateUsd),
+      autoLimitUsd: Math.min(acc.autoLimitUsd, t.autoLimitUsd),
+      wcLimitUsd: Math.min(acc.wcLimitUsd, t.wcLimitUsd),
+      cyberLimitUsd: Math.min(acc.cyberLimitUsd, t.cyberLimitUsd),
+      emrMax: Math.min(acc.emrMax, t.emrMax),
+      soc2MaxAgeMonths: Math.min(acc.soc2MaxAgeMonths, t.soc2MaxAgeMonths),
+      requireAdditionalInsured:
+        acc.requireAdditionalInsured || t.requireAdditionalInsured,
+      requireWaiverOfSubrogation:
+        acc.requireWaiverOfSubrogation || t.requireWaiverOfSubrogation,
+      requirePrimaryNoncontributory:
+        acc.requirePrimaryNoncontributory || t.requirePrimaryNoncontributory,
+    }),
+    first,
+  );
 }
 
 export function toWorkProfile(raw: unknown): VendorWorkProfile {

@@ -1,26 +1,28 @@
 /**
  * Vendor-assistant persistence over this app's own `assistant_chat_turn`
  * table (a generic {thread_id, message_id, role, parts, metadata} turn
- * store — packages/db-vendor). Three thread namespaces per vendor, all
- * keyed by the vendor uuid:
+ * store — packages/db-vendor). Two live thread namespaces per vendor, keyed
+ * by the vendor uuid:
  *   vendor-chat:<uuid>     — the UIMessage transcript (one row per message)
  *   vendor-session:<uuid>  — ONE row holding the harness session resume-state
- *   vendor-memory:<uuid>   — remembered facts (one row per fact)
+ * (A third, `vendor-memory:<uuid>`, predates §22's `assistant_memory` table;
+ * its accessors were dead code and are gone — SPEC §23.15. Legacy rows remain
+ * as inert history and the `memory` role value stays valid, since the column
+ * is plain text.)
  * Every write lands on the (thread_id, message_id) unique constraint:
  * transcript inserts are targetless onConflictDoNothing (idempotent
  * retries), the resume-state row is an upsert at a fixed message_id.
  */
-import { asc, desc, eq, sql } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 
 import { getDb, schema } from "@vendra/db-vendor";
 
 import type { VendorAssistantUIMessage } from "@/features/vendor-compliance/lib/vendor-harness-contract";
 
-const { assistantChatTurn } = schema;
+const { assistantChatTurn, vendor } = schema;
 
 const chatThreadId = (vendorUuid: string) => `vendor-chat:${vendorUuid}`;
 const sessionThreadId = (vendorUuid: string) => `vendor-session:${vendorUuid}`;
-const memoryThreadId = (vendorUuid: string) => `vendor-memory:${vendorUuid}`;
 
 const RESUME_STATE_MESSAGE_ID = "harness-resume-state";
 
@@ -161,78 +163,29 @@ export async function clearAssistantSessionState(
     .where(eq(assistantChatTurn.threadId, sessionThreadId(vendorUuid)));
 }
 
-// ── Memory facts ─────────────────────────────────────────────────────────────
-
-export interface StoredMemoryFact {
-  messageId: string;
-  fact: string;
-  createdAt: Date;
-}
-
-/** Oldest-first list of remembered facts (bounded by the caller's cap). */
-export async function listMemoryFacts(
-  vendorUuid: string,
-  limit: number,
-): Promise<StoredMemoryFact[]> {
-  const rows = await getDb()
-    .select({
-      messageId: assistantChatTurn.messageId,
-      parts: assistantChatTurn.parts,
-      createdAt: assistantChatTurn.createdAt,
-    })
-    .from(assistantChatTurn)
-    .where(eq(assistantChatTurn.threadId, memoryThreadId(vendorUuid)))
-    .orderBy(asc(assistantChatTurn.createdAt), asc(assistantChatTurn.id))
-    .limit(limit);
-  return rows.flatMap((row) => {
-    const part = (row.parts as { type?: string; text?: string }[])[0];
-    return typeof part?.text === "string"
-      ? [
-          {
-            messageId: row.messageId,
-            fact: part.text,
-            createdAt: row.createdAt,
-          },
-        ]
-      : [];
-  });
-}
-
-/** Append memory facts (one row each; ids minted by the caller). */
-export async function insertMemoryFacts(
-  vendorUuid: string,
-  vendorId: number,
-  facts: { messageId: string; fact: string }[],
-): Promise<void> {
-  if (facts.length === 0) return;
-  await getDb()
-    .insert(assistantChatTurn)
-    .values(
-      facts.map(({ messageId, fact }) => ({
-        threadId: memoryThreadId(vendorUuid),
-        vendorId,
-        messageId,
-        role: "memory",
-        parts: [{ type: "text", text: fact }],
-        metadata: null,
-      })),
+/**
+ * Drop every parked session state in an organization (SPEC §24.7). Instructions
+ * are frozen on a parked session, so a tier change — a policy activation whose
+ * assistant privilege differs, or an org-wide re-pin — must force the next turn
+ * of every affected vendor to start fresh. Tool GATING does not depend on this
+ * (activeTools is recomputed per lease); only instruction freshness does.
+ */
+export async function clearAssistantSessionStatesForOrg(
+  organizationId: number,
+): Promise<number> {
+  const vendors = await getDb()
+    .select({ uuid: vendor.uuid })
+    .from(vendor)
+    .where(eq(vendor.organizationId, organizationId));
+  if (vendors.length === 0) return 0;
+  const deleted = await getDb()
+    .delete(assistantChatTurn)
+    .where(
+      inArray(
+        assistantChatTurn.threadId,
+        vendors.map((v) => sessionThreadId(v.uuid)),
+      ),
     )
-    .onConflictDoNothing();
-}
-
-/** Delete the oldest facts beyond `keep` (bounds the memory thread). */
-export async function pruneMemoryFacts(
-  vendorUuid: string,
-  keep: number,
-): Promise<void> {
-  await getDb().execute(sql`
-    DELETE FROM assistant_chat_turn
-    WHERE thread_id = ${memoryThreadId(vendorUuid)}
-      AND id NOT IN (
-        SELECT id FROM assistant_chat_turn
-        WHERE thread_id = ${memoryThreadId(vendorUuid)}
-        ORDER BY created_at DESC, id DESC
-        LIMIT ${keep}
-      )
-  `);
+    .returning({ id: assistantChatTurn.id });
+  return deleted.length;
 }

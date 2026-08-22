@@ -47,10 +47,15 @@ import {
   listAssistantMessages,
   pruneAssistantMessages,
 } from "@/server/assistant/store";
-import { buildAssistantTools } from "@/server/assistant/tools";
+import {
+  assistantActiveTools,
+  buildAssistantTools,
+} from "@/server/assistant/tools";
 import { authFailureResponse, requireVendorContact } from "@/server/auth-guards";
+import { loadVendorCompanyPolicy } from "@/server/company-policy";
 import { vendraError, vendraLog, vendraWarn } from "@/server/harness/log";
 import { missingHarnessCredentialNames } from "@/server/harness/sandbox";
+import { orgScopeKey } from "@/server/memory/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -129,6 +134,12 @@ export async function POST(req: Request) {
 
   const vendorName = vendor.legalName?.trim() || "the vendor";
 
+  // The privilege tier rides the vendor's PINNED policy (org ACTIVE fallback),
+  // resolved per lease (SPEC §24.5) — so a tier revoke bites on the very next
+  // turn, parked session or not. No policy at all means CONVERSATIONAL.
+  const pinnedPolicy = await loadVendorCompanyPolicy(vendor);
+  const privilege = pinnedPolicy?.assistantPrivilege ?? "CONVERSATIONAL";
+
   let lease;
   try {
     lease = await leaseAssistantTurn({
@@ -137,8 +148,16 @@ export async function POST(req: Request) {
       instructions: buildAssistantInstructions({
         vendorName,
         orgName: organization.name,
+        privilege,
       }),
-      tools: buildAssistantTools({ vendorUuid, vendorId: vendor.id }),
+      tools: buildAssistantTools({
+        vendorUuid,
+        vendorId: vendor.id,
+        organizationId: organization.id,
+        organizationUuid: organization.uuid,
+        privilege,
+      }),
+      activeTools: assistantActiveTools(privilege),
       abortSignal,
     });
   } catch (err) {
@@ -196,15 +215,22 @@ export async function POST(req: Request) {
   );
 
   const userText = message.parts.map((part) => part.text).join("\n\n");
-  // Memory recall — injected only when the session starts fresh (a resumed
-  // session already carries the block in its own history).
+  // Memory recall — EVERY turn (SPEC §24.6). The old fresh-session-only guard
+  // dated from recency recall, where re-injecting the same newest-N block each
+  // turn was pure duplication; semantic recall is query-driven and
+  // budget-capped, so each turn retrieves what THIS question needs — and a
+  // parked session finally sees facts written after its first turn (approved
+  // directives above all). The org scope merges the company's directive
+  // memories into the same budget.
   //
-  // The turn text is the retrieval query (SPEC §22): recall is semantic now, so
-  // what the vendor just asked decides which facts come back. Passing "" would
-  // silently fall back to the old recency list.
-  const memoryFacts = turn.isFreshSession
-    ? await recallMemory(vendorUuid, userText)
-    : [];
+  // The turn text is the retrieval query (SPEC §22): what the vendor just
+  // asked decides which facts come back. Passing "" would silently fall back
+  // to the recency list.
+  const memoryFacts = await recallMemory(
+    vendorUuid,
+    userText,
+    orgScopeKey(organization.uuid),
+  );
 
 
   let fatal = false;
@@ -249,20 +275,23 @@ export async function POST(req: Request) {
       const aborted = abortSignal.aborted;
       try {
         let persistable = messages.filter((m) => m.parts.length > 0);
-        if (aborted) {
+        if (aborted || fatal) {
           // Spec §16 B4: a Stop/timeout keeps the partial reply, marked. The
           // slot is NOT refunded — an unconditional abort refund would let a
           // scripted stop-loop bypass the rate limit entirely while still
           // consuming harness capacity (refunds stay reserved for turns
           // rejected before any work: the lease throw and the 409).
+          // A fatal mid-stream failure takes the same marker path: unmarked,
+          // the truncated reply would rehydrate indistinguishable from a
+          // complete answer — and duplicate ahead of the retried one.
+          const marker = aborted
+            ? "\n\n— *interrumpido*"
+            : "\n\n— *interrumpido por un error*";
           persistable = persistable.map((m) =>
             m.role === "assistant"
               ? {
                   ...m,
-                  parts: [
-                    ...m.parts,
-                    { type: "text" as const, text: "\n\n— *interrumpido*" },
-                  ],
+                  parts: [...m.parts, { type: "text" as const, text: marker }],
                 }
               : m,
           );

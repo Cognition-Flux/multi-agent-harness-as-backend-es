@@ -145,6 +145,49 @@ export async function reconcileRequirementReferrals(
   return { opened: openedCategories, closed: closedCategories };
 }
 
+/**
+ * Resolve an open referral as GRANTED, with the ratifying officer's id (SPEC
+ * §23.14). Called from `grantManualRequirement` on the SAME transaction, before
+ * the recompute runs — so the fold's SUPERSEDED close-update (which touches
+ * only `resolved_at IS NULL` rows) can no longer reach it: the officer's
+ * verdict wins the record. Leaves `note` null on purpose — the justification
+ * already lives on the grant row, and note bodies never enter logs.
+ */
+export async function resolveOpenReferralAsGranted(
+  executor: Executor,
+  input: {
+    vendorId: number;
+    organizationId: number;
+    category: string;
+    resolvedByUserId: string;
+  },
+): Promise<boolean> {
+  const resolved = await executor
+    .update(requirementReferral)
+    .set({
+      resolvedAt: sql`now()`,
+      resolution: "GRANTED",
+      resolvedByUserId: input.resolvedByUserId,
+    })
+    .where(
+      and(
+        eq(requirementReferral.vendorId, input.vendorId),
+        eq(requirementReferral.category, input.category),
+        isNull(requirementReferral.resolvedAt),
+      ),
+    )
+    .returning({ id: requirementReferral.id });
+  if (resolved.length === 0) return false;
+  await executor.insert(vendorActivity).values({
+    vendorId: input.vendorId,
+    organizationId: input.organizationId,
+    type: "REQUIREMENT_REFERRAL_RESOLVED",
+    actorUserId: input.resolvedByUserId,
+    metadata: { categories: [input.category], resolution: "GRANTED" },
+  });
+  return true;
+}
+
 /** Open referrals for one vendor — the officer queue's read model. */
 /**
  * Is this category's grant currently withheld from the pipeline, waiting on an

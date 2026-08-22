@@ -13,8 +13,13 @@ request path never touches it. Everything else here is offline `opa eval` /
 `opa test` with no server.
 
 ```bash
-bash policy/run-checks.sh
+bash policy/run-checks.sh        # also: pnpm policy:check
 ```
+
+Since SPEC §23.12 the suite also gates pushes: activate the committed hook once
+per clone with `pnpm hooks:install` (= `git config core.hooksPath .githooks`);
+`.githooks/pre-push` runs this suite plus the app type-check, with
+`VENDRA_SKIP_CHECKS=1 git push` as the emergency escape hatch.
 
 Findings and the reasoning behind each check: `docs/opa-applications.md`.
 
@@ -25,7 +30,7 @@ Findings and the reasoning behind each check: `docs/opa-applications.md`.
 | `coverage.rego` | `validateCoverageDetermination` | does any payload get past the gate that the payload contract forbids? |
 | `repo.rego` | `docker-compose.yml`, the `package.json` files, the harness pins, `auth.ts` | do the eight hard rules in `.claude/CLAUDE.md` still hold? |
 | `policy-resolver.rego` | the referee boundary in `deriveRequirementEvidence` | is an officer source ever withheld? does the boundary bite? **does this suite catch the direction inversion that shipped once?** |
-| `company-policy.rego` | — (it IS the policy the app runs) | is a proposed company policy admissible? Nine rejection rules, two warnings |
+| `company-policy.rego` | — (it IS the policy the app runs) | is a proposed company policy admissible? Thirteen rejection rules, two warnings |
 | `verify-engine-invariants.ts` | the engines themselves | the properties Rego cannot express, because it cannot call TypeScript |
 
 Run everything with `bash policy/run-checks.sh`. Rebuild the Wasm artifact after
@@ -53,7 +58,10 @@ copy.
 constants — the seeded profiles from `server/seed-demo.ts`, the category catalog,
 the document→category map, and the adversarial payloads. They go stale silently
 when the engines change. Re-derive them when touching
-`packages/workflow/src/vendor/`.
+`packages/workflow/src/vendor/`. Since §23.12, `coverage-cases.json` is no
+longer prose-only: run-checks passes it to the coverage suite, and each case's
+`expect` array (deny-message prefixes) is asserted table-driven — a truncated or
+un-passed file FAILS the suite instead of silently checking nothing.
 
 ### The capability pin
 
@@ -63,7 +71,10 @@ in `run-checks.sh` passes it, so a policy that reaches the network fails to
 compile (`rego_type_error: undefined function http.send`) rather than being
 caught in review. That is repo rule 1 enforced on the checking tool itself.
 Regenerate it with the snippet in `run-checks.sh`'s header comment after an OPA
-upgrade.
+upgrade. Since §23.12 run-checks also diffs the pin against
+`opa capabilities --current` on every run: a pin referencing built-ins or ABI
+versions the installed binary lacks fails loudly (that would break every suite
+silently), while the pin's deliberate subsetting stays legal.
 
 ## Reproducing the differential against the real TS
 

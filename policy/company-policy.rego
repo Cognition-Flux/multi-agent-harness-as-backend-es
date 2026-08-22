@@ -88,12 +88,19 @@ violation contains v if {
 
 # --- validator / threshold coherence ----------------------------------------
 
+# `object.get` with a poisoning default, never a bare path: a missing key would
+# UNDEFINE the whole floor object and every rule reading it would silently stop
+# firing — a pass, which is the exact failure mode this block exists to refuse
+# (SPEC §23.5). The TS caller merges DEFAULT_THRESHOLDS first; this is the
+# backstop for any caller that does not.
+thresholds := object.get(input, "thresholds", {})
+
 # A threshold-driven validator whose threshold is zero or missing fails every
 # document of that type. Selecting it is a configuration that can never pass, so
 # it is refused rather than discovered by a vendor.
 threshold_floor := {
-	"emr_within_bound": input.thresholds.emrMax,
-	"report_recent": input.thresholds.soc2MaxAgeMonths,
+	"emr_within_bound": object.get(thresholds, "emrMax", -1),
+	"report_recent": object.get(thresholds, "soc2MaxAgeMonths", -1),
 }
 
 violation contains v if {
@@ -107,6 +114,27 @@ violation contains v if {
 		"detail": sprintf(
 			"%v selects %v, but its threshold is %v — every document of that type would fail",
 			[doc.document_type, validator, floor],
+		),
+	}
+}
+
+# The USD floors are the inverse hazard: a zero (or missing) floor does not make
+# `limit_meets_threshold` unsatisfiable — it makes it VACUOUS, every limit
+# "meets" a floor of nothing. A policy that runs the check under a floor that
+# never binds is refused (SPEC §23.5).
+usd_floor_keys := {"glOccurrenceUsd", "glAggregateUsd", "autoLimitUsd", "wcLimitUsd", "cyberLimitUsd"}
+
+violation contains v if {
+	some key in usd_floor_keys
+	floor := object.get(thresholds, key, -1)
+	floor <= 0
+	some doc in policy.documents
+	"limit_meets_threshold" in doc.validators
+	v := {
+		"rule": "threshold_disables_limit_check",
+		"detail": sprintf(
+			"%v is %v but %v runs limit_meets_threshold — the limit floor would never bind",
+			[key, floor, doc.document_type],
 		),
 	}
 }
@@ -177,6 +205,33 @@ violation contains v if {
 	v := {
 		"rule": "unknown_category",
 		"detail": sprintf("%v is not a requirement category", [category]),
+	}
+}
+
+# --- assistant privilege (SPEC §24) -------------------------------------------
+
+# Absent means CONVERSATIONAL — the behaviour-preserving default (§24.1), so a
+# pre-§24 caller keeps its exact admissibility.
+assistant_privilege := object.get(policy, "assistant_privilege", "CONVERSATIONAL")
+
+violation contains v if {
+	not assistant_privilege in superset.assistant_privileges
+	v := {
+		"rule": "unknown_privilege_level",
+		"detail": sprintf("%v is not an assistant privilege level", [assistant_privilege]),
+	}
+}
+
+# EMPOWERED routes every proposal to a human, and referred work needs somewhere
+# to land — the approver pool must exist (§24.4). officer_count is an
+# always-defined fact (the TS caller defaults it to 0), so this rule can never
+# silently un-fire on a missing key.
+violation contains v if {
+	assistant_privilege == "EMPOWERED"
+	input.company.officer_count == 0
+	v := {
+		"rule": "empowered_requires_officer",
+		"detail": "EMPOWERED requires at least one compliance officer account and the organization has none",
 	}
 }
 

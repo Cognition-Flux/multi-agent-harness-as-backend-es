@@ -24,26 +24,33 @@ import { redactMemoryFact } from "./redact";
 const MIN_TURN_CHARS = 24;
 
 export interface MemoryWriteTarget {
-  vendorId: number;
+  /** Null for the org scope (SPEC §24.6) — then organizationId is set. */
+  vendorId: number | null;
+  organizationId?: number | null;
+  /** The mem0 scope key (`userId`): vendor uuid, or `org:<orgUuid>`. */
   vendorUuid: string;
   threadId: string;
 }
 
 /**
- * Store facts the agent chose to remember, already redacted by the caller.
+ * Store facts the agent chose to remember — or, since §24.6, facts the
+ * approval path consolidates — already redacted by the caller.
  * Returns how many became new records (duplicates are silently absorbed).
  */
 export async function recordFacts(
   target: MemoryWriteTarget,
   facts: string[],
+  options?: { source?: "tool" | "directive"; knobKey?: string | null },
 ): Promise<number> {
   if (facts.length === 0) return 0;
   try {
     const inserted = await insertMemories({
       vendorId: target.vendorId,
+      organizationId: target.organizationId ?? null,
       vendorUuid: target.vendorUuid,
       facts,
-      source: "tool",
+      source: options?.source ?? "tool",
+      knobKey: options?.knobKey ?? null,
     });
     if (inserted.length === 0) return 0;
     // Enqueue only when the layer can actually drain. The record write above
@@ -53,6 +60,7 @@ export async function recordFacts(
     if (memoryConfig()) {
       await enqueueMemoryWork({
         vendorId: target.vendorId,
+        organizationId: target.organizationId ?? null,
         vendorUuid: target.vendorUuid,
         threadId: target.threadId,
         kind: "fact",

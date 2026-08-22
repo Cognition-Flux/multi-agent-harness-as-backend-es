@@ -28,8 +28,10 @@ import {
 
 import { COMPLIANCE_OFFICER_ROLE, PLATFORM_ORG_SLUG } from "@/server/auth";
 import { createUserWithRole } from "@/server/auth-admin";
+import { recordPolicyDecision } from "@/server/company-policy";
 import { vendraLog } from "@/server/harness/log";
 import { evaluateAdmission } from "@/server/policy-admission";
+import { toThresholds } from "@/server/profile";
 import { findPreset, type RequirementPreset } from "@/server/requirement-presets";
 
 const { companyPolicy, companyPolicyDocument, organization, vendorRequirementProfile } =
@@ -71,6 +73,8 @@ export interface ProvisionCompanyInput {
   presetId: string;
   /** The company's first compliance officer. Omit to provision the tenant only. */
   officer?: { email: string; password: string; name: string };
+  /** The provisioning superadmin, for the decision record. Null from the CLI. */
+  actorUserId?: string | null;
 }
 
 export interface ProvisionCompanyResult {
@@ -136,9 +140,14 @@ export async function provisionCompany(
 
   // SPEC §19.5: nothing is activated without passing the gate — including the
   // policy we generate ourselves. A failure here means the generator is wrong.
+  // SPEC §23.4: the PRESET's thresholds ride the call — omitting them silently
+  // substituted engine defaults, so a preset with a degenerate threshold sailed
+  // through provisioning and only surfaced later.
+  const thresholds = toThresholds({ thresholds: preset.thresholds ?? null });
   const admission = await evaluateAdmission({
     policy: { refereeableCategories: refereeable, documents },
     profiles: [{ required: preset.required, mandatory: preset.mandatory }],
+    thresholds,
   });
   if (!admission.admissible) {
     throw new ProvisioningError(
@@ -192,6 +201,17 @@ export async function provisionCompany(
         })),
       );
     }
+    await recordPolicyDecision(tx, {
+      organizationId: org.id,
+      action: "PROVISION",
+      actorUserId: input.actorUserId ?? null,
+      companyPolicyId: policy.id,
+      policyVersion: 1,
+      admissible: true,
+      warnings: admission.warnings,
+      thresholds,
+      metadata: { presetId: preset.id },
+    });
     return { org, profileId: profile.id, policyId: policy.id };
   });
 

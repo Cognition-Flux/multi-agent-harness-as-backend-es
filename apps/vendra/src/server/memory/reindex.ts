@@ -19,7 +19,7 @@ import { vendraError, vendraLog } from "@/server/harness/log";
 
 import { getDb, schema } from "@vendra/db-vendor";
 
-import { MEMORY_AGENT_ID } from "./config";
+import { MEMORY_AGENT_ID, orgScopeKey } from "./config";
 import {
   clearMem0Ids,
   linkMem0Id,
@@ -69,6 +69,10 @@ export async function reindexMemories(
   let failed = 0;
   for (const row of rows) {
     try {
+      // Deliberately no `runId` (the drain sets one): assistant_memory stores
+      // no thread id, so it is unrecoverable here — and nothing reads mem0's
+      // run_id back (recall filters on user_id + agent_id only). The
+      // `source: "reindex"` metadata is the provenance marker. SPEC §23.15.
       const result = await client.add(row.fact, {
         userId: row.vendorUuid,
         agentId: MEMORY_AGENT_ID,
@@ -122,14 +126,39 @@ export async function adoptIndexOrphans(): Promise<{
   const vendors = await getDb()
     .select({ id: schema.vendor.id, uuid: schema.vendor.uuid })
     .from(schema.vendor);
+  // Org scopes too (SPEC §24.6): directive memories live under `org:<uuid>`,
+  // and a scope this pass does not walk is a scope whose orphans a rebuild
+  // silently drops.
+  const orgs = await getDb()
+    .select({ id: schema.organization.id, uuid: schema.organization.uuid })
+    .from(schema.organization);
+  const scopes: {
+    scopeKey: string;
+    vendorId: number | null;
+    organizationId: number | null;
+    source: "extracted" | "directive";
+  }[] = [
+    ...vendors.map((v) => ({
+      scopeKey: v.uuid,
+      vendorId: v.id,
+      organizationId: null,
+      source: "extracted" as const,
+    })),
+    ...orgs.map((o) => ({
+      scopeKey: orgScopeKey(o.uuid),
+      vendorId: null,
+      organizationId: o.id,
+      source: "directive" as const,
+    })),
+  ];
   let orphansAdopted = 0;
-  for (const v of vendors) {
+  for (const scope of scopes) {
     try {
       const [known, indexed] = await Promise.all([
-        listAllMem0Ids(v.uuid),
+        listAllMem0Ids(scope.scopeKey),
         client.getAll({
           topK: 1_000,
-          filters: { user_id: v.uuid, agent_id: MEMORY_AGENT_ID },
+          filters: { user_id: scope.scopeKey, agent_id: MEMORY_AGENT_ID },
         }),
       ]);
       for (const item of indexed.results ?? []) {
@@ -137,20 +166,22 @@ export async function adoptIndexOrphans(): Promise<{
         const fact = item.memory ? redactMemoryFact(item.memory) : "";
         if (!fact) continue;
         await recordExtractedFact({
-          vendorId: v.id,
-          vendorUuid: v.uuid,
+          vendorId: scope.vendorId,
+          organizationId: scope.organizationId,
+          vendorUuid: scope.scopeKey,
           fact,
           mem0MemoryId: item.id,
+          source: scope.source,
         });
         orphansAdopted += 1;
       }
     } catch (err) {
       vendraError("memory.adopt_vendor_failed", {
-        vendor: v.uuid,
+        vendor: scope.scopeKey,
         err: err instanceof Error ? err.message : String(err),
       });
     }
   }
-  vendraLog("memory.adopt_done", { vendors: vendors.length, orphansAdopted });
+  vendraLog("memory.adopt_done", { scopes: scopes.length, orphansAdopted });
   return { vendors: vendors.length, orphansAdopted };
 }

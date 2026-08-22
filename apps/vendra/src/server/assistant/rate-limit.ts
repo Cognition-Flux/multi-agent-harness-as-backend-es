@@ -55,6 +55,12 @@ export function checkRateLimit(
     }
     return { allowed: maxRequests >= 1, count: 1 };
   }
+  // A rejected request consumes nothing (SPEC §23.15): incrementing on the way
+  // to a refusal inflated the counter unboundedly under retry spam, and a
+  // refund after N rejections no longer restores a usable slot.
+  if (state.count >= maxRequests) {
+    return { allowed: false, count: state.count };
+  }
   state.count += 1;
-  return { allowed: state.count <= maxRequests, count: state.count };
+  return { allowed: true, count: state.count };
 }

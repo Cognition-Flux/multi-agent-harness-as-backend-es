@@ -38,7 +38,7 @@ export function DocumentProcessor({
   const { messages, sendMessage, error } = useChat<VendorDocUIMessage>({
     id: `${pointer}#retry-${retryNonce}`,
     transport,
-    experimental_throttle: 60,
+    throttle: 60,
   });
 
   const startedRef = useRef(false);

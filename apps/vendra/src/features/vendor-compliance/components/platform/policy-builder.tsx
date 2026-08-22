@@ -26,6 +26,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangleIcon,
+  BotIcon,
   CheckIcon,
   ChevronDownIcon,
   ChevronRightIcon,
@@ -37,6 +38,13 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
+
+import type {
+  AssistantPrivilege,
+  RequirementCategoryType,
+  VendorDocumentType,
+  VendorValidatorId,
+} from "@vendra/workflow/vendor";
 
 import {
   Badge,
@@ -51,7 +59,12 @@ import {
 import { useTRPC } from "@/lib/trpc-client";
 import { cn, formatDate } from "@/lib/utils";
 
-import { ActivateDialog, AddOfficerDialog } from "./dialogs";
+import {
+  ActivateDialog,
+  AddOfficerDialog,
+  ApproveProposalDialog,
+  RejectProposalDialog,
+} from "./dialogs";
 
 interface DraftDocument {
   documentType: string;
@@ -61,17 +74,40 @@ interface DraftDocument {
 
 interface WorkingPolicy {
   refereeable: string[];
+  /** "CONVERSATIONAL" | "EMPOWERED" (SPEC §24.1). */
+  assistantPrivilege: string;
   documents: DraftDocument[];
 }
 
-/** The wire shape for a draft save — identical for save, check and activate. */
-function toPayload(working: WorkingPolicy) {
+/**
+ * The wire shape for a draft save — identical for save, check and activate.
+ *
+ * Structural fields are rendered checked-and-locked, so the payload must SAY
+ * the same thing (SPEC §23.10): they are unioned in here (structural first).
+ * Without this, a policy authored outside the console whose field list omits a
+ * structural field showed a state the gate refuses with no way to repair it
+ * from the UI. An EMPTY list still means "every field" (§19.6) and is sent as
+ * is. The gate's `structural_field_deselected` stays as the backstop for
+ * hand-built API calls.
+ *
+ * The casts are the client/server type seam: the working copy is plain strings
+ * (checkbox state), the router input is the engine vocabularies — anything
+ * outside them is refused by zod, and admissibility stays the gate's job.
+ */
+function toPayload(
+  working: WorkingPolicy,
+  structuralOf: (type: string) => readonly string[],
+) {
   return {
-    refereeableCategories: working.refereeable,
+    refereeableCategories: working.refereeable as RequirementCategoryType[],
+    assistantPrivilege: working.assistantPrivilege as AssistantPrivilege,
     documents: working.documents.map((d) => ({
-      documentType: d.documentType,
-      extractFields: d.extractFields,
-      validators: d.validators,
+      documentType: d.documentType as VendorDocumentType,
+      extractFields:
+        d.extractFields.length > 0
+          ? [...new Set([...structuralOf(d.documentType), ...d.extractFields])]
+          : d.extractFields,
+      validators: d.validators as VendorValidatorId[],
     })),
   };
 }
@@ -139,6 +175,10 @@ function describeFinding(
       return `${cat ?? "Un requisito"} es un requisito de esta empresa, pero ningún documento aceptado puede acreditarlo.`;
     case "refereeable_not_required":
       return `${cat ?? "Ese requisito"} está marcado para aprobación automática, pero ningún perfil lo exige: la marca no tiene efecto.`;
+    case "unknown_privilege_level":
+      return "Ese nivel de privilegio del asistente no existe.";
+    case "empowered_requires_officer":
+      return "El modo delegado del asistente requiere al menos un oficial de cumplimiento y esta empresa no tiene ninguno.";
     case "mandatory_category_referred":
       return `${cat ?? "Un requisito obligatorio"} es obligatorio y requerirá la decisión de un oficial en cada proveedor.`;
     case "validators_reduced":
@@ -153,9 +193,16 @@ export function PolicyBuilder({ uuid }: { uuid: string }) {
   const queryClient = useQueryClient();
   const companyQuery = useQuery(trpc.platform.getCompany.queryOptions({ uuid }));
   const catalogQuery = useQuery(trpc.platform.catalog.queryOptions());
+  const proposalsQuery = useQuery(
+    trpc.platform.listDirectiveProposals.queryOptions({ uuid }),
+  );
 
   const [draft, setDraft] = useState<WorkingPolicy | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [reviewing, setReviewing] = useState<{
+    uuid: string;
+    mode: "approve" | "reject";
+  } | null>(null);
   const [checkResult, setCheckResult] = useState<{
     admissible: boolean;
     violations: AdmissionFinding[];
@@ -178,13 +225,18 @@ export function PolicyBuilder({ uuid }: { uuid: string }) {
     (baseline
       ? {
           refereeable: [...baseline.refereeableCategories],
+          assistantPrivilege: baseline.assistantPrivilege,
           documents: baseline.documents.map((d) => ({
             documentType: d.documentType,
             extractFields: [...d.extractFields],
             validators: [...d.validators],
           })),
         }
-      : { refereeable: [], documents: [] });
+      : {
+          refereeable: [],
+          assistantPrivilege: "CONVERSATIONAL",
+          documents: [],
+        });
 
   const requiredCategories = useMemo(
     () =>
@@ -242,6 +294,9 @@ export function PolicyBuilder({ uuid }: { uuid: string }) {
   const invalidate = () => {
     void queryClient.invalidateQueries(trpc.platform.getCompany.pathFilter());
     void queryClient.invalidateQueries(trpc.platform.listCompanies.pathFilter());
+    void queryClient.invalidateQueries(
+      trpc.platform.listDirectiveProposals.pathFilter(),
+    );
   };
 
   const check = useMutation(
@@ -289,20 +344,24 @@ export function PolicyBuilder({ uuid }: { uuid: string }) {
       onError: (err) => {
         setConfirming(false);
         setBanner(null);
-        // The gate's refusal arrives as a JSON array of findings — render it as
-        // violations. Anything else is a plain message.
-        try {
-          const parsed: unknown = JSON.parse(err.message);
-          if (Array.isArray(parsed)) {
-            setCheckResult({
-              admissible: false,
-              violations: parsed as AdmissionFinding[],
-              warnings: [],
-            });
-            return;
-          }
-        } catch {
-          /* not a findings payload */
+        // The gate's refusal travels structurally as error.data.admission
+        // (SPEC §23.9) — render it as violations. Anything else is a plain
+        // message.
+        const admission = (
+          err.data as {
+            admission?: {
+              violations: AdmissionFinding[];
+              warnings?: AdmissionFinding[];
+            };
+          } | null
+        )?.admission;
+        if (admission) {
+          setCheckResult({
+            admissible: false,
+            violations: admission.violations,
+            warnings: admission.warnings ?? [],
+          });
+          return;
         }
         setFailure(err.message);
       },
@@ -318,6 +377,56 @@ export function PolicyBuilder({ uuid }: { uuid: string }) {
         invalidate();
       },
       onError: (err) => setFailure(err.message),
+    }),
+  );
+  const approveProposal = useMutation(
+    trpc.platform.approveDirectiveProposal.mutationOptions({
+      onSuccess: (data) => {
+        setReviewing(null);
+        setBanner(
+          data.superseded
+            ? "La propuesta quedó obsoleta: la política activa cambió desde que se propuso."
+            : `Propuesta aprobada — política v${data.version} activada${
+                data.repinnedVendors > 0
+                  ? ` y aplicada a ${data.repinnedVendors} proveedor(es)`
+                  : ""
+              }.`,
+        );
+        invalidate();
+      },
+      onError: (err) => {
+        setReviewing(null);
+        const admission = (
+          err.data as {
+            admission?: {
+              violations: AdmissionFinding[];
+              warnings?: AdmissionFinding[];
+            };
+          } | null
+        )?.admission;
+        if (admission) {
+          setCheckResult({
+            admissible: false,
+            violations: admission.violations,
+            warnings: admission.warnings ?? [],
+          });
+          return;
+        }
+        setFailure(err.message);
+      },
+    }),
+  );
+  const rejectProposal = useMutation(
+    trpc.platform.rejectDirectiveProposal.mutationOptions({
+      onSuccess: () => {
+        setReviewing(null);
+        setBanner("Propuesta rechazada. El asistente lo recordará.");
+        invalidate();
+      },
+      onError: (err) => {
+        setReviewing(null);
+        setFailure(err.message);
+      },
     }),
   );
 
@@ -357,13 +466,15 @@ export function PolicyBuilder({ uuid }: { uuid: string }) {
       catalog.categories.find((c) => c.category === category)?.label,
     validatorLabel: (id) => catalog.validators.find((v) => v.id === id)?.label,
   };
+  const structuralOf = (type: string): readonly string[] =>
+    catalog.documentTypes.find((t) => t.type === type)?.structuralFields ?? [];
 
   /** Save-then-activate: activation reads the draft from the database, so
    *  activating an unsaved form would silently publish the PREVIOUS draft. */
   const handleActivate = async (applyToExistingVendors: boolean) => {
     if (dirty) {
       try {
-        await save.mutateAsync({ uuid, ...toPayload(working) });
+        await save.mutateAsync({ uuid, ...toPayload(working, structuralOf) });
       } catch {
         setConfirming(false);
         return; // save.onError already reported it
@@ -489,6 +600,50 @@ export function PolicyBuilder({ uuid }: { uuid: string }) {
               ) : null}
             </>
           )}
+        </CardContent>
+      </Card>
+
+      {/* ── Assistant privilege (SPEC §24.1) ───────────────────────────── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <BotIcon className="h-4 w-4" />
+            Privilegios del asistente
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <p className="max-w-prose text-sm text-muted-foreground">
+            Qué puede hacer el asistente del proveedor bajo esta política. En
+            cualquier nivel, nada cambia sin la aprobación de esta consola.
+          </p>
+          <ul className="flex flex-col gap-1.5">
+            {(catalog.assistantPrivileges ?? []).map((tier) => {
+              const on = working.assistantPrivilege === tier.value;
+              return (
+                <li key={tier.value}>
+                  <label className="flex items-start gap-2 rounded-md px-1 py-1 text-sm hover:bg-muted/40">
+                    <input
+                      type="radio"
+                      name="assistant-privilege"
+                      className="mt-0.5"
+                      checked={on}
+                      onChange={() =>
+                        mutate({ ...working, assistantPrivilege: tier.value })
+                      }
+                    />
+                    <span className="min-w-0">
+                      <span className="block">{tier.label}</span>
+                      <span className="block text-xs text-muted-foreground">
+                        {tier.value === "EMPOWERED"
+                          ? "El asistente puede PROPONER cambios de directivas (documentos, campos, validaciones, aprobación automática). Cada propuesta llega aquí y nada se aplica sin su aprobación."
+                          : "El asistente solo explica el expediente del proveedor. Es el comportamiento de siempre."}
+                      </span>
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
         </CardContent>
       </Card>
 
@@ -698,6 +853,109 @@ export function PolicyBuilder({ uuid }: { uuid: string }) {
         </CardContent>
       </Card>
 
+      {/* ── Assistant proposals (SPEC §24.2/§24.3) ─────────────────────── */}
+      {(proposalsQuery.data ?? []).length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <BotIcon className="h-4 w-4" />
+              Propuestas del asistente
+              <Badge variant="muted">
+                {(proposalsQuery.data ?? []).filter((p) => !p.resolvedAt).length}{" "}
+                abierta(s)
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-3">
+            {(proposalsQuery.data ?? []).map((proposal) => (
+              <div
+                key={proposal.uuid}
+                className={cn(
+                  "rounded-md border p-3",
+                  proposal.resolvedAt ? "border-border/40 opacity-80" : "border-border",
+                )}
+              >
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <span className="font-medium">
+                    {proposal.vendorName ?? "Proveedor"}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDate(proposal.raisedAt)} · sobre v
+                    {proposal.baseVersion ?? "—"}
+                  </span>
+                  {proposal.resolvedAt ? (
+                    <Badge
+                      variant={
+                        proposal.resolution === "APPROVED"
+                          ? "success"
+                          : proposal.resolution === "REJECTED"
+                            ? "destructive"
+                            : "muted"
+                      }
+                    >
+                      {proposal.resolution === "APPROVED"
+                        ? `Aprobada${proposal.appliedVersion ? ` → v${proposal.appliedVersion}` : ""}`
+                        : proposal.resolution === "REJECTED"
+                          ? "Rechazada"
+                          : "Obsoleta"}
+                    </Badge>
+                  ) : proposal.admissible === false ? (
+                    <Badge variant="warning">No admisible tal cual</Badge>
+                  ) : (
+                    <Badge variant="warning">Pendiente</Badge>
+                  )}
+                </div>
+                <ul className="mt-2 list-disc pl-5 text-sm">
+                  {proposal.summaryLines.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Motivo del proveedor: “{proposal.rationale}”
+                </p>
+                {proposal.violations.length > 0 ? (
+                  <div className="mt-2 flex flex-col gap-1 text-xs text-destructive">
+                    {proposal.violations.map((v) => (
+                      <p key={`${v.rule}-${v.detail}`}>
+                        {describeFinding(v, vocabulary)}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+                {proposal.resolutionNote ? (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Nota de resolución: {proposal.resolutionNote}
+                  </p>
+                ) : null}
+                {!proposal.resolvedAt ? (
+                  <div className="mt-3 flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      disabled={approveProposal.isPending || rejectProposal.isPending}
+                      onClick={() =>
+                        setReviewing({ uuid: proposal.uuid, mode: "approve" })
+                      }
+                    >
+                      Aprobar…
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={approveProposal.isPending || rejectProposal.isPending}
+                      onClick={() =>
+                        setReviewing({ uuid: proposal.uuid, mode: "reject" })
+                      }
+                    >
+                      Rechazar…
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
+
       {/* ── Gate result ────────────────────────────────────────────────── */}
       {checkResult ? (
         <Card
@@ -782,7 +1040,7 @@ export function PolicyBuilder({ uuid }: { uuid: string }) {
         <Button
           variant="outline"
           disabled={check.isPending}
-          onClick={() => check.mutate({ uuid, ...toPayload(working) })}
+          onClick={() => check.mutate({ uuid, ...toPayload(working, structuralOf) })}
         >
           {check.isPending ? <Loader className="mr-1.5 h-4 w-4" /> : null}
           Validar
@@ -790,7 +1048,7 @@ export function PolicyBuilder({ uuid }: { uuid: string }) {
         <Button
           variant="secondary"
           disabled={save.isPending || !dirty}
-          onClick={() => save.mutate({ uuid, ...toPayload(working) })}
+          onClick={() => save.mutate({ uuid, ...toPayload(working, structuralOf) })}
         >
           {save.isPending ? <Loader className="mr-1.5 h-4 w-4" /> : null}
           Guardar borrador
@@ -840,9 +1098,39 @@ export function PolicyBuilder({ uuid }: { uuid: string }) {
           acceptedCount={working.documents.length}
           automaticCategories={working.refereeable.map(categoryLabel)}
           manualCategories={manualCategories.map(categoryLabel)}
+          assistantPrivilegeLabel={
+            catalog.assistantPrivileges?.find(
+              (t) => t.value === working.assistantPrivilege,
+            )?.label ?? working.assistantPrivilege
+          }
           pending={activate.isPending || save.isPending}
           onClose={() => setConfirming(false)}
           onConfirm={(repin) => void handleActivate(repin)}
+        />
+      ) : null}
+
+      {reviewing?.mode === "approve" ? (
+        <ApproveProposalDialog
+          companyName={company.name}
+          vendorCount={company.vendorCount}
+          pending={approveProposal.isPending}
+          onClose={() => setReviewing(null)}
+          onConfirm={(repin, note) =>
+            approveProposal.mutate({
+              uuid: reviewing.uuid,
+              applyToExistingVendors: repin,
+              ...(note ? { note } : {}),
+            })
+          }
+        />
+      ) : null}
+      {reviewing?.mode === "reject" ? (
+        <RejectProposalDialog
+          pending={rejectProposal.isPending}
+          onClose={() => setReviewing(null)}
+          onConfirm={(note) =>
+            rejectProposal.mutate({ uuid: reviewing.uuid, note })
+          }
         />
       ) : null}
     </main>

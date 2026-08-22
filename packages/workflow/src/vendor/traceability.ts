@@ -18,6 +18,7 @@ import {
   type CoverageDeterminationRecord,
   LINE_TO_REQUIREMENT_CATEGORY,
 } from "./coverage-determination";
+import { isGrantWithheldByPolicy } from "./policy";
 import { getPotentialRequirementsForDocumentType } from "./requirements";
 import type { GrantSource } from "./requirement-profile";
 import type { VendorDocumentType } from "./schemas";
@@ -179,20 +180,11 @@ export function deriveRequirementEvidence(
     : null;
   const required = new Set<string>(input.requiredCategories ?? []);
 
-  /**
-   * Is this grant the automated pipeline settling a category policy says a human
-   * must settle? Officer sources (`manual_grant`, `waiver`) are the human
-   * decision itself and are never withheld — withholding them would make the
-   * officer's rescue path unreachable.
-   */
+  // The single referee predicate (policy.ts) — the fold only binds its sets.
   const withheldByPolicy = (
     category: RequirementCategoryType,
     kind: GrantSource["kind"],
-  ): boolean => {
-    if (!refereeable) return false;
-    if (kind === "manual_grant" || kind === "waiver") return false;
-    return required.has(category) && !refereeable.has(category);
-  };
+  ): boolean => isGrantWithheldByPolicy({ category, kind, required, refereeable });
 
   const addSource = (
     category: RequirementCategoryType,

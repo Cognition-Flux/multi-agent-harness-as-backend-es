@@ -243,6 +243,7 @@ export function ActivateDialog({
   acceptedCount,
   automaticCategories,
   manualCategories,
+  assistantPrivilegeLabel,
   pending,
   onClose,
   onConfirm,
@@ -253,6 +254,7 @@ export function ActivateDialog({
   acceptedCount: number;
   automaticCategories: string[];
   manualCategories: string[];
+  assistantPrivilegeLabel: string;
   pending: boolean;
   onClose: () => void;
   onConfirm: (applyToExistingVendors: boolean) => void;
@@ -284,6 +286,12 @@ export function ActivateDialog({
                 ? manualCategories.join(", ")
                 : "Ninguno."}
             </dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+              Asistente del proveedor
+            </dt>
+            <dd>{assistantPrivilegeLabel}</dd>
           </div>
         </dl>
 
@@ -418,6 +426,126 @@ export function AddOfficerDialog({
           >
             {create.isPending ? <Loader className="mr-1.5 h-4 w-4" /> : null}
             Crear cuenta
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+/**
+ * Approving an assistant proposal (SPEC §24.3) — the ActivateDialog's shape,
+ * because approval IS an activation: it states that a new version goes live
+ * and asks the same re-pin question at the same moment.
+ */
+export function ApproveProposalDialog({
+  companyName,
+  vendorCount,
+  pending,
+  onClose,
+  onConfirm,
+}: {
+  companyName: string;
+  vendorCount: number;
+  pending: boolean;
+  onClose: () => void;
+  onConfirm: (applyToExistingVendors: boolean, note: string) => void;
+}) {
+  const [repin, setRepin] = useState(false);
+  const [note, setNote] = useState("");
+  return (
+    <Dialog open onClose={onClose} title="Aprobar la propuesta del asistente">
+      <div className="flex flex-col gap-4 text-sm">
+        <p className="text-muted-foreground">
+          Al aprobar, se crea y ACTIVA una nueva versión de la política de{" "}
+          {companyName} con los cambios propuestos — el mismo efecto que activar
+          un borrador desde esta consola. La puerta de admisibilidad se vuelve a
+          evaluar antes de aplicar nada.
+        </p>
+
+        {vendorCount > 0 ? (
+          <label className="flex items-start gap-2 rounded-md border border-border p-3">
+            <input
+              type="checkbox"
+              className="mt-0.5"
+              checked={repin}
+              onChange={(e) => setRepin(e.target.checked)}
+            />
+            <span>
+              Aplicar también a los {vendorCount} proveedor(es) existentes
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Por defecto la política nueva rige solo para proveedores nuevos:
+                a nadie se le cambian las reglas a mitad de su proceso.
+              </span>
+            </span>
+          </label>
+        ) : null}
+
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="approve-note">Nota (opcional)</Label>
+          <Input
+            id="approve-note"
+            value={note}
+            maxLength={500}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Contexto de la aprobación"
+          />
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose} disabled={pending}>
+            Cancelar
+          </Button>
+          <Button onClick={() => onConfirm(repin, note.trim())} disabled={pending}>
+            {pending ? <Loader className="mr-1.5 h-4 w-4" /> : null}
+            Aprobar y activar
+          </Button>
+        </div>
+      </div>
+    </Dialog>
+  );
+}
+
+/** Rejecting a proposal requires a note: the assistant remembers it (§24.6). */
+export function RejectProposalDialog({
+  pending,
+  onClose,
+  onConfirm,
+}: {
+  pending: boolean;
+  onClose: () => void;
+  onConfirm: (note: string) => void;
+}) {
+  const [note, setNote] = useState("");
+  const valid = note.trim().length > 0;
+  return (
+    <Dialog open onClose={onClose} title="Rechazar la propuesta">
+      <div className="flex flex-col gap-4 text-sm">
+        <p className="text-muted-foreground">
+          Nada cambia en la política. El motivo se consolida en la memoria del
+          asistente para que no vuelva a proponer lo mismo.
+        </p>
+        <div className="flex flex-col gap-1">
+          <Label htmlFor="reject-note">Motivo (obligatorio)</Label>
+          <Input
+            id="reject-note"
+            value={note}
+            maxLength={500}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Por qué se rechaza"
+          />
+        </div>
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" onClick={onClose} disabled={pending}>
+            Cancelar
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => onConfirm(note.trim())}
+            disabled={pending || !valid}
+          >
+            {pending ? <Loader className="mr-1.5 h-4 w-4" /> : null}
+            Rechazar
           </Button>
         </div>
       </div>

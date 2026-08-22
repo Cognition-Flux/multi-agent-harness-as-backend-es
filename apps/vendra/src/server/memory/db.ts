@@ -70,13 +70,19 @@ export async function findMemoriesByMem0Ids(
  * Record facts the agent chose to store. Returns the rows actually inserted —
  * the partial unique index drops exact duplicates without an error, so a
  * shorter return is the normal "already knew that" path, not a failure.
+ *
+ * `vendorUuid` is the SCOPE KEY handed to mem0 as userId: a vendor uuid, or
+ * `org:<orgUuid>` for org-scoped directive facts (SPEC §24.6) — then vendorId
+ * is null and organizationId is set.
  */
 export async function insertMemories(
   input: {
-    vendorId: number;
+    vendorId: number | null;
+    organizationId?: number | null;
     vendorUuid: string;
     facts: string[];
-    source: "tool" | "extracted";
+    source: "tool" | "extracted" | "directive";
+    knobKey?: string | null;
   },
 ): Promise<{ id: number; fact: string }[]> {
   if (input.facts.length === 0) return [];
@@ -85,13 +91,47 @@ export async function insertMemories(
     .values(
       input.facts.map((fact) => ({
         vendorId: input.vendorId,
+        organizationId: input.organizationId ?? null,
         vendorUuid: input.vendorUuid,
         fact,
         source: input.source,
+        knobKey: input.knobKey ?? null,
       })),
     )
     .onConflictDoNothing()
     .returning({ id: assistantMemory.id, fact: assistantMemory.fact });
+}
+
+/**
+ * Supersede the live directive facts for the given knobs in one scope (SPEC
+ * §24.6) — the Postgres half of "an approved change replaces the previous
+ * directive for the same knob". Returns the affected rows' mem0 ids so the
+ * caller can best-effort delete them from the index (mem0 is additive-only;
+ * `--rebuild` remains the guaranteed cleanup).
+ */
+export async function supersedeDirectiveFactsByKnob(
+  scopeKey: string,
+  knobKeys: readonly string[],
+): Promise<{ mem0MemoryIds: string[] }> {
+  if (knobKeys.length === 0) return { mem0MemoryIds: [] };
+  const rows = await getDb()
+    .update(assistantMemory)
+    .set({ supersededAt: new Date() })
+    .where(
+      and(
+        eq(assistantMemory.vendorUuid, scopeKey),
+        eq(assistantMemory.source, "directive"),
+        inArray(assistantMemory.knobKey, [...knobKeys]),
+        isNull(assistantMemory.deletedAt),
+        isNull(assistantMemory.supersededAt),
+      ),
+    )
+    .returning({ mem0MemoryId: assistantMemory.mem0MemoryId });
+  return {
+    mem0MemoryIds: rows
+      .map((r) => r.mem0MemoryId)
+      .filter((v): v is string => !!v),
+  };
 }
 
 /** Attach mem0's id once the drain has indexed a row. */
@@ -136,18 +176,21 @@ export async function softDeleteByMem0Id(mem0MemoryId: string): Promise<void> {
 
 /** Upsert an extracted fact and return its row id, for id linkage. */
 export async function recordExtractedFact(input: {
-  vendorId: number;
+  vendorId: number | null;
+  organizationId?: number | null;
   vendorUuid: string;
   fact: string;
   mem0MemoryId: string;
+  source?: "extracted" | "directive";
 }): Promise<void> {
   const [row] = await getDb()
     .insert(assistantMemory)
     .values({
       vendorId: input.vendorId,
+      organizationId: input.organizationId ?? null,
       vendorUuid: input.vendorUuid,
       fact: input.fact,
-      source: "extracted",
+      source: input.source ?? "extracted",
       mem0MemoryId: input.mem0MemoryId,
     })
     .onConflictDoNothing()
@@ -176,7 +219,8 @@ export async function recordExtractedFact(input: {
 
 export interface QueuedWork {
   id: number;
-  vendorId: number;
+  /** Null for org-scoped fact work (SPEC §24.6). */
+  vendorId: number | null;
   vendorUuid: string;
   threadId: string;
   kind: string;
@@ -195,7 +239,8 @@ export interface QueuedWork {
 }
 
 export async function enqueueMemoryWork(input: {
-  vendorId: number;
+  vendorId: number | null;
+  organizationId?: number | null;
   vendorUuid: string;
   threadId: string;
   kind: "turn" | "fact";
@@ -203,6 +248,7 @@ export async function enqueueMemoryWork(input: {
 }): Promise<void> {
   await getDb().insert(memoryIngestQueue).values({
     vendorId: input.vendorId,
+    organizationId: input.organizationId ?? null,
     vendorUuid: input.vendorUuid,
     threadId: input.threadId,
     kind: input.kind,
@@ -346,7 +392,7 @@ export async function pendingMemoryWorkCount(): Promise<number> {
 /** Rows whose index entry is missing — the re-index worklist. */
 export async function listUnindexedMemories(
   limit: number,
-): Promise<(LiveMemoryRow & { vendorId: number; vendorUuid: string })[]> {
+): Promise<(LiveMemoryRow & { vendorId: number | null; vendorUuid: string })[]> {
   return getDb()
     .select({
       id: assistantMemory.id,
@@ -387,7 +433,7 @@ export async function listAllMem0Ids(vendorUuid: string): Promise<Set<string>> {
 
 /** Everything live, for a full rebuild after a lost Qdrant volume. */
 export async function listAllLiveMemories(): Promise<
-  (LiveMemoryRow & { vendorId: number; vendorUuid: string })[]
+  (LiveMemoryRow & { vendorId: number | null; vendorUuid: string })[]
 > {
   return getDb()
     .select({

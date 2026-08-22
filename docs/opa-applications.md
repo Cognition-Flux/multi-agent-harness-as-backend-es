@@ -369,7 +369,7 @@ needs the document/validator/category catalogs, satisfiability over a config
 space, and every violation at once rather than the first. That is Rego's shape,
 not TypeScript's.
 
-So `policy/company-policy.rego` (10 rejection rules, 2 warnings, 16 assertions)
+So `policy/company-policy.rego` (13 rejection rules since SPEC §23/§24, 2 warnings)
 compiles to a committed `company-policy.wasm`, and
 `apps/vendra/src/server/policy-admission.ts` evaluates it in-process. The
 boundary that keeps this narrow:

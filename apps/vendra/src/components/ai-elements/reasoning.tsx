@@ -99,7 +99,7 @@ export function ReasoningTrigger({ className, children, ...props }: ReasoningTri
         type="button"
         data-slot="reasoning-trigger"
         className={cn(
-          "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=open]:rounded-b-none data-[state=open]:bg-agent/5",
+          "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40 data-[state=open]:rounded-b-none data-[state=open]:bg-agent/5",
           className,
         )}
         {...props}

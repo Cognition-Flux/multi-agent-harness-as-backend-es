@@ -39,6 +39,17 @@ export const MEMORY_COLLECTION = "vendra_assistant_memory";
 /** mem0 scope: one agent, one memory space, vendors separated by `userId`. */
 export const MEMORY_AGENT_ID = "vendra-assistant";
 
+/**
+ * The org-scope userId prefix (SPEC §24.6): directive memories are stored under
+ * `org:<orgUuid>` so every vendor conversation of that company recalls them.
+ * A uuid can never start with "org:", so the scopes cannot collide.
+ */
+export const ORG_SCOPE_PREFIX = "org:";
+
+export function orgScopeKey(orgUuid: string): string {
+  return `${ORG_SCOPE_PREFIX}${orgUuid}`;
+}
+
 /** Recall budget — unchanged from the pre-mem0 caps so prompts stay bounded. */
 export const RECALL_MAX_FACTS = 20;
 export const RECALL_MAX_CHARS = 2_000;

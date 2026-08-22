@@ -14,6 +14,7 @@ base := {
 	"harness": {
 		"egress_allowlist": ["api.anthropic.com", "*.npmjs.org"],
 		"network_policy_uses_allowlist": true,
+		"assistant_active_tools_derived": true,
 		"lanes": {"doc-run": {
 			"declares_active_tools": true,
 			"permission_mode": "allow-reads",
@@ -24,6 +25,7 @@ base := {
 		"wasm_present": true,
 		"manifest_present": true,
 		"wasm_stale": false,
+		"wasm_binary_stale": false,
 		"entrypoints": ["vendra/policy/admission/decision"],
 		"host_builtins": ["sprintf"],
 		"app_entrypoint": "vendra/policy/admission/decision",
@@ -36,6 +38,11 @@ base := {
 		"auth_disabled_paths": ["/sign-up/email"],
 		"auth_rate_limit_enabled": true,
 	},
+	# Without this key the nine §22 memory rules are VACUOUSLY satisfied in
+	# test_clean_fact_set_is_clean — the exact silent-undefined shape this suite
+	# exists to catch (SPEC §23.12). Rego is order-independent, so the forward
+	# reference to memory_base is fine.
+	"memory": memory_base,
 }
 
 rules(vs) := {v.rule | some v in vs}
@@ -228,6 +235,16 @@ test_missing_admission_wasm_fires if {
 test_stale_admission_wasm_fires if {
 	got := rules(repo.violation) with data.repo as patched({"governance": {"wasm_stale": true}})
 	got == {"G1_admission_wasm_stale"}
+}
+
+test_stale_admission_wasm_binary_fires if {
+	got := rules(repo.violation) with data.repo as patched({"governance": {"wasm_binary_stale": true}})
+	got == {"G1_admission_wasm_binary_stale"}
+}
+
+test_hardcoded_assistant_tools_fires if {
+	got := rules(repo.violation) with data.repo as patched({"harness": {"assistant_active_tools_derived": false}})
+	got == {"G5_assistant_tools_not_policy_derived"}
 }
 
 test_missing_manifest_fires if {

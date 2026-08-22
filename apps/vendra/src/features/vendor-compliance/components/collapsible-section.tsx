@@ -48,7 +48,7 @@ export function CollapsibleSection({
       >
         <CollapsibleTrigger
           className={cn(
-            "flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left font-medium transition-colors",
+            "flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring/40",
             tone === "warning"
               ? "text-warning hover:bg-warning/10"
               : "text-muted-foreground hover:bg-muted/40",

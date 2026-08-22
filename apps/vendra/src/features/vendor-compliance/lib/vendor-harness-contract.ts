@@ -15,6 +15,7 @@ import { z } from "zod";
 
 import type { ValidationRule } from "@vendra/workflow/vendor";
 import {
+  ASSISTANT_PRIVILEGE_VALUES,
   COVERAGE_CONTRIBUTION_ROLES,
   COVERAGE_DETERMINATION_LINES,
   COVERAGE_VERDICTS,
@@ -439,6 +440,86 @@ export const rememberFactsInputSchema = z.object({
     ),
 });
 export type RememberFactsInput = z.infer<typeof rememberFactsInputSchema>;
+
+// --- assistant privilege tiers (SPEC §24) ------------------------------------
+
+export const assistantPrivilegeSchema = z.enum(ASSISTANT_PRIVILEGE_VALUES);
+
+/**
+ * The EMPOWERED assistant's proposal input (SPEC §24.2) — structured knobs
+ * only, every member a closed vocabulary at the gate. Deliberately z.string()
+ * rather than enums HERE: an unknown name must reach the dry-run gate and come
+ * back as an enum-precise violation the assistant can explain, not vanish as a
+ * bridge-side schema retry loop. Plain z.object throughout — never z.record.
+ */
+export const proposeDirectiveChangeInputSchema = z.object({
+  rationale: z
+    .string()
+    .min(1)
+    .max(500)
+    .describe("Why the vendor wants this, in their words (redacted at persist)"),
+  acceptDocumentTypes: z
+    .array(z.string().min(1).max(64))
+    .max(16)
+    .optional()
+    .describe("Document types the company should start accepting"),
+  dropDocumentTypes: z
+    .array(z.string().min(1).max(64))
+    .max(16)
+    .optional()
+    .describe("Document types the company should stop accepting"),
+  fieldChanges: z
+    .array(
+      z.object({
+        documentType: z.string().min(1).max(64),
+        addFields: z.array(z.string().min(1).max(120)).max(50).optional(),
+        removeFields: z.array(z.string().min(1).max(120)).max(50).optional(),
+      }),
+    )
+    .max(16)
+    .optional()
+    .describe("Per-type extraction-field changes"),
+  validatorChanges: z
+    .array(
+      z.object({
+        documentType: z.string().min(1).max(64),
+        addValidators: z.array(z.string().min(1).max(64)).max(20).optional(),
+        removeValidators: z.array(z.string().min(1).max(64)).max(20).optional(),
+      }),
+    )
+    .max(16)
+    .optional()
+    .describe("Per-type validator changes"),
+  makeRefereeable: z
+    .array(z.string().min(1).max(64))
+    .max(32)
+    .optional()
+    .describe("Categories the system should settle automatically"),
+  makeReferred: z
+    .array(z.string().min(1).max(64))
+    .max(32)
+    .optional()
+    .describe("Categories an officer should ratify every time"),
+});
+export type ProposeDirectiveChangeInput = z.infer<
+  typeof proposeDirectiveChangeInputSchema
+>;
+
+export const getDirectiveProposalsInputSchema = z.object({});
+export type GetDirectiveProposalsInput = z.infer<
+  typeof getDirectiveProposalsInputSchema
+>;
+
+/** One proposal as the assistant tools report it back to the model. */
+export interface AssistantDirectiveProposal {
+  proposalUuid: string;
+  raisedAt: string;
+  /** null while OPEN. */
+  resolution: "APPROVED" | "REJECTED" | "SUPERSEDED" | null;
+  resolutionNote: string | null;
+  admissible: boolean | null;
+  summary: string;
+}
 
 // Snapshot shapes returned by the assistant host tools. These ride the UI
 // stream and persist in the transcript — keep them PII-redacted at build

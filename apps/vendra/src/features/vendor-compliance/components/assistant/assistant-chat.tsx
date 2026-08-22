@@ -7,7 +7,7 @@
  * cookie-implied), and the message render loop — text via Streamdown,
  * reasoning collapsed, host-tool calls as compact activity pills.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 // Transports import from `ai` core, NOT @ai-sdk/react.
 import { DefaultChatTransport, getToolName, isToolUIPart } from "ai";
@@ -15,6 +15,8 @@ import {
   CheckIcon,
   CircleAlertIcon,
   FileSearchIcon,
+  FileSignatureIcon,
+  InboxIcon,
   LightbulbIcon,
   ListChecksIcon,
   LoaderCircleIcon,
@@ -62,12 +64,24 @@ const TOOL_LABELS: Record<string, [string, string]> = {
   ],
   getDocumentDetails: ["Revisando un documento…", "Se revisó un documento"],
   rememberFacts: ["Tomando nota…", "Anotado para la próxima vez"],
+  // EMPOWERED tier only (SPEC §24) — present unconditionally: a pill for a
+  // tool the tier hides simply never renders.
+  proposeDirectiveChange: [
+    "Redactando una propuesta de directiva…",
+    "Propuesta enviada a revisión",
+  ],
+  getDirectiveProposals: [
+    "Consultando sus propuestas…",
+    "Se consultaron sus propuestas",
+  ],
 };
 
 const TOOL_ICONS: Record<string, typeof ListChecksIcon> = {
   getComplianceState: ListChecksIcon,
   getDocumentDetails: FileSearchIcon,
   rememberFacts: LightbulbIcon,
+  proposeDirectiveChange: FileSignatureIcon,
+  getDirectiveProposals: InboxIcon,
 };
 
 function ToolPill({
@@ -83,6 +97,9 @@ function ToolPill({
   const done = state === "output-available";
   const errored = state === "output-error" || state === "output-denied";
   const inFlight = !done && !errored && live;
+  // Non-terminal part that is no longer live (Stop/timeout mid-call, or a
+  // rehydrated aborted turn) — the finished label would be a false claim.
+  const interrupted = !done && !errored && !live;
   const [pending, finished] = TOOL_LABELS[toolName] ?? [
     `Ejecutando ${toolName}…`,
     `Se ejecutó ${toolName}`,
@@ -90,7 +107,6 @@ function ToolPill({
   const Icon = TOOL_ICONS[toolName] ?? ListChecksIcon;
   return (
     <span
-      aria-live="polite"
       className={cn(
         "inline-flex w-fit items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs backdrop-blur-sm transition-colors duration-300",
         errored
@@ -107,6 +123,8 @@ function ToolPill({
         "Esa consulta falló"
       ) : inFlight ? (
         <TextShimmer>{pending}</TextShimmer>
+      ) : interrupted ? (
+        "Consulta interrumpida"
       ) : (
         finished
       )}
@@ -157,6 +175,8 @@ export function AssistantChat() {
   // because useChat seeds its messages exactly once.
   const [history, setHistory] = useState<HistoryState>({ phase: "loading" });
   const [attempt, setAttempt] = useState(0);
+  const loadingRef = useRef<HTMLDivElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -180,13 +200,24 @@ export function AssistantChat() {
     };
   }, [attempt]);
 
+  // A retry unmounts the focused "Reintentar" button — walk focus through
+  // each phase (skeleton → error card, or skeleton → the mounted chat body
+  // reclaims it) so keyboard/SR users keep their place in the drawer.
+  useEffect(() => {
+    if (attempt === 0) return;
+    if (history.phase === "loading") loadingRef.current?.focus();
+    else if (history.phase === "error") errorRef.current?.focus();
+  }, [history.phase, attempt]);
+
   if (history.phase === "loading") {
     // Skeleton bubbles mirroring the Message layout (user right-aligned,
     // assistant full-width) so hydration doesn't visibly re-layout.
     return (
       <div
-        className="flex flex-1 flex-col gap-4 overflow-hidden p-4"
+        className="flex flex-1 flex-col gap-4 overflow-hidden p-4 outline-none"
+        ref={loadingRef}
         role="status"
+        tabIndex={-1}
       >
         <span className="sr-only">Cargando su conversación…</span>
         <div aria-hidden className="flex w-full justify-end">
@@ -205,7 +236,12 @@ export function AssistantChat() {
   }
   if (history.phase === "error") {
     return (
-      <div className="flex flex-1 animate-fade-in flex-col items-center justify-center gap-3 p-6 text-center">
+      <div
+        className="flex flex-1 animate-fade-in flex-col items-center justify-center gap-3 p-6 text-center outline-none"
+        ref={errorRef}
+        role="alert"
+        tabIndex={-1}
+      >
         <span className="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10 text-destructive">
           <CircleAlertIcon className="h-5 w-5" />
         </span>
@@ -218,7 +254,7 @@ export function AssistantChat() {
           type="button"
           variant="outline"
         >
-          Intentar de nuevo
+          Reintentar
         </Button>
       </div>
     );
@@ -233,6 +269,14 @@ function AssistantChatBody({
   initialMessages: VendorAssistantUIMessage[];
 }) {
   const [input, setInput] = useState("");
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+
+  // If the history skeleton held focus (a retry parked it there), its
+  // unmount dropped focus on <body> — reclaim it for the composer. Guarded
+  // so a user who already moved focus elsewhere is never interrupted.
+  useEffect(() => {
+    if (document.activeElement === document.body) composerRef.current?.focus();
+  }, []);
 
   const transport = useMemo(
     () =>
@@ -253,7 +297,7 @@ function AssistantChatBody({
       id: "vendor-assistant",
       messages: initialMessages,
       transport,
-      experimental_throttle: 50,
+      throttle: 50,
     });
 
   const busy = status === "submitted" || status === "streaming";
@@ -284,7 +328,10 @@ function AssistantChatBody({
 
   return (
     <>
-      <Conversation>
+      {/* initial="instant": the body mounts with up to 80 hydrated messages —
+          a smooth initial scroll would rush the whole transcript past the
+          user on first open. Streaming keeps its smooth stick-to-bottom. */}
+      <Conversation aria-label="Conversación con el asistente" initial="instant">
         <ConversationContent className="min-h-full">
           {rendered.length === 0 && !busy ? (
             <ConversationEmptyState className="flex-1 animate-fade-in-up">
@@ -352,9 +399,13 @@ function AssistantChatBody({
                         return (
                           <Reasoning
                             isStreaming={
+                              // part.state is the canonical signal (reasoning-end
+                              // flips it to "done"); the outer guards keep a
+                              // persisted aborted block (state stuck "streaming")
+                              // from shimmering on later turns.
                               status === "streaming" &&
                               messageIdx === rendered.length - 1 &&
-                              idx === message.parts.length - 1
+                              part.state === "streaming"
                             }
                             key={key}
                             reasoning={part.text}
@@ -382,7 +433,6 @@ function AssistantChatBody({
               })}
               {thinking && (
                 <div
-                  aria-live="polite"
                   className="flex animate-fade-in items-center gap-2 text-sm text-muted-foreground"
                   role="status"
                 >
@@ -407,6 +457,9 @@ function AssistantChatBody({
                       onClick={() => {
                         clearError();
                         void regenerate();
+                        // The alert unmounts with the click — keep focus in
+                        // the drawer instead of dropping it on <body>.
+                        composerRef.current?.focus();
                       }}
                       size="sm"
                       type="button"
@@ -415,7 +468,10 @@ function AssistantChatBody({
                       Reintentar
                     </Button>
                     <Button
-                      onClick={clearError}
+                      onClick={() => {
+                        clearError();
+                        composerRef.current?.focus();
+                      }}
                       size="sm"
                       type="button"
                       variant="ghost"
@@ -435,6 +491,7 @@ function AssistantChatBody({
         <PromptInput onSubmit={() => submit()}>
           <PromptInputTextarea
             aria-label="Escribir al asistente"
+            ref={composerRef}
             maxLength={ASSISTANT_MAX_MESSAGE_CHARS}
             onChange={(e) => setInput(e.currentTarget.value)}
             onEnterSubmit={() => submit()}

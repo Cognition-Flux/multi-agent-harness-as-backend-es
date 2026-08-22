@@ -68,6 +68,15 @@ export interface LeaseAssistantTurnInput {
   vendorId: number;
   instructions: string;
   tools: ReturnType<typeof buildAssistantTools>;
+  /**
+   * The allowlist for THIS lease, derived from the vendor's resolved privilege
+   * tier (`assistantActiveTools`, SPEC §24.5). Recomputed per turn, so a
+   * revoked tier loses its tools immediately even on a parked session; no
+   * tool-name literal lives here (repo.rego asserts that).
+   */
+  activeTools: ReadonlyArray<
+    keyof ReturnType<typeof buildAssistantTools> & string
+  >;
   abortSignal: AbortSignal;
 }
 
@@ -107,11 +116,7 @@ export async function leaseAssistantTurn(
         sandbox,
         instructions: input.instructions,
         tools: input.tools,
-        activeTools: [
-          "getComplianceState",
-          "getDocumentDetails",
-          "rememberFacts",
-        ],
+        activeTools: input.activeTools,
         // No built-in is active; this gates them a second time regardless.
         permissionMode: "allow-reads",
         telemetry: { integrations: [getHarnessFileReporter()] },

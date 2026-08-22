@@ -7,6 +7,16 @@ import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import { Button } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
+/**
+ * use-stick-to-bottom's scrolling is JS-driven (a spring on scrollTop), so
+ * the CSS reduced-motion kill-switch in globals.css cannot reach it — the
+ * preference resolves here and downgrades every programmatic scroll to an
+ * instant jump.
+ */
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
 
 // The library scrolls its Content WRAPPER (where it mounts scrollRef and
@@ -20,11 +30,13 @@ export const Conversation = ({
   ...props
 }: ConversationProps) => (
   <StickToBottom
+    aria-label="Conversación"
     className={cn("relative min-h-0 flex-1 overflow-hidden", className)}
     data-slot="conversation"
-    initial="smooth"
-    resize="smooth"
+    initial={prefersReducedMotion() ? "instant" : "smooth"}
+    resize={prefersReducedMotion() ? "instant" : "smooth"}
     role="log"
+    tabIndex={-1}
     {...props}
   >
     {typeof children === "function" ? (
@@ -125,7 +137,19 @@ export const ConversationScrollButton = ({
         className,
       )}
       data-slot="conversation-scroll-button"
-      onClick={() => void scrollToBottom()}
+      onClick={(e) => {
+        // Park focus on the log root before isAtBottom hides this button —
+        // aria-hidden/tabIndex=-1 must never land on the focused element,
+        // and blurring to <body> would strand keyboard users outside the
+        // drawer. preventScroll keeps the focus move from fighting the
+        // scroll animation.
+        e.currentTarget
+          .closest<HTMLElement>('[data-slot="conversation"]')
+          ?.focus({ preventScroll: true });
+        void scrollToBottom(
+          prefersReducedMotion() ? { animation: "instant" } : undefined,
+        );
+      }}
       size="sm"
       tabIndex={isAtBottom ? -1 : 0}
       type="button"

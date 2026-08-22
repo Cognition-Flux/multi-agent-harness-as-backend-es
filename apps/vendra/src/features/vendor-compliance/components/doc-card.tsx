@@ -56,9 +56,12 @@ function StatusPill({ doc }: { doc: ClientDoc }) {
       </Badge>
     );
   }
-  // SETTLED — the server projection when reconciled; else the live verdict
-  // (a just-settled stream's terminal, until the next snapshot refresh).
-  if (!server && live?.terminal) {
+  // SETTLED — the server projection once it has caught up to a terminal
+  // status; until then the live verdict wins (a reconcile can attach a
+  // stale pre-terminal row while the stream settles).
+  const serverSettled =
+    !!server && ["PROCESSED", "FAILED", "ERROR"].includes(server.uploadStatus);
+  if (!serverSettled && live?.terminal) {
     if (live.terminal.status === "COMPLETED") {
       return <Badge variant="success">Verificado</Badge>;
     }
@@ -109,7 +112,9 @@ function cardTone(doc: ClientDoc): "live" | "verified" | "failed" | "neutral" {
     }
     return "live";
   }
-  if (!server && live?.terminal) {
+  const serverSettled =
+    !!server && ["PROCESSED", "FAILED", "ERROR"].includes(server.uploadStatus);
+  if (!serverSettled && live?.terminal) {
     if (live.terminal.status === "COMPLETED") return "verified";
     return (live.terminal.scopedCategories?.length ?? 0) > 0 ? "neutral" : "failed";
   }
@@ -133,9 +138,22 @@ const STAGE_ORDER = Object.keys(STAGE_INDEX) as ProcessingStage[];
 function StageProgress({ stage }: { stage: ProcessingStage }) {
   const index = STAGE_INDEX[stage];
   return (
-    <div className="flex flex-col gap-1.5" aria-busy="true" aria-live="polite">
+    <div className="flex flex-col gap-1.5">
+      {/* aria-live on the container would re-announce the whole stage list
+          per transition (and a constant aria-busy would mute it entirely) —
+          one sr-only status line announces exactly the transition instead. */}
+      <span className="sr-only" role="status">
+        {`Etapa ${index} de ${TOTAL_STAGES}: ${STAGE_MESSAGES[stage]}`}
+      </span>
       <div className="flex items-center gap-2">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+        <div
+          aria-label="Progreso del procesamiento del documento"
+          aria-valuemax={TOTAL_STAGES}
+          aria-valuemin={0}
+          aria-valuenow={index}
+          className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+          role="progressbar"
+        >
           <div
             className="h-full rounded-full bg-gradient-to-r from-primary to-agent transition-[width] duration-500 ease-out"
             style={{ width: `${Math.round((index / TOTAL_STAGES) * 100)}%` }}
@@ -341,7 +359,14 @@ export function DocCard({
             </p>
           ) : null}
           {verbose && live.reasoningText ? (
-            <Reasoning reasoning={live.reasoningText} isStreaming={!live.terminal}>
+            <Reasoning
+              reasoning={live.reasoningText}
+              isStreaming={
+                // The fold's per-part state, not the run: the agent spends
+                // long stretches in tools/uploads where "Pensando…" would lie.
+                live.status === "PROCESSING" && live.reasoningStreaming === true
+              }
+            >
               <ReasoningTrigger />
               <ReasoningContent />
             </Reasoning>

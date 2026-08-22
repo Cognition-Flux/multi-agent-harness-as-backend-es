@@ -11,7 +11,9 @@
     "dev": "pnpm --filter vendra dev",
     "build": "pnpm --filter vendra build",
     "type-check": "pnpm -r type-check",
-    "migrate": "pnpm --filter vendra migrate"
+    "migrate": "pnpm --filter vendra migrate",
+    "hooks:install": "git config core.hooksPath .githooks",
+    "policy:check": "bash policy/run-checks.sh"
   },
   "pnpm": {
     "packageExtensions": {

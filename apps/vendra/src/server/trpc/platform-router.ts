@@ -11,33 +11,57 @@
  * Rule 7: all reads and writes go through Drizzle.
  */
 import { TRPCError } from "@trpc/server";
-import { and, asc, count, eq, ne, sql } from "drizzle-orm";
+import { and, asc, count, eq, inArray, isNull, ne, sql } from "drizzle-orm";
 import { z } from "zod";
 
 import { getDb, schema } from "@vendra/db-vendor";
 import {
+  ASSISTANT_PRIVILEGE_VALUES,
   REQUIREMENT_CATEGORY_VALUES,
   VALIDATORS_BY_DOCUMENT_TYPE,
+  VENDOR_VALIDATOR_ID_VALUES,
+  VendorDocumentTypeEnum,
   extractionFieldNames,
   getPotentialRequirementsForDocumentType,
   listDocumentTypeCatalog,
   listValidatorCatalog,
   requirementCategoryLabel,
   structuralExtractionFields,
+  type AssistantPrivilege,
+  type DirectiveDiff,
   type RequirementCategoryType,
   type VendorDocumentType,
   type VendorValidatorId,
 } from "@vendra/workflow/vendor";
 
+import { clearAssistantSessionStatesForOrg } from "@/server/assistant/store";
 import { COMPLIANCE_OFFICER_ROLE, PLATFORM_ORG_SLUG } from "@/server/auth";
 import { createUserWithRole } from "@/server/auth-admin";
+import {
+  activateCompanyPolicyTx,
+  recordPolicyDecision,
+} from "@/server/company-policy";
 import {
   ProvisioningError,
   provisionCompany,
 } from "@/server/company-provisioning";
-import { vendraLog } from "@/server/harness/log";
-import { evaluateAdmission } from "@/server/policy-admission";
-import { toThresholds } from "@/server/profile";
+import {
+  countOpenProposalsByOrg,
+  listProposalsForOrg,
+  resolveProposalTx,
+  supersedeOpenProposalsForOrgTx,
+  type ProposedPolicySnapshot,
+} from "@/server/directive-proposals";
+import { vendraError, vendraLog } from "@/server/harness/log";
+import {
+  consolidateDirectiveOutcome,
+  summarizeDirectiveDiffLines,
+} from "@/server/memory/directives";
+import {
+  AdmissionRefusedError,
+  evaluateAdmission,
+} from "@/server/policy-admission";
+import { strictestThresholds, toThresholds } from "@/server/profile";
 import { REQUIREMENT_PRESETS } from "@/server/requirement-presets";
 
 import { router, superadminProcedure } from "./init";
@@ -45,11 +69,26 @@ import { router, superadminProcedure } from "./init";
 const {
   companyPolicy,
   companyPolicyDocument,
+  directiveProposal,
   organization,
   user,
   vendor,
   vendorRequirementProfile,
 } = schema;
+
+/** Officers are the approver pool §24.4's gate rule counts. */
+async function officerCountFor(organizationId: number): Promise<number> {
+  const [row] = await getDb()
+    .select({ n: count() })
+    .from(user)
+    .where(
+      and(
+        eq(user.organizationId, organizationId),
+        eq(user.role, COMPLIANCE_OFFICER_ROLE),
+      ),
+    );
+  return row?.n ?? 0;
+}
 
 // =============================================================================
 // Shared resolution
@@ -66,11 +105,45 @@ async function resolveCompany(uuid: string) {
   return org;
 }
 
+// Shape-gated at the edge (SPEC §23.7): types and validators come from the
+// engine vocabularies, so garbage never reaches the DB — previously a duplicate
+// documentType 500'd on company_policy_document_uq and an unknown string
+// persisted a draft only the gate could refuse. The OPA gate stays the sole
+// authority on ADMISSIBILITY; zod only refuses malformed shapes. extractFields
+// stays string-typed — unknown fields are the gate's `unknown_field` job.
+const SELECTABLE_DOCUMENT_TYPES = Object.values(VendorDocumentTypeEnum).filter(
+  (type) => type !== "UNKNOWN",
+) as [VendorDocumentType, ...VendorDocumentType[]];
+
 const documentPolicyInput = z.object({
-  documentType: z.string().min(1).max(64),
+  documentType: z.enum(SELECTABLE_DOCUMENT_TYPES),
   extractFields: z.array(z.string().min(1).max(120)).max(200),
-  validators: z.array(z.string().min(1).max(64)).max(40),
+  validators: z.array(z.enum(VENDOR_VALIDATOR_ID_VALUES)).max(40),
 });
+
+const policyDraftFields = {
+  uuid: z.string().uuid(),
+  refereeableCategories: z.array(z.enum(REQUIREMENT_CATEGORY_VALUES)).max(32),
+  /** SPEC §24.1 — defaulted so pre-§24 console payloads stay valid. */
+  assistantPrivilege: z
+    .enum(ASSISTANT_PRIVILEGE_VALUES)
+    .default("CONVERSATIONAL"),
+  documents: z
+    .array(documentPolicyInput)
+    .max(64)
+    .superRefine((docs, ctx) => {
+      const seen = new Set<string>();
+      for (const doc of docs) {
+        if (seen.has(doc.documentType)) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: `Tipo de documento duplicado en la política: ${doc.documentType}.`,
+          });
+        }
+        seen.add(doc.documentType);
+      }
+    }),
+};
 
 async function loadPolicyWithDocuments(policyId: number) {
   const db = getDb();
@@ -113,6 +186,14 @@ export const platformRouter = router({
       description: preset.description,
       requiredCount: preset.required.length,
     })),
+    // SPEC §24.1 — the tier vocabulary, engine-derived like everything else.
+    assistantPrivileges: ASSISTANT_PRIVILEGE_VALUES.map((value) => ({
+      value,
+      label:
+        value === "EMPOWERED"
+          ? "Delegado — puede proponer directivas"
+          : "Conversacional — solo explica",
+    })),
   })),
 
   listCompanies: superadminProcedure.query(async () => {
@@ -122,6 +203,7 @@ export const platformRouter = router({
       .from(organization)
       .where(ne(organization.slug, PLATFORM_ORG_SLUG))
       .orderBy(asc(organization.name));
+    const openProposals = await countOpenProposalsByOrg();
 
     // Small N (companies, not vendors) — a per-org rollup is clearer here than
     // one wide join, and it keeps each count independently correct.
@@ -189,10 +271,12 @@ export const platformRouter = router({
                 version: policy.version,
                 acceptedDocumentTypes: docCount?.n ?? 0,
                 refereeableCategories: policy.refereeableCategories?.length ?? 0,
+                assistantPrivilege: policy.assistantPrivilege as AssistantPrivilege,
                 activatedAt: policy.activatedAt?.toISOString() ?? null,
               }
             : null,
           hasDraft: !!draft,
+          openProposalCount: openProposals.get(org.id) ?? 0,
         };
       }),
     );
@@ -264,6 +348,7 @@ export const platformRouter = router({
               version: active.version,
               refereeableCategories: (active.refereeableCategories ??
                 []) as RequirementCategoryType[],
+              assistantPrivilege: active.assistantPrivilege as AssistantPrivilege,
               activatedAt: active.activatedAt?.toISOString() ?? null,
               documents: await loadPolicyWithDocuments(active.id),
             }
@@ -274,6 +359,7 @@ export const platformRouter = router({
               version: draft.version,
               refereeableCategories: (draft.refereeableCategories ??
                 []) as RequirementCategoryType[],
+              assistantPrivilege: draft.assistantPrivilege as AssistantPrivilege,
               documents: await loadPolicyWithDocuments(draft.id),
             }
           : null,
@@ -303,7 +389,7 @@ export const platformRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const result = await provisionCompany(input);
+        const result = await provisionCompany({ ...input, actorUserId: ctx.user.id });
         vendraLog("platform.provisioned_via_console", {
           by: ctx.user.id,
           org: result.organizationId,
@@ -368,13 +454,7 @@ export const platformRouter = router({
     }),
 
   savePolicyDraft: superadminProcedure
-    .input(
-      z.object({
-        uuid: z.string().uuid(),
-        refereeableCategories: z.array(z.string().min(1).max(64)).max(32),
-        documents: z.array(documentPolicyInput).max(64),
-      }),
-    )
+    .input(z.object(policyDraftFields))
     .mutation(async ({ ctx, input }) => {
       const org = await resolveCompany(input.uuid);
       const db = getDb();
@@ -399,6 +479,7 @@ export const platformRouter = router({
             .update(companyPolicy)
             .set({
               refereeableCategories: input.refereeableCategories,
+              assistantPrivilege: input.assistantPrivilege,
             })
             .where(eq(companyPolicy.id, draftId));
           await tx
@@ -417,6 +498,7 @@ export const platformRouter = router({
               version,
               status: "DRAFT",
               refereeableCategories: input.refereeableCategories,
+              assistantPrivilege: input.assistantPrivilege,
               createdByUserId: ctx.user.id,
             })
             .returning({ id: companyPolicy.id });
@@ -434,41 +516,54 @@ export const platformRouter = router({
             })),
           );
         }
+        await recordPolicyDecision(tx, {
+          organizationId: org.id,
+          action: "DRAFT_SAVE",
+          actorUserId: ctx.user.id,
+          companyPolicyId: draftId,
+          policyVersion: version,
+        });
         return { draftId, version };
       });
     }),
 
-  /** Dry-run the activation gate without writing anything. */
+  /** Dry-run the activation gate; writes nothing but the decision record. */
   checkPolicyDraft: superadminProcedure
-    .input(
-      z.object({
-        uuid: z.string().uuid(),
-        refereeableCategories: z.array(z.string().min(1).max(64)).max(32),
-        documents: z.array(documentPolicyInput).max(64),
-      }),
-    )
-    .mutation(async ({ input }) => {
+    .input(z.object(policyDraftFields))
+    .mutation(async ({ ctx, input }) => {
       const org = await resolveCompany(input.uuid);
       const db = getDb();
       const profiles = await db
         .select()
         .from(vendorRequirementProfile)
-        .where(eq(vendorRequirementProfile.organizationId, org.id));
-      return evaluateAdmission({
+        .where(eq(vendorRequirementProfile.organizationId, org.id))
+        .orderBy(asc(vendorRequirementProfile.id));
+      // SPEC §23.3: the per-key strictest merge across ALL profiles — which
+      // profile row Postgres returned first must never decide the gate.
+      const thresholds = strictestThresholds(profiles);
+      const decision = await evaluateAdmission({
         policy: {
           refereeableCategories: input.refereeableCategories,
-          documents: input.documents.map((doc) => ({
-            documentType: doc.documentType as VendorDocumentType,
-            extractFields: doc.extractFields,
-            validators: doc.validators as VendorValidatorId[],
-          })),
+          assistantPrivilege: input.assistantPrivilege,
+          documents: input.documents,
         },
         profiles: profiles.map((p) => ({
           required: p.required,
           mandatory: p.mandatory,
         })),
-        ...(profiles[0] ? { thresholds: toThresholds(profiles[0]) } : {}),
+        thresholds,
+        company: { officerCount: await officerCountFor(org.id) },
       });
+      await recordPolicyDecision(db, {
+        organizationId: org.id,
+        action: "CHECK",
+        actorUserId: ctx.user.id,
+        admissible: decision.admissible,
+        violations: decision.violations,
+        warnings: decision.warnings,
+        thresholds,
+      });
+      return decision;
     }),
 
   /**
@@ -510,54 +605,82 @@ export const platformRouter = router({
       const profiles = await db
         .select()
         .from(vendorRequirementProfile)
-        .where(eq(vendorRequirementProfile.organizationId, org.id));
+        .where(eq(vendorRequirementProfile.organizationId, org.id))
+        .orderBy(asc(vendorRequirementProfile.id));
+      const thresholds = strictestThresholds(profiles);
 
       const decision = await evaluateAdmission({
         policy: {
           refereeableCategories: (draft.refereeableCategories ?? []) as string[],
+          assistantPrivilege: draft.assistantPrivilege,
           documents,
         },
         profiles: profiles.map((p) => ({
           required: p.required,
           mandatory: p.mandatory,
         })),
-        ...(profiles[0] ? { thresholds: toThresholds(profiles[0]) } : {}),
+        thresholds,
+        company: { officerCount: await officerCountFor(org.id) },
       });
       if (!decision.admissible) {
-        // The gate's reasons ARE the error — the console renders them all.
+        await recordPolicyDecision(db, {
+          organizationId: org.id,
+          action: "ACTIVATE_REFUSED",
+          actorUserId: ctx.user.id,
+          companyPolicyId: draft.id,
+          policyVersion: draft.version,
+          admissible: false,
+          violations: decision.violations,
+          warnings: decision.warnings,
+          thresholds,
+        });
+        // The gate's reasons ARE the error — typed, never JSON-in-a-message
+        // (SPEC §23.9). The errorFormatter surfaces them as data.admission.
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: JSON.stringify(decision.violations),
+          message: "La política no es admisible.",
+          cause: new AdmissionRefusedError(decision.violations, decision.warnings),
         });
       }
 
-      const repinned = await db.transaction(async (tx) => {
-        await tx
-          .update(companyPolicy)
-          .set({ status: "ARCHIVED" })
-          .where(
-            and(
-              eq(companyPolicy.organizationId, org.id),
-              eq(companyPolicy.status, "ACTIVE"),
-            ),
-          );
-        await tx
-          .update(companyPolicy)
-          .set({
-            status: "ACTIVE",
-            activatedAt: new Date(),
-            activatedByUserId: ctx.user.id,
-          })
-          .where(eq(companyPolicy.id, draft.id));
+      // For §24.7: does this activation change the assistant tier?
+      const [previousActive] = await db
+        .select({ assistantPrivilege: companyPolicy.assistantPrivilege })
+        .from(companyPolicy)
+        .where(
+          and(
+            eq(companyPolicy.organizationId, org.id),
+            eq(companyPolicy.status, "ACTIVE"),
+          ),
+        )
+        .limit(1);
 
-        if (!input.applyToExistingVendors) return 0;
-        const rows = await tx
-          .update(vendor)
-          .set({ companyPolicyId: draft.id })
-          .where(eq(vendor.organizationId, org.id))
-          .returning({ id: vendor.id });
-        return rows.length;
-      });
+      const { repinned } = await db.transaction(async (tx) =>
+        activateCompanyPolicyTx(tx, {
+          organizationId: org.id,
+          draftId: draft.id,
+          draftVersion: draft.version,
+          userId: ctx.user.id,
+          applyToExistingVendors: input.applyToExistingVendors,
+          warnings: decision.warnings,
+          thresholds,
+        }),
+      );
+
+      // SPEC §24.7 — instructions are frozen on parked sessions; a tier change
+      // (or a re-pin, which moves vendors across versions) forces fresh ones.
+      // Best-effort post-txn: tool gating never depends on this.
+      const tierChanged =
+        (previousActive?.assistantPrivilege ?? "CONVERSATIONAL") !==
+        draft.assistantPrivilege;
+      if (tierChanged || repinned > 0) {
+        await clearAssistantSessionStatesForOrg(org.id).catch((err) =>
+          vendraError("assistant.session_clear_failed", {
+            org: org.id,
+            err: err instanceof Error ? err.message : String(err),
+          }),
+        );
+      }
 
       vendraLog("platform.policy_activated", {
         by: ctx.user.id,
@@ -571,19 +694,477 @@ export const platformRouter = router({
 
   discardPolicyDraft: superadminProcedure
     .input(z.object({ uuid: z.string().uuid() }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const org = await resolveCompany(input.uuid);
       // Documents cascade on the FK, so deleting the draft row is enough.
-      const deleted = await getDb()
-        .delete(companyPolicy)
+      return getDb().transaction(async (tx) => {
+        const deleted = await tx
+          .delete(companyPolicy)
+          .where(
+            and(
+              eq(companyPolicy.organizationId, org.id),
+              eq(companyPolicy.status, "DRAFT"),
+            ),
+          )
+          .returning({ id: companyPolicy.id, version: companyPolicy.version });
+        if (deleted.length > 0) {
+          await recordPolicyDecision(tx, {
+            organizationId: org.id,
+            action: "DRAFT_DISCARD",
+            actorUserId: ctx.user.id,
+            policyVersion: deleted[0]?.version ?? null,
+          });
+        }
+        return { discarded: deleted.length };
+      });
+    }),
+
+  /**
+   * Re-run the gate over every ACTIVE policy (SPEC §23.6). The gate runs once at
+   * activation; an engine upgrade can strand an activated policy referencing
+   * entities that left the catalog, and nothing else re-checks it. Verdicts are
+   * recorded as RECHECK decisions and returned for the roster to render.
+   */
+  recheckActivePolicies: superadminProcedure.mutation(async ({ ctx }) => {
+    const db = getDb();
+    const rows = await db
+      .select({ org: organization, policy: companyPolicy })
+      .from(companyPolicy)
+      .innerJoin(organization, eq(companyPolicy.organizationId, organization.id))
+      .where(
+        and(eq(companyPolicy.status, "ACTIVE"), ne(organization.slug, PLATFORM_ORG_SLUG)),
+      )
+      .orderBy(asc(organization.name));
+
+    const results = [];
+    for (const { org, policy } of rows) {
+      const documents = await loadPolicyWithDocuments(policy.id);
+      const profiles = await db
+        .select()
+        .from(vendorRequirementProfile)
+        .where(eq(vendorRequirementProfile.organizationId, org.id))
+        .orderBy(asc(vendorRequirementProfile.id));
+      const thresholds = strictestThresholds(profiles);
+      const decision = await evaluateAdmission({
+        policy: {
+          refereeableCategories: (policy.refereeableCategories ?? []) as string[],
+          documents,
+        },
+        profiles: profiles.map((p) => ({
+          required: p.required,
+          mandatory: p.mandatory,
+        })),
+        thresholds,
+      });
+      await recordPolicyDecision(db, {
+        organizationId: org.id,
+        action: "RECHECK",
+        actorUserId: ctx.user.id,
+        companyPolicyId: policy.id,
+        policyVersion: policy.version,
+        admissible: decision.admissible,
+        violations: decision.violations,
+        warnings: decision.warnings,
+        thresholds,
+      });
+      results.push({
+        uuid: org.uuid,
+        name: org.name,
+        version: policy.version,
+        admissible: decision.admissible,
+        violations: decision.violations,
+        warnings: decision.warnings,
+      });
+    }
+    vendraLog("platform.policies_rechecked", {
+      by: ctx.user.id,
+      checked: results.length,
+      inadmissible: results.filter((r) => !r.admissible).length,
+    });
+    return results;
+  }),
+
+  /**
+   * The directive-proposal queue (SPEC §24) — per company when `uuid` is
+   * given, else across every company (the roster badge's detail view).
+   */
+  listDirectiveProposals: superadminProcedure
+    .input(z.object({ uuid: z.string().uuid().optional() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      const orgIds = input.uuid ? [(await resolveCompany(input.uuid)).id] : null;
+      const orgs = orgIds
+        ? await db.select().from(organization).where(eq(organization.id, orgIds[0]!))
+        : await db
+            .select()
+            .from(organization)
+            .where(ne(organization.slug, PLATFORM_ORG_SLUG));
+      const out = [];
+      for (const org of orgs) {
+        const rows = await listProposalsForOrg(org.id);
+        if (rows.length === 0) continue;
+        const vendorIds = [
+          ...new Set(rows.map((r) => r.vendorId).filter((v): v is number => v !== null)),
+        ];
+        const vendors = vendorIds.length
+          ? await db
+              .select({ id: vendor.id, legalName: vendor.legalName })
+              .from(vendor)
+              .where(inArray(vendor.id, vendorIds))
+          : [];
+        const vendorName = new Map(vendors.map((v) => [v.id, v.legalName]));
+        const versions = await db
+          .select({ id: companyPolicy.id, version: companyPolicy.version })
+          .from(companyPolicy)
+          .where(eq(companyPolicy.organizationId, org.id));
+        const versionOf = new Map(versions.map((p) => [p.id, p.version]));
+        for (const row of rows) {
+          const verdict = row.gateVerdict as {
+            admissible?: boolean;
+            violations?: { rule: string; detail: string }[];
+            warnings?: { rule: string; detail: string }[];
+          } | null;
+          out.push({
+            uuid: row.uuid,
+            companyUuid: org.uuid,
+            companyName: org.name,
+            vendorName: row.vendorId !== null ? (vendorName.get(row.vendorId) ?? null) : null,
+            baseVersion: versionOf.get(row.basePolicyId) ?? null,
+            appliedVersion:
+              row.appliedPolicyId !== null
+                ? (versionOf.get(row.appliedPolicyId) ?? null)
+                : null,
+            rationale: row.rationale,
+            summaryLines: summarizeDirectiveDiffLines(row.diff as DirectiveDiff),
+            proposedPrivilege: (row.proposedPolicy as ProposedPolicySnapshot)
+              .assistantPrivilege as AssistantPrivilege,
+            admissible: verdict?.admissible ?? null,
+            violations: verdict?.violations ?? [],
+            warnings: verdict?.warnings ?? [],
+            raisedAt: row.raisedAt.toISOString(),
+            resolvedAt: row.resolvedAt?.toISOString() ?? null,
+            resolution: row.resolution as
+              | "APPROVED"
+              | "REJECTED"
+              | "SUPERSEDED"
+              | null,
+            resolutionNote: row.resolutionNote,
+          });
+        }
+      }
+      return out;
+    }),
+
+  /**
+   * Approve a proposal (SPEC §24.3/§24.4): re-gate against the CURRENT world,
+   * then draft rows → activation — the same transaction shape as
+   * activatePolicy, with the proposer preserved and the approver recorded.
+   */
+  approveDirectiveProposal: superadminProcedure
+    .input(
+      z.object({
+        uuid: z.string().uuid(),
+        note: z.string().max(500).optional(),
+        applyToExistingVendors: z.boolean().default(false),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const [proposal] = await db
+        .select()
+        .from(directiveProposal)
+        .where(
+          and(
+            eq(directiveProposal.uuid, input.uuid),
+            isNull(directiveProposal.resolvedAt),
+          ),
+        )
+        .limit(1);
+      if (!proposal) throw new TRPCError({ code: "NOT_FOUND" });
+      const [org] = await db
+        .select()
+        .from(organization)
+        .where(eq(organization.id, proposal.organizationId))
+        .limit(1);
+      if (!org) throw new TRPCError({ code: "NOT_FOUND" });
+
+      // One-draft-per-org is load-bearing: a pending human draft must be
+      // activated or discarded first, never silently displaced (§24.4).
+      const [humanDraft] = await db
+        .select({ id: companyPolicy.id })
+        .from(companyPolicy)
         .where(
           and(
             eq(companyPolicy.organizationId, org.id),
             eq(companyPolicy.status, "DRAFT"),
           ),
         )
-        .returning({ id: companyPolicy.id });
-      return { discarded: deleted.length };
+        .limit(1);
+      if (humanDraft) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Hay un borrador manual pendiente — actívelo o descártelo primero.",
+        });
+      }
+
+      // Base drift ⇒ SUPERSEDED, never re-based (§24.4).
+      const [active] = await db
+        .select()
+        .from(companyPolicy)
+        .where(
+          and(
+            eq(companyPolicy.organizationId, org.id),
+            eq(companyPolicy.status, "ACTIVE"),
+          ),
+        )
+        .limit(1);
+      if (!active || active.id !== proposal.basePolicyId) {
+        await db.transaction(async (tx) => {
+          await resolveProposalTx(tx, {
+            proposalId: proposal.id,
+            resolution: "SUPERSEDED",
+            resolvedByUserId: ctx.user.id,
+            resolutionNote:
+              "La política activa cambió desde la propuesta; pida al proveedor volver a proponer.",
+          });
+        });
+        vendraLog("platform.directive_superseded", {
+          by: ctx.user.id,
+          org: org.id,
+          proposal: proposal.uuid,
+        });
+        return { superseded: true as const };
+      }
+
+      // The AUTHORITATIVE gate: current engines, profiles, thresholds and
+      // officer count — never the stored dry-run (§24.4).
+      const snapshot = proposal.proposedPolicy as ProposedPolicySnapshot;
+      const profiles = await db
+        .select()
+        .from(vendorRequirementProfile)
+        .where(eq(vendorRequirementProfile.organizationId, org.id))
+        .orderBy(asc(vendorRequirementProfile.id));
+      const thresholds = strictestThresholds(profiles);
+      const decision = await evaluateAdmission({
+        policy: {
+          refereeableCategories: snapshot.refereeableCategories,
+          assistantPrivilege: snapshot.assistantPrivilege,
+          documents: snapshot.documents.map((doc) => ({
+            documentType: doc.documentType as VendorDocumentType,
+            extractFields: doc.extractFields,
+            validators: doc.validators as VendorValidatorId[],
+          })),
+        },
+        profiles: profiles.map((p) => ({
+          required: p.required,
+          mandatory: p.mandatory,
+        })),
+        thresholds,
+        company: { officerCount: await officerCountFor(org.id) },
+      });
+      if (!decision.admissible) {
+        await recordPolicyDecision(db, {
+          organizationId: org.id,
+          action: "PROPOSAL_APPROVE",
+          actorUserId: ctx.user.id,
+          admissible: false,
+          violations: decision.violations,
+          warnings: decision.warnings,
+          thresholds,
+          metadata: { proposalUuid: proposal.uuid },
+        });
+        // The proposal stays OPEN: the operator sees why and decides.
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "La propuesta ya no es admisible.",
+          cause: new AdmissionRefusedError(decision.violations, decision.warnings),
+        });
+      }
+
+      const result = await db.transaction(async (tx) => {
+        // Lock the ACTIVE row so a concurrent activation serializes behind us.
+        await tx
+          .select({ id: companyPolicy.id })
+          .from(companyPolicy)
+          .where(eq(companyPolicy.id, active.id))
+          .for("update");
+        const [{ maxVersion }] = await tx
+          .select({
+            maxVersion: sql<number>`coalesce(max(${companyPolicy.version}), 0)`,
+          })
+          .from(companyPolicy)
+          .where(eq(companyPolicy.organizationId, org.id));
+        const version = Number(maxVersion) + 1;
+        const [created] = await tx
+          .insert(companyPolicy)
+          .values({
+            organizationId: org.id,
+            version,
+            status: "DRAFT",
+            refereeableCategories: snapshot.refereeableCategories,
+            assistantPrivilege: snapshot.assistantPrivilege,
+            // The approving superadmin authors the version; the proposer stays
+            // auditable on the proposal row (§24.3).
+            createdByUserId: ctx.user.id,
+          })
+          .returning({ id: companyPolicy.id });
+        if (!created) throw new Error("proposal draft insert returned no row");
+        if (snapshot.documents.length > 0) {
+          await tx.insert(companyPolicyDocument).values(
+            snapshot.documents.map((doc) => ({
+              companyPolicyId: created.id,
+              documentType: doc.documentType,
+              extractFields: doc.extractFields,
+              validators: doc.validators,
+            })),
+          );
+        }
+        const { repinned } = await activateCompanyPolicyTx(tx, {
+          organizationId: org.id,
+          draftId: created.id,
+          draftVersion: version,
+          userId: ctx.user.id,
+          applyToExistingVendors: input.applyToExistingVendors,
+          warnings: decision.warnings,
+          thresholds,
+          metadata: { proposalUuid: proposal.uuid },
+        });
+        await resolveProposalTx(tx, {
+          proposalId: proposal.id,
+          resolution: "APPROVED",
+          resolvedByUserId: ctx.user.id,
+          resolutionNote: input.note ?? null,
+          appliedPolicyId: created.id,
+        });
+        const superseded = await supersedeOpenProposalsForOrgTx(
+          tx,
+          org.id,
+          proposal.id,
+        );
+        await recordPolicyDecision(tx, {
+          organizationId: org.id,
+          action: "PROPOSAL_APPROVE",
+          actorUserId: ctx.user.id,
+          companyPolicyId: created.id,
+          policyVersion: version,
+          admissible: true,
+          warnings: decision.warnings,
+          thresholds,
+          metadata: { proposalUuid: proposal.uuid, repinnedVendors: repinned },
+        });
+        return { version, repinned, superseded };
+      });
+
+      // §24.7 — the tier may have changed, and a re-pin moves vendors: force
+      // fresh sessions. Best-effort; gating never depends on it.
+      const tierChanged =
+        active.assistantPrivilege !== snapshot.assistantPrivilege;
+      if (tierChanged || result.repinned > 0) {
+        await clearAssistantSessionStatesForOrg(org.id).catch((err) =>
+          vendraError("assistant.session_clear_failed", {
+            org: org.id,
+            err: err instanceof Error ? err.message : String(err),
+          }),
+        );
+      }
+      // §24.6 — consolidate the approval into org-scoped memory. Best-effort.
+      const [vendorRow] = proposal.vendorId
+        ? await db
+            .select({ legalName: vendor.legalName })
+            .from(vendor)
+            .where(eq(vendor.id, proposal.vendorId))
+            .limit(1)
+        : [];
+      await consolidateDirectiveOutcome({
+        organization: { id: org.id, uuid: org.uuid },
+        diff: proposal.diff as DirectiveDiff,
+        vendorName: vendorRow?.legalName ?? null,
+        approved: true,
+        appliedVersion: result.version,
+        resolutionNote: input.note ?? null,
+        dateIso: new Date().toISOString().slice(0, 10),
+      });
+
+      vendraLog("platform.directive_approved", {
+        by: ctx.user.id,
+        org: org.id,
+        proposal: proposal.uuid,
+        version: result.version,
+        repinnedVendors: result.repinned,
+        supersededProposals: result.superseded,
+        noteLen: input.note?.length ?? 0,
+      });
+      return {
+        superseded: false as const,
+        version: result.version,
+        repinnedVendors: result.repinned,
+        warnings: decision.warnings,
+      };
+    }),
+
+  rejectDirectiveProposal: superadminProcedure
+    .input(z.object({ uuid: z.string().uuid(), note: z.string().min(1).max(500) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const [proposal] = await db
+        .select()
+        .from(directiveProposal)
+        .where(
+          and(
+            eq(directiveProposal.uuid, input.uuid),
+            isNull(directiveProposal.resolvedAt),
+          ),
+        )
+        .limit(1);
+      if (!proposal) throw new TRPCError({ code: "NOT_FOUND" });
+      const [org] = await db
+        .select()
+        .from(organization)
+        .where(eq(organization.id, proposal.organizationId))
+        .limit(1);
+      if (!org) throw new TRPCError({ code: "NOT_FOUND" });
+
+      await db.transaction(async (tx) => {
+        await resolveProposalTx(tx, {
+          proposalId: proposal.id,
+          resolution: "REJECTED",
+          resolvedByUserId: ctx.user.id,
+          resolutionNote: input.note,
+        });
+        await recordPolicyDecision(tx, {
+          organizationId: org.id,
+          action: "PROPOSAL_REJECT",
+          actorUserId: ctx.user.id,
+          metadata: { proposalUuid: proposal.uuid, noteLen: input.note.length },
+        });
+      });
+
+      // §24.6 — a remembered rejection stops the assistant re-proposing it.
+      const [vendorRow] = proposal.vendorId
+        ? await db
+            .select({ legalName: vendor.legalName })
+            .from(vendor)
+            .where(eq(vendor.id, proposal.vendorId))
+            .limit(1)
+        : [];
+      await consolidateDirectiveOutcome({
+        organization: { id: org.id, uuid: org.uuid },
+        diff: proposal.diff as DirectiveDiff,
+        vendorName: vendorRow?.legalName ?? null,
+        approved: false,
+        appliedVersion: null,
+        resolutionNote: input.note,
+        dateIso: new Date().toISOString().slice(0, 10),
+      });
+
+      vendraLog("platform.directive_rejected", {
+        by: ctx.user.id,
+        org: org.id,
+        proposal: proposal.uuid,
+        noteLen: input.note.length,
+      });
+      return { rejected: true as const };
     }),
 
   /** Seed-parity helper: the fields a type can offer, with the locked ones marked. */

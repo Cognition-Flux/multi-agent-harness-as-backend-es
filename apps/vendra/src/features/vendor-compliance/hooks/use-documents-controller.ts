@@ -114,7 +114,16 @@ export function useDocumentsController(options: {
   /** Flip at most MAX_CONCURRENT_DOC_STREAMS docs to PROCESSING. */
   const promoteQueued = useCallback(() => {
     setDocs((prev) => {
-      const live = prev.filter((d) => d.status === "PROCESSING").length;
+      // An errored client stream may still shadow a DETACHED server run
+      // holding its semaphore slot (the process route deliberately ignores
+      // req.signal — R5): only a settled server row proves the slot is
+      // actually free. Pre-claim failures keep counting, so a systemic
+      // outage never cascades the whole queue into failed streams.
+      const live = prev.filter(
+        (d) =>
+          d.status === "PROCESSING" &&
+          !(d.liveVM?.status === "ERROR" && serverRowSettled(d.server)),
+      ).length;
       let slots = MAX_CONCURRENT_DOC_STREAMS - live;
       if (slots <= 0) return prev;
       return prev.map((d) => {
@@ -133,10 +142,13 @@ export function useDocumentsController(options: {
       if (!res.ok) return;
       const snapshot = (await res.json()) as ExistingVendorDocProjection[];
       setDocs((prev) => reconcile(prev, snapshot));
+      // A settled row landing on a dead (errored) stream is what frees its
+      // client slot — drain the queue on every reconcile.
+      promoteQueued();
     } catch {
       // Transient network failure — the next poll tick retries.
     }
-  }, []);
+  }, [promoteQueued]);
 
   const addFiles = useCallback(
     async (files: File[]) => {
@@ -301,8 +313,11 @@ export function useDocumentsController(options: {
       const current = docsRef.current.find((d) => d.pointer === pointer);
       if (current?.liveVM && vmSignature(current.liveVM) === vmSignature(vm)) return;
       update(pointer, { liveVM: vm });
+      // A dead stream whose server row already settled frees its client
+      // slot now instead of waiting for the next poll reconcile.
+      if (vm.status === "ERROR") promoteQueued();
     },
-    [update],
+    [promoteQueued, update],
   );
 
   const tryAgain = useCallback(
@@ -310,13 +325,20 @@ export function useDocumentsController(options: {
       const doc = docsRef.current.find((d) => d.pointer === pointer);
       if (!doc?.documentUuid) return;
       update(pointer, {
-        status: "PROCESSING",
+        // Through the queue, not straight to PROCESSING — a retried doc must
+        // respect MAX_CONCURRENT_DOC_STREAMS like every other promotion.
+        status: "UPLOADED",
         retryNonce: doc.retryNonce + 1,
         liveVM: undefined,
         actionError: undefined,
+        // The settled pre-retry projection must not shadow the new run — with
+        // it attached, the retry's settle would render the OLD verdict
+        // (serverSettled reads the stale row) until a refresh lands.
+        server: undefined,
       });
+      promoteQueued();
     },
-    [update],
+    [promoteQueued, update],
   );
 
   /** Retry a failed upload without re-selecting — re-stages the kept File. */
@@ -436,6 +458,7 @@ function vmSignature(vm: DocVM): string {
     vm.stage ?? "",
     vm.narration ?? "",
     vm.reasoningText?.length ?? 0,
+    vm.reasoningStreaming ? 1 : 0,
     vm.toolActivity.length,
     toolStateSum,
     lastTool ? `${lastTool.toolCallId}:${lastTool.state}:${lastToolInputLen}` : "",
@@ -445,6 +468,15 @@ function vmSignature(vm: DocVM): string {
     vm.terminal?.status ?? "",
     vm.errorText?.length ?? 0,
   ].join("|");
+}
+
+/** R5 corollary: only a settled row proves a run's semaphore slot is free. */
+function serverRowSettled(
+  server: ExistingVendorDocProjection | undefined,
+): boolean {
+  return (
+    !!server && ["PROCESSED", "FAILED", "ERROR"].includes(server.uploadStatus)
+  );
 }
 
 function serverStatusToClient(
@@ -498,9 +530,35 @@ function reconcile(
       continue;
     }
     if (clientOwned) {
-      out.push({ ...doc, server });
+      // A SETTLED projection cannot describe a run this tab is still
+      // streaming — it is the pre-retry verdict, or the poll racing the
+      // terminal part. Keep the live fold authoritative (and shed any stale
+      // settled row) until the stream itself settles or dies. liveVM
+      // undefined counts as alive: the retry stream has not pushed its
+      // first fold yet, and re-attaching the old row in that window is the
+      // exact bug this guards against.
+      const streamAlive =
+        doc.status === "PROCESSING" && doc.liveVM?.status !== "ERROR";
+      out.push(
+        serverRowSettled(server) && streamAlive
+          ? { ...doc, server: undefined }
+          : { ...doc, server },
+      );
     } else {
-      out.push({ ...doc, server, status: "SETTLED" });
+      // An officer reset (FAILED/ERROR → UPLOADED) must not stay shadowed by
+      // the old run's retained fold — shed it so the pill falls through to
+      // the server switch ("Procesando") within one poll cycle. A row still
+      // PROCESSING keeps the fold: that is the settle race, where the fresh
+      // live terminal must win over the stale pre-terminal row.
+      const rowReset = ["PENDING", "UPLOADING", "UPLOADED"].includes(
+        server.uploadStatus,
+      );
+      out.push({
+        ...doc,
+        server,
+        status: "SETTLED",
+        liveVM: rowReset ? undefined : doc.liveVM,
+      });
     }
   }
   for (const server of byUuid.values()) {

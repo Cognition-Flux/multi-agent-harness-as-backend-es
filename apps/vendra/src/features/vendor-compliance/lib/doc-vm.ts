@@ -35,6 +35,8 @@ export interface DocVM {
   stage?: ProcessingStage;
   narration?: string;
   reasoningText?: string;
+  /** True while the LAST reasoning part is still streaming (honest shimmer gate). */
+  reasoningStreaming?: boolean;
   extraction?: VendorDocExtractionPart;
   validation?: VendorDocValidationPart;
   /** The OPEN confirmation (settled windows clear it). */
@@ -94,8 +96,10 @@ export function deriveLiveDocVM(
           break;
         }
         case "reasoning": {
-          const text = (part as { text?: string }).text;
-          if (typeof text === "string") reasoning += text;
+          const p = part as { text?: string; state?: "streaming" | "done" };
+          if (typeof p.text === "string") reasoning += p.text;
+          // Later parts overwrite — the fold tracks the LAST block's state.
+          vm.reasoningStreaming = p.state === "streaming";
           break;
         }
         case "dynamic-tool": {

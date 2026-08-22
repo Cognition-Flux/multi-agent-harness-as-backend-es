@@ -76,7 +76,14 @@ def harness() -> dict:
             # Rule 2: every createSession/stream call carries an abortSignal.
             "abort_signal_sites": len(re.findall(r"abortSignal", src)),
         }
+    # SPEC §24.5: the assistant lane's activeTools must be DERIVED from the
+    # resolved privilege tier at lease time, never a hardcoded roster — a
+    # literal tool name in session.ts would mean someone re-inlined the list.
+    assistant_src = read(HARNESS_LANES["assistant-session"])
     return {"egress_allowlist": allowlist, "lanes": lanes,
+            "assistant_active_tools_derived":
+                "activeTools: input.activeTools" in assistant_src
+                and '"getComplianceState"' not in assistant_src,
             "network_policy_uses_allowlist":
                 "networkPolicy: { allow: SANDBOX_EGRESS_ALLOWLIST }" in sandbox}
 
@@ -103,6 +110,13 @@ def governance() -> dict:
         "wasm_present": wasm.exists(),
         "manifest_present": bool(manifest),
         "wasm_stale": bool(manifest) and manifest.get("rego_sha256") != rego_hash,
+        # The BINARY, not just the source: a swapped or truncated .wasm with an
+        # intact manifest would otherwise pass every check and load unverified
+        # (SPEC §23.1). The runtime loader makes the same comparison and fails
+        # closed.
+        "wasm_binary_stale": bool(manifest) and wasm.exists()
+            and manifest.get("wasm_sha256")
+                != hashlib.sha256(wasm.read_bytes()).hexdigest(),
         "entrypoints": manifest.get("entrypoints", []),
         "host_builtins": manifest.get("host_builtins", []),
         "app_entrypoint": m.group(1) if m else None,

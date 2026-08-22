@@ -13,6 +13,7 @@ import {
   getSessionUser,
   type SessionUser,
 } from "@/server/auth";
+import { AdmissionRefusedError } from "@/server/policy-admission";
 
 export interface TrpcContext {
   user: SessionUser | null;
@@ -27,6 +28,24 @@ export async function createTrpcContext(opts: {
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
+  // Gate refusals travel STRUCTURALLY (SPEC §23.9): an AdmissionRefusedError
+  // cause becomes `error.data.admission`, so the console never re-parses
+  // findings out of a message string.
+  errorFormatter({ shape, error }) {
+    if (error.cause instanceof AdmissionRefusedError) {
+      return {
+        ...shape,
+        data: {
+          ...shape.data,
+          admission: {
+            violations: error.cause.violations,
+            warnings: error.cause.warnings,
+          },
+        },
+      };
+    }
+    return shape;
+  },
 });
 
 export const router = t.router;

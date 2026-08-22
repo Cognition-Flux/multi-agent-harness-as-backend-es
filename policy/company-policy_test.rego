@@ -8,14 +8,17 @@ import rego.v1
 base := {
 	"policy": {
 		"refereeable_categories": ["TAX_IDENTITY"],
+		"assistant_privilege": "CONVERSATIONAL",
 		"documents": [{
 			"document_type": "W9",
 			"extract_fields": ["legal_name", "tin_last4"],
 			"validators": ["entity_name_match", "is_signed"],
 		}],
 	},
+	"company": {"officer_count": 1},
 	"superset": {
 		"categories": ["TAX_IDENTITY", "SAFETY_RECORD"],
+		"assistant_privileges": ["CONVERSATIONAL", "EMPOWERED"],
 		"document_types": {
 			"W9": {
 				"fields": ["legal_name", "tin_last4", "dba_name"],
@@ -32,7 +35,15 @@ base := {
 		},
 	},
 	"profiles": [{"required": ["TAX_IDENTITY"], "mandatory": ["TAX_IDENTITY"]}],
-	"thresholds": {"emrMax": 1, "soc2MaxAgeMonths": 12},
+	"thresholds": {
+		"emrMax": 1,
+		"soc2MaxAgeMonths": 12,
+		"glOccurrenceUsd": 1000000,
+		"glAggregateUsd": 2000000,
+		"autoLimitUsd": 1000000,
+		"wcLimitUsd": 500000,
+		"cyberLimitUsd": 1000000,
+	},
 }
 
 rules(vs) := {v.rule | some v in vs}
@@ -193,4 +204,100 @@ test_positive_threshold_is_fine if {
 		"profiles": [{"required": ["SAFETY_RECORD"], "mandatory": []}],
 	})
 	not "threshold_makes_validator_unsatisfiable" in got
+}
+
+# A MISSING key must fire the same rule, not silently undefine it — the
+# object.get(-1) default exists for exactly this test (SPEC §23.5).
+test_missing_emr_threshold_fires if {
+	got := rules(admission.violation) with input as json.remove(
+		patched({
+			"policy": {"documents": [{
+				"document_type": "EMR_LETTER", "extract_fields": [],
+				"validators": ["emr_within_bound"],
+			}]},
+			"profiles": [{"required": ["SAFETY_RECORD"], "mandatory": []}],
+		}),
+		["/thresholds/emrMax"],
+	)
+	"threshold_makes_validator_unsatisfiable" in got
+}
+
+# --- USD floor coherence (SPEC §23.5) -----------------------------------------
+
+# base + a COI-like type running limit_meets_threshold.
+coi_patch := patched({
+	"superset": {
+		"categories": ["TAX_IDENTITY", "SAFETY_RECORD", "GENERAL_LIABILITY"],
+		"document_types": {"ACORD_25_COI": {
+			"fields": ["insured_name", "gl_occurrence_limit"],
+			"structural_fields": ["insured_name"],
+			"validators": ["entity_name_match", "limit_meets_threshold"],
+			"categories": ["GENERAL_LIABILITY"],
+		}},
+	},
+	"policy": {"documents": [
+		{
+			"document_type": "W9", "extract_fields": [],
+			"validators": ["entity_name_match", "is_signed", "tin_present_and_masked"],
+		},
+		{
+			"document_type": "ACORD_25_COI", "extract_fields": [],
+			"validators": ["entity_name_match", "limit_meets_threshold"],
+		},
+	]},
+})
+
+test_zero_gl_floor_disables_limit_check if {
+	got := rules(admission.violation) with input as object.union(coi_patch, {"thresholds": {"glOccurrenceUsd": 0}})
+	"threshold_disables_limit_check" in got
+}
+
+test_zero_usd_floor_without_limit_check_is_fine if {
+	got := rules(admission.violation) with input as patched({"thresholds": {"glOccurrenceUsd": 0}})
+	not "threshold_disables_limit_check" in got
+}
+
+test_missing_usd_key_fires_when_limit_check_selected if {
+	got := rules(admission.violation) with input as json.remove(coi_patch, ["/thresholds/wcLimitUsd"])
+	"threshold_disables_limit_check" in got
+}
+
+test_absent_thresholds_object_fires if {
+	got := rules(admission.violation) with input as json.remove(coi_patch, ["/thresholds"])
+	"threshold_disables_limit_check" in got
+}
+
+# --- assistant privilege (SPEC §24) --------------------------------------------
+
+test_unknown_privilege_level_fires if {
+	got := rules(admission.violation) with input as patched({"policy": {"assistant_privilege": "GODMODE"}})
+	"unknown_privilege_level" in got
+}
+
+test_empowered_without_officer_fires if {
+	got := rules(admission.violation) with input as patched({
+		"policy": {"assistant_privilege": "EMPOWERED"},
+		"company": {"officer_count": 0},
+	})
+	"empowered_requires_officer" in got
+}
+
+test_empowered_with_officer_admissible if {
+	patch := patched({"policy": {"assistant_privilege": "EMPOWERED"}})
+	got := rules(admission.violation) with input as patch
+	not "empowered_requires_officer" in got
+	admission.decision.admissible with input as patch
+}
+
+# Behaviour preservation (§24.1): a pre-§24 caller sends no privilege at all,
+# and even with zero officers that must stay admissible — absent defaults to
+# CONVERSATIONAL, which asks nothing of the approver pool.
+test_missing_privilege_defaults_conversational if {
+	legacy := json.remove(
+		patched({"company": {"officer_count": 0}}),
+		["/policy/assistant_privilege"],
+	)
+	got := rules(admission.violation) with input as legacy
+	not "empowered_requires_officer" in got
+	not "unknown_privilege_level" in got
 }

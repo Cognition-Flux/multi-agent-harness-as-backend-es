@@ -34,7 +34,10 @@ import {
 import { buildComplianceSummary } from "@/server/compliance-summary";
 import { runCoverageDetermination } from "@/server/harness/coverage-runner";
 import { loadDocumentsSnapshot } from "@/server/harness/db/page-load";
-import { hasOpenReferral } from "@/server/harness/db/referrals";
+import {
+  hasOpenReferral,
+  resolveOpenReferralAsGranted,
+} from "@/server/harness/db/referrals";
 import { loadVendorCompanyPolicy } from "@/server/company-policy";
 import { toRequirementProfile, toThresholds, toWorkProfile } from "@/server/profile";
 import { recomputeCrossDocumentRequirementsForVendor } from "@/server/recompute";
@@ -747,6 +750,18 @@ export const appRouter = router({
           justification: input.justification,
           grantedByUserId: ctx.user.id,
         });
+        // SPEC §23.14: granting a category with an open referral IS the
+        // ratification — record the verdict and the officer on the referral
+        // itself, in this transaction, before the recompute's fold would close
+        // it as an anonymous SUPERSEDED.
+        if (referred) {
+          await resolveOpenReferralAsGranted(tx, {
+            vendorId: vendorRow.id,
+            organizationId: ctx.organizationId,
+            category: input.category,
+            resolvedByUserId: ctx.user.id,
+          });
+        }
         await appendMetadataAudit(tx, vendorRow.id, "manual_requirement_overrides", {
           action: "GRANT",
           documentUuid: doc.uuid,
