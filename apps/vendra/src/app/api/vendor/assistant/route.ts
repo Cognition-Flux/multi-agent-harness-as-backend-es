@@ -205,9 +205,7 @@ export async function POST(req: Request) {
   const memoryFacts = turn.isFreshSession
     ? await recallMemory(vendorUuid, userText)
     : [];
-  // Queue the turn for background fact extraction. Fire-and-forget by design:
-  // the vendor waits for the answer, never for the memory (SPEC §22).
-  void observeVendorTurn(vendorUuid, vendor.id, vendorUuid, userText);
+
 
   let fatal = false;
   const stream = createUIMessageStream<VendorAssistantUIMessage>({
@@ -287,6 +285,16 @@ export async function POST(req: Request) {
             err: err instanceof Error ? err.message : String(err),
           }),
         );
+        // Queue the turn for background fact extraction — HERE, after the
+        // stream, not at turn start. Fire-and-forget either way; the ordering
+        // is the point: the queue is FIFO, and enqueueing at start put the
+        // turn AHEAD of any facts the agent stored via rememberFacts during
+        // the same stream. Extraction then ran before those facts were
+        // indexed, mem0 could not see them, and one crane turned into two
+        // near-duplicate memories (one per lane) in the first e2e round.
+        // Enqueued after, the tool facts index first and extraction dedupes
+        // against them.
+        void observeVendorTurn(vendorUuid, vendor.id, vendorUuid, userText);
       } finally {
         // An aborted turn may still be live inside the runtime — parking it
         // would strand a suspended turn the next stream() cannot enter, so

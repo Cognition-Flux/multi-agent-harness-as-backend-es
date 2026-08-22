@@ -16,6 +16,7 @@
  */
 import { vendraError, vendraLog } from "@/server/harness/log";
 
+import { memoryConfig } from "./config";
 import { enqueueMemoryWork, insertMemories } from "./db";
 import { redactMemoryFact } from "./redact";
 
@@ -45,13 +46,19 @@ export async function recordFacts(
       source: "tool",
     });
     if (inserted.length === 0) return 0;
-    await enqueueMemoryWork({
-      vendorId: target.vendorId,
-      vendorUuid: target.vendorUuid,
-      threadId: target.threadId,
-      kind: "fact",
-      payload: { rows: inserted },
-    });
+    // Enqueue only when the layer can actually drain. The record write above
+    // is unconditional — the fact is safe either way, and `memory-reindex
+    // --backfill` indexes rows with no mem0 id once the layer is configured.
+    // Enqueueing regardless would just grow a queue nothing consumes.
+    if (memoryConfig()) {
+      await enqueueMemoryWork({
+        vendorId: target.vendorId,
+        vendorUuid: target.vendorUuid,
+        threadId: target.threadId,
+        kind: "fact",
+        payload: { rows: inserted },
+      });
+    }
     vendraLog("memory.facts_recorded", {
       vendor: target.vendorUuid,
       facts: inserted.length,
@@ -88,6 +95,11 @@ export async function recordTurn(
   // extraction exists for all survive redaction.
   const text = redactMemoryFact(vendorText);
   if (text.length < MIN_TURN_CHARS) return;
+  // Unconfigured means no extraction pipeline exists: the drain returns
+  // before claiming, so every enqueued turn would sit pending forever and the
+  // queue would grow at chat pace with no consumer. Skipping is the honest
+  // behaviour — there is nothing to extract WITH.
+  if (!memoryConfig()) return;
   try {
     await enqueueMemoryWork({
       vendorId: target.vendorId,
