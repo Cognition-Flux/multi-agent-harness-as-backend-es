@@ -618,6 +618,13 @@ export const assistantMemory = pgTable(
       table.vendorId,
       table.createdAt,
     ),
+    // What the READ paths actually filter on: recall's recency fallback and
+    // the drain's reconciliation both key on vendor_uuid, not vendor_id — the
+    // audit caught the first index covering only queries nobody runs.
+    index("assistant_memory_vendor_uuid_created_idx").on(
+      table.vendorUuid,
+      table.createdAt,
+    ),
     // PARTIAL on purpose. mem0 keeps the same memory id across an UPDATE
     // decision (the text changes, the identity does not), and the drain records
     // the new text as a new row while marking the old one superseded. A total

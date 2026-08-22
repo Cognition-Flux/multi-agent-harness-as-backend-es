@@ -17,6 +17,7 @@
 import { vendraError, vendraLog } from "@/server/harness/log";
 
 import { enqueueMemoryWork, insertMemories } from "./db";
+import { redactMemoryFact } from "./redact";
 
 /** Below this, a turn is a greeting or an acknowledgement — nothing to learn. */
 const MIN_TURN_CHARS = 24;
@@ -77,7 +78,15 @@ export async function recordTurn(
   target: MemoryWriteTarget,
   vendorText: string,
 ): Promise<void> {
-  const text = vendorText.trim();
+  // Redact BEFORE the text leaves this function. Three stores sit downstream
+  // of a queued turn — the queue row itself, whatever mem0 extracts into
+  // Qdrant's payload, and the assistant_memory record — and the audit showed
+  // the middle one received the raw text: mem0 writes the extracted fact into
+  // Qdrant BEFORE the drain's own redaction pass ever sees it, and recall
+  // injects Qdrant text straight into prompts. Redacting at the entry point
+  // means no downstream store can hold what never arrived; the business facts
+  // extraction exists for all survive redaction.
+  const text = redactMemoryFact(vendorText);
   if (text.length < MIN_TURN_CHARS) return;
   try {
     await enqueueMemoryWork({

@@ -22,11 +22,18 @@ export function redactMemoryFact(fact: string): string {
     .replace(/[<>]/g, " ")
     .replace(/\b\d{3}[-.\s]?\d{2}[-.\s]?\d{4}\b/g, "[redacted-ssn]")
     .replace(/\b\d{2}-\d{7}\b/g, "[redacted-ein]")
+    // International (+CC …) numbers FIRST, then the NANP shape. This portal's
+    // vendors write Spanish, and "+56 9 1234 5678" sailed straight through a
+    // NANP-only matcher; over-redaction is the safe direction here, so any
+    // plus-prefixed run of 7–15 digits with common separators goes.
+    .replace(/\+\d{1,3}[\s.-]?(?:\(?\d{1,4}\)?[\s.-]?)?\d(?:[\s.-]?\d){5,11}\b/g, "[redacted-phone]")
     .replace(
       /\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
       "[redacted-phone]",
     )
-    .replace(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g, "[redacted-email]")
+    // Any non-space local part and domain — \w-based classes miss accented
+    // and unicode addresses, which an es-419 audience actually uses.
+    .replace(/[^\s@<>]+@[^\s@<>]+\.[^\s@<>]{2,}/g, "[redacted-email]")
     .replace(/\s{2,}/g, " ")
     .trim();
 }

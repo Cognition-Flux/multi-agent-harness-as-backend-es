@@ -182,6 +182,16 @@ export interface QueuedWork {
   kind: string;
   payload: unknown;
   attempts: number;
+  /**
+   * The locked_at this claim stamped — the fencing token for complete/fail.
+   *
+   * Kept as the RAW STRING node-postgres returned, never coerced to Date:
+   * Postgres timestamps carry microseconds, a JS Date truncates to
+   * milliseconds, and a truncated fence matches nothing — every item would
+   * retry forever and none could complete or bury. Comparisons cast the
+   * string back (`::timestamp`), which round-trips the exact stored value.
+   */
+  claimedAt: string;
 }
 
 export async function enqueueMemoryWork(input: {
@@ -215,7 +225,12 @@ export async function claimMemoryWork(
   limit: number,
   staleLockMs: number,
 ): Promise<QueuedWork[]> {
-  const staleBefore = new Date(Date.now() - staleLockMs);
+  // Staleness is computed ENTIRELY on the database clock. The first version
+  // compared Postgres now() (written into a timestamp-without-tz column)
+  // against a JS Date parameter — node-postgres serializes a Date as LOCAL
+  // wall time with an offset the timestamp cast then discards, so on this
+  // very machine (America/Santiago vs a UTC container) "stale after 5 min"
+  // silently became "stale after ~4 h". The audit reproduced it live in psql.
   const claimed = await getDb().execute<{
     id: number;
     vendor_id: number;
@@ -224,21 +239,23 @@ export async function claimMemoryWork(
     kind: string;
     payload: unknown;
     attempts: number;
+    locked_at: string;
   }>(sql`
     WITH claimable AS (
       SELECT id FROM memory_ingest_queue
       WHERE processed_at IS NULL
-        AND (locked_at IS NULL OR locked_at < ${staleBefore})
+        AND (locked_at IS NULL
+             OR locked_at < now() - make_interval(secs => ${staleLockMs} / 1000.0))
       ORDER BY created_at ASC, id ASC
       LIMIT ${limit}
       FOR UPDATE SKIP LOCKED
     )
     UPDATE memory_ingest_queue q
-       SET locked_at = now(), attempts = q.attempts + 1
+       SET locked_at = clock_timestamp(), attempts = q.attempts + 1
       FROM claimable c
      WHERE q.id = c.id
     RETURNING q.id, q.vendor_id, q.vendor_uuid, q.thread_id, q.kind,
-              q.payload, q.attempts
+              q.payload, q.attempts, q.locked_at
   `);
   return claimed.rows.map((row) => ({
     id: row.id,
@@ -248,14 +265,42 @@ export async function claimMemoryWork(
     kind: row.kind,
     payload: row.payload,
     attempts: row.attempts,
+    claimedAt: row.locked_at,
   }));
 }
 
-export async function completeMemoryWork(id: number): Promise<void> {
+/**
+ * Mark an item done — fenced on the claim stamp.
+ *
+ * The fence closes a double-processing hole: a batch slower than
+ * STALE_LOCK_MS lets another drain reclaim the row (stamping a NEW
+ * locked_at); when the original holder finishes late, its unfenced complete
+ * would have marked work done that the second holder is still doing — or
+ * clobbered its failure bookkeeping. With the fence, the late writer's
+ * UPDATE matches zero rows and the reclaim's outcome wins.
+ *
+ * The payload is scrubbed at the same moment. The queue is a work ledger,
+ * not a transcript: a processed row's payload is raw vendor prose serving no
+ * further purpose, and prose is where PII lives. (Enqueue also redacts —
+ * this is the second layer, and it also empties rows written before
+ * redaction-at-enqueue existed as they complete.)
+ */
+export async function completeMemoryWork(id: number, claimedAt: string): Promise<void> {
   await getDb()
     .update(memoryIngestQueue)
-    .set({ processedAt: new Date(), lockedAt: null, error: null })
-    .where(eq(memoryIngestQueue.id, id));
+    .set({
+      processedAt: new Date(),
+      lockedAt: null,
+      error: null,
+      payload: {},
+    })
+    .where(
+      and(
+        eq(memoryIngestQueue.id, id),
+        // Raw-string fence — see QueuedWork.claimedAt for why not a Date.
+        sql`${memoryIngestQueue.lockedAt} = ${claimedAt}::timestamp`,
+      ),
+    );
 }
 
 /**
@@ -265,20 +310,28 @@ export async function completeMemoryWork(id: number): Promise<void> {
  * starve the queue and bill an extraction call every tick.
  */
 export async function failMemoryWork(
-  id: number,
-  attempts: number,
+  item: { id: number; attempts: number; claimedAt: string },
   maxAttempts: number,
   error: string,
 ): Promise<void> {
-  const buried = attempts >= maxAttempts;
+  const buried = item.attempts >= maxAttempts;
   await getDb()
     .update(memoryIngestQueue)
     .set({
       lockedAt: null,
       error: error.slice(0, 500),
-      ...(buried ? { processedAt: new Date() } : {}),
+      // A buried row's payload is scrubbed for the same reason as a completed
+      // one's — and burial makes it MORE important, because a poisoned turn
+      // that will never be retried should not preserve its prose forever.
+      ...(buried ? { processedAt: new Date(), payload: {} } : {}),
     })
-    .where(eq(memoryIngestQueue.id, id));
+    .where(
+      and(
+        eq(memoryIngestQueue.id, item.id),
+        // Raw-string fence — see QueuedWork.claimedAt for why not a Date.
+        sql`${memoryIngestQueue.lockedAt} = ${item.claimedAt}::timestamp`,
+      ),
+    );
 }
 
 /** Pending depth, for /api/health. */
@@ -313,6 +366,23 @@ export async function listUnindexedMemories(
     )
     .orderBy(asc(assistantMemory.id))
     .limit(limit);
+}
+
+/**
+ * Every mem0 id this vendor's record has EVER linked — including superseded
+ * and soft-deleted rows. The adopt pass diffs the index against this set: an
+ * id in mem0 but in no row at all is an orphan (a crash landed between mem0's
+ * write and ours), while an id on a superseded/deleted row is history working
+ * as designed and must not be re-adopted.
+ */
+export async function listAllMem0Ids(vendorUuid: string): Promise<Set<string>> {
+  const rows = await getDb()
+    .select({ mem0MemoryId: assistantMemory.mem0MemoryId })
+    .from(assistantMemory)
+    .where(eq(assistantMemory.vendorUuid, vendorUuid));
+  return new Set(
+    rows.map((r) => r.mem0MemoryId).filter((v): v is string => !!v),
+  );
 }
 
 /** Everything live, for a full rebuild after a lost Qdrant volume. */

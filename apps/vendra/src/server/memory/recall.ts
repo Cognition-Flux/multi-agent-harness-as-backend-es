@@ -21,6 +21,7 @@ import {
   RECALL_SEARCH_LIMIT,
 } from "./config";
 import { listLiveMemories } from "./db";
+import { redactMemoryFact } from "./redact";
 import { getMemoryClient } from "./mem0-client";
 
 export type RecallMode = "semantic" | "recency" | "empty";
@@ -92,10 +93,14 @@ export async function recallRelevant(
       // Scoping is snake_case on search (camelCase on add) — see mem0-client.ts.
       filters: { user_id: vendorUuid, agent_id: MEMORY_AGENT_ID },
     });
+    // Redact on the way out as well as the way in. Semantic recall reads the
+    // INDEX's text (Qdrant payload), not the vetted assistant_memory row — so
+    // this is the last gate before a fact re-enters a prompt, and it also
+    // cleans entries indexed before redaction-at-enqueue existed.
     const facts = applyBudget(
       (result.results ?? [])
-        .map((item) => item.memory?.trim())
-        .filter((fact): fact is string => !!fact && fact.length > 0),
+        .map((item) => (item.memory ? redactMemoryFact(item.memory) : ""))
+        .filter((fact): fact is string => fact.length > 0),
     );
     if (facts.length === 0) {
       // An empty index is normal for a new vendor; an empty index with rows in

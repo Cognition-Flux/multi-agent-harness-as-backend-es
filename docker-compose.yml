@@ -98,7 +98,18 @@ services:
     # bge-m3 is multilingual on purpose: this portal's content is Spanish, and
     # the English-centric alternatives lose recall on it (§22). ~2.2 GB, pulled
     # once into the named volume. First boot needs egress to ollama.com.
-    entrypoint: ["/bin/sh", "-c", "ollama pull bge-m3"]
+    #
+    # BEST-EFFORT by design: the app hard-depends on this one-shot completing,
+    # so a failed pull (no egress, registry down) exiting non-zero would stop
+    # the WHOLE app from booting — inverting the "memory is optional" contract.
+    # On failure the app boots anyway, memory degrades to recency, and mem0's
+    # Ollama embedder auto-pulls the model on first use once egress returns.
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        "ollama pull bge-m3 || echo '[ollama-init] pull failed — booting without the model; the embedder auto-pulls on first use'",
+      ]
     restart: "no"
 
   migrate: # one-shot: apply committed migrations + demo seed (§9.5)

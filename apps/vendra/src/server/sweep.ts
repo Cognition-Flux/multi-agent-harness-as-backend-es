@@ -16,7 +16,7 @@
  */
 import { and, eq, inArray, sql } from "drizzle-orm";
 
-import { getDb, schema } from "@vendra/db-vendor";
+import { getDb, schema, withAdvisoryLock } from "@vendra/db-vendor";
 import { vendraError, vendraLog } from "@vendra/workflow/vendor";
 
 import { env } from "@/env";
@@ -62,15 +62,14 @@ export async function runSweepTick(): Promise<void> {
   const db = getDb();
   const startedAt = Date.now();
   try {
-    // node-postgres drizzle execute returns a QueryResult — read .rows.
-    const lockResult = await db.execute<{ locked: boolean }>(
-      sql`SELECT pg_try_advisory_lock(${VENDOR_SWEEP_LOCK_KEY}) AS locked`,
-    );
-    if (lockResult.rows[0]?.locked !== true) {
-      vendraLog("sweep.skipped", { reason: "lock_held" });
-      return;
-    }
-    try {
+    // The lock lives on ONE PINNED connection (withAdvisoryLock). The previous
+    // pool-level pg_try_advisory_lock acquired on one pooled connection and
+    // unlocked on whichever was idle later — when they differed, the unlock
+    // silently no-oped and the lock stayed glued to a connection serving
+    // unrelated traffic, so every future sweep in every process skipped with
+    // "lock_held" and expiries stopped being enforced fleet-wide, with nothing
+    // in the logs. Found by the §22 memory audit; the drain shared the bug.
+    const outcome = await withAdvisoryLock(VENDOR_SWEEP_LOCK_KEY, async () => {
       const now = new Date();
       // Vendors with time-exposed state: anything with an expiry horizon or
       // already APPROVED (the CAS target).
@@ -177,8 +176,9 @@ export async function runSweepTick(): Promise<void> {
         notified,
         ms: Date.now() - startedAt,
       });
-    } finally {
-      await db.execute(sql`SELECT pg_advisory_unlock(${VENDOR_SWEEP_LOCK_KEY})`);
+    });
+    if (!outcome.ran) {
+      vendraLog("sweep.skipped", { reason: "lock_held" });
     }
   } catch (err) {
     vendraError("sweep.tick_failed", {

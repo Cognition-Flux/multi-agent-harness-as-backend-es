@@ -9,8 +9,13 @@
  *                    deploying §22; safe to re-run.
  *   --backfill       Index every `assistant_memory` row that has no mem0 id
  *                    yet. This is the normal catch-up.
- *   --rebuild        Forget every mem0 id and re-index everything live. For a
- *                    lost or suspect Qdrant volume.
+ *   --rebuild        RESET the Qdrant collection, forget every mem0 id, and
+ *                    re-index everything live. For a lost, duplicated or
+ *                    suspect index.
+ *   --adopt-index    Reverse direction: adopt facts that exist only in the
+ *                    index (a crash between mem0's write and ours) back into
+ *                    `assistant_memory`. Run before --rebuild when the index
+ *                    might hold facts the record lost.
  *
  * Usage (cwd must be apps/vendra so tsx resolves the `@/` alias; the pnpm
  * script handles that and loads .env.local):
@@ -29,7 +34,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { getDb, getPool, schema } from "@vendra/db-vendor";
 
 import { memoryConfigGap } from "../src/server/memory/config";
-import { reindexMemories } from "../src/server/memory/reindex";
+import { adoptIndexOrphans, reindexMemories } from "../src/server/memory/reindex";
 import { redactMemoryFact } from "../src/server/memory/redact";
 
 const { assistantChatTurn, assistantMemory, vendor } = schema;
@@ -101,18 +106,31 @@ async function main() {
     allowPositionals: true,
     options: {
       "adopt-legacy": { type: "boolean" },
+      "adopt-index": { type: "boolean" },
       backfill: { type: "boolean" },
       rebuild: { type: "boolean" },
     },
   });
 
-  if (!values["adopt-legacy"] && !values.backfill && !values.rebuild) {
-    fail("pick at least one of --adopt-legacy | --backfill | --rebuild");
+  if (
+    !values["adopt-legacy"] &&
+    !values["adopt-index"] &&
+    !values.backfill &&
+    !values.rebuild
+  ) {
+    fail("pick at least one of --adopt-legacy | --adopt-index | --backfill | --rebuild");
   }
 
   if (values["adopt-legacy"]) {
     const result = await adoptLegacy();
     console.log(JSON.stringify({ job: "adopt-legacy", ...result }));
+  }
+
+  if (values["adopt-index"]) {
+    const gap = memoryConfigGap();
+    if (gap) fail(`the memory index is unconfigured (${gap} is unset)`);
+    const result = await adoptIndexOrphans();
+    console.log(JSON.stringify({ job: "adopt-index", ...result }));
   }
 
   if (values.backfill || values.rebuild) {

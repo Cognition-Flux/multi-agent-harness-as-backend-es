@@ -48,3 +48,45 @@ export function getDb(): NodePgDatabase<typeof schema> {
 }
 
 export type VendorDb = NodePgDatabase<typeof schema>;
+
+/**
+ * Run `fn` under a Postgres session advisory lock held on ONE PINNED
+ * connection, or skip (return null) when another holder has it.
+ *
+ * The pinning is the whole point. `pg_try_advisory_lock` over the pool's
+ * `query()` acquires the lock on whichever connection happens to be idle; the
+ * matching unlock later runs on whichever connection happens to be idle THEN.
+ * When they differ — guaranteed eventually under concurrent traffic, because
+ * the awaits between them return the connection to the pool — the unlock is a
+ * silent no-op (`pg_advisory_unlock` returns false, nobody checks), the lock
+ * stays glued to a connection now serving unrelated queries, and every future
+ * try-lock in every process returns false: the scheduled job stops fleet-wide
+ * with nothing in the logs. Found by an adversarial audit of the §22 drain;
+ * the sweep had the identical latent bug.
+ *
+ * Session-level (not xact) so the lock spans `fn`'s own transactions; acquire,
+ * `fn`, and unlock all live and die on the same checked-out client.
+ */
+export async function withAdvisoryLock<T>(
+  key: number,
+  fn: () => Promise<T>,
+): Promise<{ ran: true; result: T } | { ran: false }> {
+  const client = await getPool().connect();
+  let locked = false;
+  try {
+    const res = await client.query<{ locked: boolean }>(
+      "SELECT pg_try_advisory_lock($1) AS locked",
+      [key],
+    );
+    locked = res.rows[0]?.locked === true;
+    if (!locked) return { ran: false };
+    const result = await fn();
+    return { ran: true, result };
+  } finally {
+    try {
+      if (locked) await client.query("SELECT pg_advisory_unlock($1)", [key]);
+    } finally {
+      client.release();
+    }
+  }
+}

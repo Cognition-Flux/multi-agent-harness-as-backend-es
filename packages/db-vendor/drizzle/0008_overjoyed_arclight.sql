@@ -1,0 +1,1 @@
+CREATE INDEX "assistant_memory_vendor_uuid_created_idx" ON "assistant_memory" USING btree ("vendor_uuid","created_at");

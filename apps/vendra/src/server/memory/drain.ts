@@ -8,22 +8,29 @@
  * `unref()`ed timer so it never holds the process open, and a Postgres advisory
  * lock so several app instances converge instead of competing.
  *
- * What the drain does with mem0's answer is the interesting part. `add()`
- * returns the decisions it took — ADD, UPDATE, DELETE, NONE — and each one is
- * reconciled onto `assistant_memory`:
+ * What the drain does with mem0's answer: `add()` returns decisions, and each
+ * is reconciled onto `assistant_memory`. **In the installed mem0ai@3.1.6 the
+ * extraction pipeline is ADDITIVE-ONLY** (its prompt says "your sole operation
+ * is ADD"), so in practice only ADD and "already known → no decision" occur:
+ * near-duplicates are prevented because mem0 sees the existing memories and
+ * declines to re-add, but a CONTRADICTED fact is not superseded — the stale one
+ * stays until an officer-facing surface or a future SDK restores UPDATE/DELETE.
+ * The UPDATE/DELETE branches below are kept deliberately: they are the correct
+ * reconciliation if an upgrade turns those events back on, and both event
+ * shapes (`metadata.event` and top-level) are accepted.
  *
  *   ADD    → a fact we did not have: record it with mem0's id.
- *   UPDATE → mem0 reworded/merged: the old row is superseded, the new text
- *            recorded, so the audit trail keeps both.
- *   DELETE → mem0 decided the fact stopped being true: soft-delete it.
- *   NONE   → nothing to do; the memory already said this.
+ *   UPDATE → (3.1.6: not emitted) supersede the old row, record the new text.
+ *   DELETE → (3.1.6: not emitted) soft-delete.
+ *   none   → mem0 already knew this; nothing to do.
  *
- * The index is downstream of Postgres, so a decision that fails to reconcile is
- * a logged inconsistency the re-index can repair — never a lost memory.
+ * One loss window is real and repaired elsewhere: a crash between `add()`
+ * committing to Qdrant and the reconcile writes means the retry's `add()`
+ * dedupes to zero decisions and the fact would exist only in the index.
+ * `memory-reindex --adopt-index` closes it by diffing mem0's memories against
+ * the record and adopting the orphans.
  */
-import { sql } from "drizzle-orm";
-
-import { getDb } from "@vendra/db-vendor";
+import { withAdvisoryLock } from "@vendra/db-vendor";
 
 import { env } from "@/env";
 import { vendraError, vendraLog, vendraWarn } from "@/server/harness/log";
@@ -39,14 +46,21 @@ import {
   supersedeByMem0Id,
   type QueuedWork,
 } from "./db";
-import { getMemoryClient } from "./mem0-client";
+import { getMemoryClient, probeMemoryBackends } from "./mem0-client";
 import { redactMemoryFact } from "./redact";
 
 /** Distinct from the sweep's lock key — the two must never block each other. */
 const MEMORY_DRAIN_LOCK_KEY = 981_144_701;
 const DEFAULT_DRAIN_INTERVAL_MS = 20_000;
 const BATCH_SIZE = 5;
-const MAX_ATTEMPTS = 3;
+/**
+ * Attempts before burial. Generous on purpose: the probe gate below stops
+ * attempts from burning while Qdrant/Ollama are down, but an Anthropic-side
+ * outage still costs one attempt per tick, and a buried TURN is gone for good
+ * (the payload is a turn, not a record row — no backfill recovers it). A live
+ * round watched an item reach the old cap of 3 during a ~60 s container stop.
+ */
+const MAX_ATTEMPTS = 5;
 /** A claim older than this is assumed dead (crashed mid-drain) and reclaimable. */
 const STALE_LOCK_MS = 5 * 60 * 1000;
 
@@ -90,16 +104,32 @@ export async function runMemoryDrainTick(): Promise<void> {
   // A tick that overruns its interval must not stack up behind itself.
   if (drain.running) return;
   drain.running = true;
-  const db = getDb();
   const startedAt = Date.now();
   try {
-    const lock = await db.execute<{ locked: boolean }>(
-      sql`SELECT pg_try_advisory_lock(${MEMORY_DRAIN_LOCK_KEY}) AS locked`,
-    );
-    if (lock.rows[0]?.locked !== true) return;
-    try {
+    // Single-flight across processes via a lock held on ONE PINNED connection
+    // (withAdvisoryLock). The obvious pool-level pg_try_advisory_lock is a
+    // trap: acquire and unlock land on different pooled connections under
+    // load, the unlock silently no-ops, and every drain in every process is
+    // locked out until that connection dies — the audit confirmed it and the
+    // sweep shared the bug. Correctness still never depends on the lock:
+    // claimMemoryWork uses FOR UPDATE SKIP LOCKED.
+    const outcome = await withAdvisoryLock(MEMORY_DRAIN_LOCK_KEY, async () => {
       const client = await getMemoryClient();
       if (!client) return; // unconfigured: leave the queue for later
+
+      // Probe gate: with the index or the embedder down, every item would
+      // fail, and each failure burns an attempt toward burial — a plain
+      // container restart could bury turns permanently. Skip the tick and let
+      // the queue wait; the backends' health is /api/health's job to report.
+      const backends = await probeMemoryBackends();
+      if (!backends.qdrant || !backends.ollama) {
+        vendraWarn("memory.drain_skipped", {
+          qdrant: backends.qdrant,
+          ollama: backends.ollama,
+        });
+        return;
+      }
+
       const batch = await claimMemoryWork(BATCH_SIZE, STALE_LOCK_MS);
       if (batch.length === 0) {
         drain.lastTickAt = new Date().toISOString();
@@ -114,10 +144,10 @@ export async function runMemoryDrainTick(): Promise<void> {
           added += counts.added;
           updated += counts.updated;
           deleted += counts.deleted;
-          await completeMemoryWork(item.id);
+          await completeMemoryWork(item.id, item.claimedAt);
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
-          await failMemoryWork(item.id, item.attempts, MAX_ATTEMPTS, message);
+          await failMemoryWork(item, MAX_ATTEMPTS, message);
           vendraWarn("memory.drain_item_failed", {
             item: item.id,
             vendor: item.vendorUuid,
@@ -135,9 +165,8 @@ export async function runMemoryDrainTick(): Promise<void> {
         deleted,
         ms: Date.now() - startedAt,
       });
-    } finally {
-      await db.execute(sql`SELECT pg_advisory_unlock(${MEMORY_DRAIN_LOCK_KEY})`);
-    }
+    });
+    if (!outcome.ran) return; // another process holds the tick
   } catch (err) {
     vendraError("memory.drain_failed", {
       err: err instanceof Error ? err.message : String(err),
