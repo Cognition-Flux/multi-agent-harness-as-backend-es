@@ -78,7 +78,12 @@ export function buildAssistantTools(ctx: AssistantToolContext) {
       "Store up to 5 short durable facts the vendor told you about their business, for future sessions. Never store assistant output, document contents, or contact/tax details.",
     inputSchema: rememberFactsInputSchema,
     execute: async ({ facts }) => {
-      const stored = await rememberFacts(ctx.vendorUuid, ctx.vendorId, facts);
+      const stored = await rememberFacts(
+        ctx.vendorUuid,
+        ctx.vendorId,
+        facts,
+        ctx.vendorUuid,
+      );
       return { stored };
     },
   });

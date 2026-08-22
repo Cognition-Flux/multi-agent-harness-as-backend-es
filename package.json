@@ -2,7 +2,7 @@
   "name": "multi-agent-harness-as-backend",
   "private": true,
   "version": "1.0.0",
-  "description": "Vendra — AI-adjudicated vendor onboarding & continuous compliance, powered by a Claude Code harness backend",
+  "description": "Vendra \u2014 AI-adjudicated vendor onboarding & continuous compliance, powered by a Claude Code harness backend",
   "packageManager": "pnpm@10.4.1",
   "engines": {
     "node": ">=22.10.0"
@@ -12,5 +12,28 @@
     "build": "pnpm --filter vendra build",
     "type-check": "pnpm -r type-check",
     "migrate": "pnpm --filter vendra migrate"
+  },
+  "pnpm": {
+    "packageExtensions": {
+      "mem0ai": {
+        "peerDependenciesMeta": {
+          "@cloudflare/workers-types": {
+            "optional": true
+          },
+          "@types/jest": {
+            "optional": true
+          },
+          "@types/pg": {
+            "optional": true
+          },
+          "pg": {
+            "optional": true
+          }
+        }
+      }
+    },
+    "onlyBuiltDependencies": [
+      "better-sqlite3"
+    ]
   }
 }

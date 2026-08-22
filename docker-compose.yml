@@ -1,9 +1,14 @@
 # Vendra — the full stack, off the shelf (SPEC §0, §9.4):
 #   cp .env.docker.example .env.docker   # then set the four remote keys
 #   docker compose up
-# Five services: postgres (the app's own DB), minio (S3-compatible storage),
-# minio-init (one-shot bucket creation), migrate (one-shot Drizzle apply +
-# demo seed — prints the login credentials), app (Next standalone server).
+# Eight services: postgres (the app's own DB), minio (S3-compatible storage),
+# minio-init (one-shot bucket creation), qdrant + ollama + ollama-init (the
+# assistant's memory index — §22), migrate (one-shot Drizzle apply + demo
+# seed — prints the login credentials), app (Next standalone server).
+#
+# The memory index is OPTIONAL at boot, exactly like the harness keys: with
+# qdrant/ollama absent the assistant falls back to recency recall and
+# /api/health reports `memory: unconfigured`. Nothing else degrades.
 name: vendra
 services:
   postgres:
@@ -49,6 +54,53 @@ services:
       (mc mb -p local/vendor-docs || true) &&
       (mc anonymous set none local/vendor-docs || true)"
 
+  qdrant: # the assistant's semantic memory index (§22) — rebuildable from Postgres
+    # Pinned to the SERVER minor that matches the client we pin in
+    # apps/vendra/package.json. mem0 3.1.6 calls the JS client's `search()`,
+    # which 1.19 removed, so the client is held at 1.18.x — and the client
+    # refuses a server more than one minor away.
+    image: qdrant/qdrant:v1.18.1
+    ports:
+      - "6333:6333" # REST — what @qdrant/js-client-rest speaks
+      - "6334:6334" # gRPC (unused; exposed for qdrant tooling)
+    volumes:
+      - vendor_qdrant_data:/qdrant/storage
+    healthcheck:
+      # The image is distroless-ish: no curl, but it ships its own binary that
+      # can probe the readiness endpoint.
+      test: ["CMD-SHELL", "bash -c ':> /dev/tcp/127.0.0.1/6333' || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  ollama: # local embedding model host (§22) — no external inference provider
+    image: ollama/ollama:0.5.7
+    ports:
+      # 11435 host-side — 11434 is the default port of a host-native Ollama,
+      # and colliding with one makes this service fail to start. Same reasoning
+      # as postgres on 5436. In-network the app still uses ollama:11434.
+      - "11435:11434"
+    volumes:
+      - vendor_ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+
+  ollama-init: # one-shot: pull the embedding model, like minio-init seeds the bucket
+    image: ollama/ollama:0.5.7
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    # bge-m3 is multilingual on purpose: this portal's content is Spanish, and
+    # the English-centric alternatives lose recall on it (§22). ~2.2 GB, pulled
+    # once into the named volume. First boot needs egress to ollama.com.
+    entrypoint: ["/bin/sh", "-c", "ollama pull bge-m3"]
+    restart: "no"
+
   migrate: # one-shot: apply committed migrations + demo seed (§9.5)
     build:
       context: .
@@ -66,12 +118,28 @@ services:
       dockerfile: apps/vendra/Dockerfile
       target: runner
     env_file: [.env.docker] # the §9.1 matrix, incl. the 4 user-supplied keys
+    environment:
+      # Container-internal topology for the memory index (§22) — addresses, not
+      # secrets, so they belong here rather than in .env.docker. Set both and
+      # the assistant gets semantic recall; unset either and it falls back to
+      # recency without erroring.
+      VENDOR_QDRANT_URL: http://qdrant:6333
+      VENDOR_OLLAMA_URL: http://ollama:11434
+      # Rule 1: mem0 3.1.6 POSTs to PostHog unless this is exactly "false", and
+      # it reads the var at module load. The boundary module also sets it before
+      # its dynamic import — this is the belt to that braces.
+      MEM0_TELEMETRY: "false"
     ports:
       - "3000:3000"
     depends_on:
       migrate:
         condition: service_completed_successfully
       minio-init:
+        condition: service_completed_successfully
+      # The index is optional at boot, so this waits for the model pull but
+      # does not require qdrant to be healthy — a missing index degrades to
+      # recency recall rather than blocking the app.
+      ollama-init:
         condition: service_completed_successfully
     restart: always
     healthcheck: # distroless has no shell/curl — probe with the node binary
@@ -90,3 +158,5 @@ services:
 volumes:
   vendor_db_data: {}
   vendor_minio_data: {}
+  vendor_qdrant_data: {} # disposable: reindex.ts rebuilds it from Postgres
+  vendor_ollama_models: {}

@@ -103,6 +103,52 @@ def governance() -> dict:
     }
 
 
+def memory() -> dict:
+    """Facts for the §22 memory layer's rule-1 constraints.
+
+    mem0 stopped being a forbidden dependency and became a CONSTRAINED one, so
+    the invariants moved from "is it declared" to "is it wired the only way that
+    keeps rule 1 true": self-hosted providers, no Platform client, telemetry
+    provably off, and exactly one module allowed to touch the SDK.
+    """
+    boundary = "apps/vendra/src/server/memory/mem0-client.ts"
+    boundary_src = read(boundary) if (ROOT / boundary).exists() else ""
+    compose_raw = read("docker-compose.yml")
+    return {
+        "boundary_exists": bool(boundary_src),
+        # Any file importing the SDK at all — must be the boundary alone.
+        "mem0_import_files": git_tracked_or_present(
+            r'from "mem0ai|require\("mem0ai', "apps", "packages"),
+        # The ROOT export is the hosted MemoryClient; only `mem0ai/oss` is ours.
+        "mem0_root_import_files": git_tracked_or_present(
+            r'from "mem0ai"', "apps", "packages"),
+        # Platform surfaces that must never appear.
+        # Anchored to CONSTRUCTION of the hosted client, so our own
+        # `getMemoryClient` / `Mem0Client` names do not read as violations.
+        "platform_client_files": git_tracked_or_present(
+            r"new MemoryClient|MEM0_API_KEY|@mem0/vercel-ai-provider|api\.mem0\.ai",
+            "apps", "packages"),
+        # Telemetry: the boundary must force it off before its dynamic import,
+        # and compose must set it too.
+        "boundary_sets_telemetry_false": bool(
+            re.search(r'MEM0_TELEMETRY\s*=\s*"false"', boundary_src)),
+        "boundary_uses_dynamic_import": bool(
+            re.search(r'await import\("mem0ai/oss"\)', boundary_src)),
+        "compose_sets_telemetry_false": bool(
+            re.search(r'MEM0_TELEMETRY:\s*"false"', compose_raw)),
+        # Providers actually configured in the boundary.
+        "embedder_provider": (
+            m.group(1) if (m := re.search(
+                r'embedder:\s*\{\s*provider:\s*"([a-z_]+)"', boundary_src)) else None),
+        "vector_provider": (
+            m.group(1) if (m := re.search(
+                r'vectorStore:\s*\{\s*provider:\s*"([a-z_]+)"', boundary_src)) else None),
+        # Index endpoints as compose configures them — must stay local.
+        "qdrant_urls": re.findall(r"VENDOR_QDRANT_URL:\s*(\S+)", compose_raw),
+        "ollama_urls": re.findall(r"VENDOR_OLLAMA_URL:\s*(\S+)", compose_raw),
+    }
+
+
 def sources() -> dict:
     test_files = subprocess.run(
         ["find", "apps", "packages", "-not", "-path", "*/node_modules/*",
@@ -124,6 +170,6 @@ def sources() -> dict:
 if __name__ == "__main__":
     json.dump({"repo": {"compose": compose(), "packages": packages(),
                         "harness": harness(), "sources": sources(),
-                        "governance": governance()}},
+                        "governance": governance(), "memory": memory()}},
               sys.stdout, indent=2, sort_keys=True)
     print()

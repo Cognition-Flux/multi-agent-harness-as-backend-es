@@ -1,0 +1,2 @@
+DROP INDEX "assistant_memory_mem0_id_uq";--> statement-breakpoint
+CREATE UNIQUE INDEX "assistant_memory_mem0_id_uq" ON "assistant_memory" USING btree ("mem0_memory_id") WHERE deleted_at IS NULL AND superseded_at IS NULL;

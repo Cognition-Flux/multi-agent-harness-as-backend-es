@@ -31,6 +31,18 @@ const nextConfig = {
     "@ai-sdk/sandbox-vercel",
     "@vercel/sandbox",
     "ws",
+    // mem0 reaches ~40 optional peers through `loadPeer(() => import(pkg))`.
+    // Turbopack resolves those dynamic specifiers at build time and fails on
+    // every provider we do not install (32 errors: bedrock, chromadb,
+    // weaviate…). Keeping mem0 external leaves the imports to Node at runtime,
+    // where they are guarded — and it lets better-sqlite3's native binding be
+    // traced from node_modules instead of bundled (mem0 imports it STATICALLY,
+    // even with `disableHistory: true`). §22.
+    "mem0ai",
+    "better-sqlite3",
+    "@anthropic-ai/sdk",
+    "@qdrant/js-client-rest",
+    "ollama",
   ],
 };
 

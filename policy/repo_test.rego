@@ -71,11 +71,85 @@ test_forbidden_dependency_fires if {
 	got == {"R1_forbidden_dependency"}
 }
 
+# `@qdrant/js-client-rest` used to be the fixture here; §22 made it a legitimate
+# dependency (self-hosted Qdrant), so the control moved to a provider that is
+# still banned outright.
 test_forbidden_dev_dependency_also_fires if {
 	got := rules(repo.violation) with data.repo as patched({"packages": {"apps/vendra/package.json": {
-		"dependencies": [], "devDependencies": ["@qdrant/js-client-rest"],
+		"dependencies": [], "devDependencies": ["@ai-sdk/gateway"],
 	}}})
 	got == {"R1_forbidden_dependency"}
+}
+
+# --- rule 1: the memory index (§22) ------------------------------------------
+
+memory_base := {
+	"boundary_exists": true,
+	"mem0_import_files": ["apps/vendra/src/server/memory/mem0-client.ts"],
+	"mem0_root_import_files": [],
+	"platform_client_files": [],
+	"boundary_sets_telemetry_false": true,
+	"boundary_uses_dynamic_import": true,
+	"compose_sets_telemetry_false": true,
+	"embedder_provider": "ollama",
+	"vector_provider": "qdrant",
+	"qdrant_urls": ["http://qdrant:6333"],
+	"ollama_urls": ["http://ollama:11434"],
+}
+
+memory_patch(overrides) := object.union(memory_base, overrides)
+
+test_mem0_import_outside_boundary_fires if {
+	got := rules(repo.violation) with data.repo as patched({"memory": memory_patch({"mem0_import_files": [
+		"apps/vendra/src/server/assistant/session.ts",
+	]})})
+	got == {"R1_mem0_outside_boundary"}
+}
+
+test_mem0_hosted_entrypoint_fires if {
+	got := rules(repo.violation) with data.repo as patched({"memory": memory_patch({"mem0_root_import_files": [
+		"apps/vendra/src/server/memory/mem0-client.ts",
+	]})})
+	got == {"R1_mem0_hosted_entrypoint"}
+}
+
+test_mem0_platform_surface_fires if {
+	got := rules(repo.violation) with data.repo as patched({"memory": memory_patch({"platform_client_files": [
+		"apps/vendra/src/server/memory/mem0-client.ts",
+	]})})
+	got == {"R1_mem0_platform_surface"}
+}
+
+test_mem0_telemetry_unguarded_fires if {
+	got := rules(repo.violation) with data.repo as patched({"memory": memory_patch({"boundary_sets_telemetry_false": false})})
+	got == {"R1_mem0_telemetry_unguarded"}
+}
+
+test_mem0_static_import_fires if {
+	got := rules(repo.violation) with data.repo as patched({"memory": memory_patch({"boundary_uses_dynamic_import": false})})
+	got == {"R1_mem0_static_import"}
+}
+
+test_mem0_telemetry_unset_in_compose_fires if {
+	got := rules(repo.violation) with data.repo as patched({"memory": memory_patch({"compose_sets_telemetry_false": false})})
+	got == {"R1_mem0_telemetry_unset_in_compose"}
+}
+
+test_remote_embedder_fires if {
+	got := rules(repo.violation) with data.repo as patched({"memory": memory_patch({"embedder_provider": "openai"})})
+	got == {"R1_mem0_remote_embedder"}
+}
+
+test_remote_vector_store_fires if {
+	got := rules(repo.violation) with data.repo as patched({"memory": memory_patch({"vector_provider": "pinecone"})})
+	got == {"R1_mem0_remote_vector_store"}
+}
+
+test_cloud_memory_endpoint_fires if {
+	got := rules(repo.violation) with data.repo as patched({"memory": memory_patch({"qdrant_urls": [
+		"https://xyz.aws.cloud.qdrant.io:6333",
+	]})})
+	got == {"R1_memory_endpoint_not_local"}
 }
 
 # --- rule 6 ------------------------------------------------------------------

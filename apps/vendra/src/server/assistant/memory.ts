@@ -1,80 +1,58 @@
 /**
  * Long-term memory for the vendor assistant — the memory-sandwich pattern
- * (recall before the turn, write during it) over this app's own Postgres.
+ * (recall before the turn, write during it).
  *
- * Deliberately NOT a vector store: the reliance set is exactly the Anthropic
- * API + Vercel Sandbox (CLAUDE.md rule 1) — there is no vector engine to
- * point at, and Anthropic ships no embeddings API to feed one. The service
- * keeps the boundary shape (recall / remember / caps / fail-soft) so a
- * vector engine could replace the storage without touching callers.
+ * This module is now a FAÇADE over the memory layer in `server/memory/`
+ * (SPEC §22). Its own header used to explain why memory was deliberately not a
+ * vector store — "there is no vector engine to point at, and Anthropic ships no
+ * embeddings API to feed one" — and that is what changed: the engine (Qdrant)
+ * and the embedder (Ollama + bge-m3) now run in this repo's own containers, so
+ * recall can finally be about relevance instead of recency.
+ *
+ * The signatures did not change, on purpose: `tools.ts`, `session.ts` and the
+ * `<long_term_memory>` block in `prompt.ts` are untouched by the swap. What
+ * changed underneath:
+ *
+ *  - recall asks the index for facts related to the vendor's actual question,
+ *    and falls back to the old recency list whenever the index is unreachable;
+ *  - writes land in `assistant_memory` (a real table, not a piggyback thread on
+ *    `assistant_chat_turn`) and are indexed by a background drain;
+ *  - the conversation itself is queued for extraction, so the agent no longer
+ *    has to notice what is worth remembering.
+ *
+ * `redactMemoryFact` moved to `server/memory/redact.ts` (re-exported below for
+ * continuity) because it now has two producers: facts the agent chose, and
+ * facts mem0 extracted. The second matters more — nobody vetted those before
+ * the regex did.
  */
-import { randomUUID } from "node:crypto";
+import { vendraLog } from "@/server/harness/log";
+import { recordFacts, recordTurn } from "@/server/memory/ingest";
+import { recallRelevant } from "@/server/memory/recall";
+import { redactMemoryFact } from "@/server/memory/redact";
 
-import { vendraError, vendraLog } from "@/server/harness/log";
-
-import {
-  insertMemoryFacts,
-  listMemoryFacts,
-  pruneMemoryFacts,
-} from "./store";
-
-/** Hard cap on stored facts per vendor (oldest pruned past this). */
-const MAX_STORED_FACTS = 40;
-/** Recall caps: at most N facts AND at most C characters (chars bind first). */
-const RECALL_MAX_FACTS = 20;
-const RECALL_MAX_CHARS = 2_000;
+// Re-exported for continuity: the redaction gate moved into the memory layer
+// (two producers now feed it — see server/memory/redact.ts).
+export { redactMemoryFact };
 
 /**
- * Strip what must never persist: markup first (a stored fact re-enters the
- * prompt inside an XML fence, so angle brackets are an escape vector), then
- * SSN-shaped digits (before the phone matcher can eat them), then EINs
- * (dash form only — the bare 9-digit form is indistinguishable from ids),
- * then phone numbers, then emails.
+ * Recall remembered facts for prompt injection.
+ *
+ * `query` is the vendor's turn text; pass it whenever it is available, because
+ * it is what makes recall semantic. Omitting it is valid and degrades to the
+ * recency list — the caller keeps working either way.
  */
-export function redactMemoryFact(fact: string): string {
-  return fact
-    .replace(/<[^>]*>/g, " ")
-    .replace(/[<>]/g, " ")
-    .replace(/\b\d{3}[-.\s]?\d{2}[-.\s]?\d{4}\b/g, "[redacted-ssn]")
-    .replace(/\b\d{2}-\d{7}\b/g, "[redacted-ein]")
-    .replace(
-      /\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
-      "[redacted-phone]",
-    )
-    .replace(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g, "[redacted-email]")
-    .replace(/\s{2,}/g, " ")
-    .trim();
+export async function recallMemory(
+  vendorUuid: string,
+  query = "",
+): Promise<string[]> {
+  const { facts } = await recallRelevant(vendorUuid, query);
+  return facts;
 }
 
 /**
- * Recall remembered facts for prompt injection, capped by count and chars.
- * Fail-soft: a read failure returns [] — the chat must work without memory.
- */
-export async function recallMemory(vendorUuid: string): Promise<string[]> {
-  try {
-    const stored = await listMemoryFacts(vendorUuid, MAX_STORED_FACTS);
-    const recent = stored.slice(-RECALL_MAX_FACTS);
-    const selected: string[] = [];
-    let chars = 0;
-    // Newest-first selection under the char budget, re-emitted oldest-first.
-    for (const { fact } of [...recent].reverse()) {
-      if (chars + fact.length > RECALL_MAX_CHARS) break;
-      selected.push(fact);
-      chars += fact.length;
-    }
-    return selected.reverse();
-  } catch (err) {
-    vendraError("assistant.memory_recall_failed", {
-      vendor: vendorUuid,
-      err: err instanceof Error ? err.message : String(err),
-    });
-    return [];
-  }
-}
-
-/**
- * Persist facts the agent chose to remember: redact → dedupe against the
- * stored set → append → prune past the cap. Returns the stored count.
+ * Persist facts the agent chose to remember: redact → record → queue for
+ * indexing. Returns the stored count.
+ *
  * Fail-soft with a visible log line (a silent memory-write death is the #1
  * operational trap — the log IS the alarm).
  */
@@ -82,27 +60,33 @@ export async function rememberFacts(
   vendorUuid: string,
   vendorId: number,
   facts: string[],
+  threadId = vendorUuid,
 ): Promise<number> {
-  try {
-    const existing = await listMemoryFacts(vendorUuid, MAX_STORED_FACTS);
-    const known = new Set(existing.map((f) => f.fact.toLowerCase().trim()));
-    const fresh = facts
-      .map((fact) => redactMemoryFact(fact.trim()))
-      .filter((fact) => fact.length > 0 && !known.has(fact.toLowerCase()));
-    if (fresh.length === 0) return 0;
-    await insertMemoryFacts(
-      vendorUuid,
-      vendorId,
-      fresh.map((fact) => ({ messageId: randomUUID(), fact })),
-    );
-    await pruneMemoryFacts(vendorUuid, MAX_STORED_FACTS);
-    vendraLog("assistant.memory_write", { vendor: vendorUuid, facts: fresh.length });
-    return fresh.length;
-  } catch (err) {
-    vendraError("assistant.memory_write_failed", {
-      vendor: vendorUuid,
-      err: err instanceof Error ? err.message : String(err),
-    });
-    return 0;
+  const clean = facts
+    .map((fact) => redactMemoryFact(fact.trim()))
+    .filter((fact) => fact.length > 0);
+  if (clean.length === 0) return 0;
+  const stored = await recordFacts(
+    { vendorId, vendorUuid, threadId },
+    clean,
+  );
+  if (stored > 0) {
+    vendraLog("assistant.memory_write", { vendor: vendorUuid, facts: stored });
   }
+  return stored;
+}
+
+/**
+ * Queue a vendor turn for background fact extraction.
+ *
+ * Separate from `rememberFacts` because it is a different contract: nothing is
+ * stored yet, and mem0 decides whether anything durable was said at all.
+ */
+export async function observeVendorTurn(
+  vendorUuid: string,
+  vendorId: number,
+  threadId: string,
+  vendorText: string,
+): Promise<void> {
+  await recordTurn({ vendorId, vendorUuid, threadId }, vendorText);
 }

@@ -574,6 +574,100 @@ export const assistantChatTurn = pgTable(
 );
 
 // =============================================================================
+// Assistant long-term memory (SPEC §22)
+// =============================================================================
+
+/**
+ * The assistant's durable memory — the SYSTEM OF RECORD.
+ *
+ * mem0 + Qdrant hold a semantic INDEX over these rows; this table holds the
+ * truth. Two consequences worth stating, because they are the whole reason for
+ * the split: recall falls back to this table when the index is unreachable (so
+ * a stopped container degrades relevance, never availability), and the Qdrant
+ * volume is disposable — `reindex.ts` rebuilds it from here.
+ *
+ * `mem0MemoryId` is null between the write and the drain that indexes it, and
+ * for rows whose indexing failed. Nullable-unique is deliberate: Postgres
+ * allows many NULLs in a unique index, so the constraint binds only once a row
+ * actually has a mem0 identity.
+ */
+export const assistantMemory = pgTable(
+  "assistant_memory",
+  {
+    id: serial("id").primaryKey(),
+    uuid: uuid("uuid").defaultRandom().notNull().unique(),
+    vendorId: integer("vendor_id")
+      .references(() => vendor.id, { onDelete: "cascade" })
+      .notNull(),
+    /** The scope key handed to mem0 as `userId` — stable across sessions. */
+    vendorUuid: text("vendor_uuid").notNull(),
+    /** mem0's own id for the indexed memory; null until the drain indexes it. */
+    mem0MemoryId: text("mem0_memory_id"),
+    /** Already redacted at write time (assistant/memory.ts `redactMemoryFact`). */
+    fact: text("fact").notNull(),
+    /** 'tool' — the agent chose it · 'extracted' — mem0 derived it from a turn. */
+    source: text("source").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    /** Set when consolidation replaced this fact with a better one. */
+    supersededAt: timestamp("superseded_at"),
+    /** Soft delete: mem0 resolved the fact as no longer true. */
+    deletedAt: timestamp("deleted_at"),
+  },
+  (table) => [
+    index("assistant_memory_vendor_created_idx").on(
+      table.vendorId,
+      table.createdAt,
+    ),
+    // PARTIAL on purpose. mem0 keeps the same memory id across an UPDATE
+    // decision (the text changes, the identity does not), and the drain records
+    // the new text as a new row while marking the old one superseded. A total
+    // unique index would reject that second row and make consolidation
+    // impossible; scoping it to the live row keeps "one current fact per mem0
+    // id" while the history stays queryable.
+    uniqueIndex("assistant_memory_mem0_id_uq")
+      .on(table.mem0MemoryId)
+      .where(sql`deleted_at IS NULL AND superseded_at IS NULL`),
+    // One live copy of a given fact per vendor. Exact-match only — semantic
+    // duplicates are consolidation's job, not a constraint's.
+    uniqueIndex("assistant_memory_vendor_fact_live_uq")
+      .on(table.vendorId, table.fact)
+      .where(sql`deleted_at IS NULL AND superseded_at IS NULL`),
+  ],
+);
+
+/**
+ * Pending memory work, drained out-of-band (SPEC §22).
+ *
+ * The chat turn only enqueues: mem0's `add()` with inference costs an LLM call,
+ * and no vendor should wait on it. A row here is the durable record that work
+ * is owed, so a crash mid-drain loses nothing and a retry is just another tick.
+ */
+export const memoryIngestQueue = pgTable(
+  "memory_ingest_queue",
+  {
+    id: serial("id").primaryKey(),
+    vendorId: integer("vendor_id")
+      .references(() => vendor.id, { onDelete: "cascade" })
+      .notNull(),
+    vendorUuid: text("vendor_uuid").notNull(),
+    /** The assistant thread — handed to mem0 as `runId`. */
+    threadId: text("thread_id").notNull(),
+    /** 'turn' — extract facts from a conversation · 'fact' — index as given. */
+    kind: text("kind").notNull(),
+    payload: jsonb("payload").notNull(),
+    attempts: integer("attempts").default(0).notNull(),
+    lockedAt: timestamp("locked_at"),
+    processedAt: timestamp("processed_at"),
+    error: text("error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    // The drain's claim query: oldest unprocessed first.
+    index("memory_ingest_pending_idx").on(table.processedAt, table.createdAt),
+  ],
+);
+
+// =============================================================================
 // better-auth tables (generated shape, better-auth 1.6.x drizzle adapter)
 // =============================================================================
 

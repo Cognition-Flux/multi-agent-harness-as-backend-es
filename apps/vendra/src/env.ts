@@ -49,6 +49,23 @@ export const env = createEnv({
       .default("high"),
     HARNESS_MAX_CONCURRENCY: z.coerce.number().int().min(1).max(4).default(3),
 
+    // ── Assistant memory index (optional at boot — §22) ─────────────────
+    // All three of these plus ANTHROPIC_API_KEY must be present for semantic
+    // recall; with any of them missing the assistant falls back to recency
+    // recall (the pre-mem0 behaviour) and /api/health says `unconfigured`.
+    // Nothing else in the app depends on them.
+    VENDOR_QDRANT_URL: z.string().url().optional(),
+    VENDOR_OLLAMA_URL: z.string().url().optional(),
+    /** Changing this requires a re-index — the collection's dims are fixed. */
+    VENDOR_MEMORY_EMBED_MODEL: z.string().optional(),
+    VENDOR_MEMORY_LLM_MODEL: z.string().optional(),
+    /** Test-only override of the 20 s memory-drain interval (§22). */
+    VENDOR_MEMORY_DRAIN_INTERVAL_MS: z.coerce
+      .number()
+      .int()
+      .positive()
+      .optional(),
+
     // ── Product knobs ────────────────────────────────────────────────────
     VENDOR_AGENT_VERBOSITY: z.enum(["low", "high"]).default("high"),
     /** Test-only override of the hourly sweep interval (§6.8, §11.2). */

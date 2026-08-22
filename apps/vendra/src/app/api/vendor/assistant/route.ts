@@ -7,7 +7,9 @@
  * a UI message stream (never createAgentUIStreamResponse — it does not
  * thread the harness session). Host tools give the agent live, page-equal
  * compliance state; the memory sandwich recalls remembered facts before the
- * turn and the agent writes new ones through the rememberFacts tool.
+ * turn and the agent writes new ones through the rememberFacts tool. Since §22
+ * the recall is semantic (mem0 + Qdrant, scored against this turn's text) and
+ * the turn itself is queued for background fact extraction.
  *
  * Identity is cookie-implied: the better-auth session names the vendor —
  * the body never does. Disconnect semantics — the OPPOSITE of the document
@@ -30,7 +32,7 @@ import {
   ASSISTANT_HISTORY_LIMIT,
   assistantChatRequestSchema,
 } from "@/features/vendor-compliance/lib/vendor-harness-contract";
-import { recallMemory } from "@/server/assistant/memory";
+import { observeVendorTurn, recallMemory } from "@/server/assistant/memory";
 import {
   buildAssistantInstructions,
   buildAssistantTurnPrompt,
@@ -196,9 +198,16 @@ export async function POST(req: Request) {
   const userText = message.parts.map((part) => part.text).join("\n\n");
   // Memory recall — injected only when the session starts fresh (a resumed
   // session already carries the block in its own history).
+  //
+  // The turn text is the retrieval query (SPEC §22): recall is semantic now, so
+  // what the vendor just asked decides which facts come back. Passing "" would
+  // silently fall back to the old recency list.
   const memoryFacts = turn.isFreshSession
-    ? await recallMemory(vendorUuid)
+    ? await recallMemory(vendorUuid, userText)
     : [];
+  // Queue the turn for background fact extraction. Fire-and-forget by design:
+  // the vendor waits for the answer, never for the memory (SPEC §22).
+  void observeVendorTurn(vendorUuid, vendor.id, vendorUuid, userText);
 
   let fatal = false;
   const stream = createUIMessageStream<VendorAssistantUIMessage>({

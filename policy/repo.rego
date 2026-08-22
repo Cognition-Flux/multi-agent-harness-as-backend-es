@@ -18,8 +18,11 @@ expected_egress := ["api.anthropic.com", "*.npmjs.org"]
 # Packages that would each add an external host this repo does not own.
 forbidden_deps := {
 	"@mem0/vercel-ai-provider": "Mem0 Platform (cloud) client",
-	"mem0ai": "Mem0 managed cloud by default",
-	"@qdrant/js-client-rest": "points at a Qdrant cluster",
+	# `mem0ai` and `@qdrant/js-client-rest` were on this list until §22 adopted
+	# a SELF-HOSTED memory index. They are now CONSTRAINED rather than banned —
+	# see the memory-layer rules below, which assert the only wiring that keeps
+	# rule 1 true (local providers, no Platform client, telemetry off, one
+	# boundary module). The Platform provider above stays banned outright.
 	"@vercel/ai-gateway": "Vercel AI Gateway",
 	"@ai-sdk/gateway": "Vercel AI Gateway",
 }
@@ -51,6 +54,108 @@ violation contains v if {
 	v := {
 		"rule": "R1_forbidden_dependency",
 		"detail": sprintf("%v declares %v (%v)", [manifest, dep, why]),
+	}
+}
+
+# --- rule 1 (cont.): the memory index stays self-hosted (§22) ----------------
+
+# The SDK is reachable from exactly one module. mem0 has a hosted client, a
+# Platform provider and 25 vector stores pointing at other people's servers;
+# containing all of that to one file is what makes the rest of this section
+# checkable at all.
+violation contains v if {
+	some file in data.repo.memory.mem0_import_files
+	file != "apps/vendra/src/server/memory/mem0-client.ts"
+	v := {
+		"rule": "R1_mem0_outside_boundary",
+		"detail": sprintf("%v imports mem0ai — only server/memory/mem0-client.ts may", [file]),
+	}
+}
+
+# `mem0ai` (root) is the HOSTED MemoryClient; `mem0ai/oss` is the self-hosted
+# Memory. Importing the root is how a cloud dependency arrives by accident.
+violation contains v if {
+	some file in data.repo.memory.mem0_root_import_files
+	v := {
+		"rule": "R1_mem0_hosted_entrypoint",
+		"detail": sprintf("%v imports \"mem0ai\" (the hosted client) — use \"mem0ai/oss\"", [file]),
+	}
+}
+
+violation contains v if {
+	some file in data.repo.memory.platform_client_files
+	v := {
+		"rule": "R1_mem0_platform_surface",
+		"detail": sprintf("%v references the Mem0 Platform (MemoryClient / MEM0_API_KEY / api.mem0.ai)", [file]),
+	}
+}
+
+# mem0 3.1.6 POSTs to PostHog unless MEM0_TELEMETRY is exactly "false", read at
+# module load. Two independent guarantees, because one is easy to lose in a
+# refactor: the boundary sets it before its dynamic import, and compose sets it
+# for the container.
+violation contains v if {
+	data.repo.memory.boundary_exists
+	not data.repo.memory.boundary_sets_telemetry_false
+	v := {
+		"rule": "R1_mem0_telemetry_unguarded",
+		"detail": "server/memory/mem0-client.ts no longer forces MEM0_TELEMETRY=false — mem0 defaults to sending PostHog events",
+	}
+}
+
+# A static import would be hoisted above the assignment above, so the env var
+# would be read before we set it. The dynamic import IS the mechanism.
+violation contains v if {
+	data.repo.memory.boundary_exists
+	not data.repo.memory.boundary_uses_dynamic_import
+	v := {
+		"rule": "R1_mem0_static_import",
+		"detail": "the boundary imports mem0ai/oss statically — hoisting defeats the MEM0_TELEMETRY guard",
+	}
+}
+
+violation contains v if {
+	data.repo.memory.boundary_exists
+	not data.repo.memory.compose_sets_telemetry_false
+	v := {
+		"rule": "R1_mem0_telemetry_unset_in_compose",
+		"detail": "docker-compose.yml no longer sets MEM0_TELEMETRY: \"false\" for the app",
+	}
+}
+
+# Providers must be the local ones. `openai`/`aws_bedrock`/`gemini` embedders and
+# any hosted vector store would each be a new external host.
+local_embedders := {"ollama", "lmstudio", "fastembed", "huggingface"}
+
+local_vector_stores := {"qdrant", "memory", "pgvector", "redis", "milvus"}
+
+violation contains v if {
+	data.repo.memory.boundary_exists
+	not data.repo.memory.embedder_provider in local_embedders
+	v := {
+		"rule": "R1_mem0_remote_embedder",
+		"detail": sprintf("embedder provider %v is not self-hostable", [data.repo.memory.embedder_provider]),
+	}
+}
+
+violation contains v if {
+	data.repo.memory.boundary_exists
+	not data.repo.memory.vector_provider in local_vector_stores
+	v := {
+		"rule": "R1_mem0_remote_vector_store",
+		"detail": sprintf("vector store %v is not self-hostable", [data.repo.memory.vector_provider]),
+	}
+}
+
+# The endpoints compose hands the app must be container-internal. A cloud
+# Qdrant URL here is the exact failure the qdrant skill warns about.
+violation contains v if {
+	some url in array.concat(data.repo.memory.qdrant_urls, data.repo.memory.ollama_urls)
+	not startswith(url, "http://qdrant:")
+	not startswith(url, "http://ollama:")
+	v := {
+		"rule": "R1_memory_endpoint_not_local",
+		"detail": sprintf("memory endpoint %v is not a compose-internal host", [url]),
 	}
 }
 
