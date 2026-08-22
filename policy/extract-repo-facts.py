@@ -25,11 +25,22 @@ def read(rel: str) -> str:
     return (ROOT / rel).read_text(encoding="utf-8")
 
 
+# Generated trees that mirror real sources. `next build --output standalone`
+# copies `apps/vendra/src/**` into `.next/standalone/`, so without this every
+# source-shape invariant double-reports itself against its own build artifact
+# (found when the §22 boundary rule fired on `.next/standalone/.../mem0-client.ts`).
+GENERATED_DIRS = (".next", "dist", "build", "node_modules", ".turbo")
+
+
 def git_tracked_or_present(pattern: str, *paths: str) -> list[str]:
-    """Files matching an extended regex, excluding node_modules."""
-    cmd = ["grep", "-rlnE", pattern, "--include=*.ts", *paths]
+    """Files matching an extended regex, excluding generated trees."""
+    excludes = [f"--exclude-dir={d}" for d in GENERATED_DIRS]
+    cmd = ["grep", "-rlnE", pattern, "--include=*.ts", *excludes, *paths]
     out = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True).stdout
-    return sorted(p for p in out.splitlines() if p and "node_modules" not in p)
+    return sorted(
+        p for p in out.splitlines()
+        if p and not any(f"/{d}/" in f"/{p}" for d in GENERATED_DIRS)
+    )
 
 
 def compose() -> dict:
