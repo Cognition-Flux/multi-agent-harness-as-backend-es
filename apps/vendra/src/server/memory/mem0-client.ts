@@ -67,9 +67,20 @@ const store = globalStore.__vendraMem0 ?? (globalStore.__vendraMem0 = { client: 
  * The lazily-built singleton, or null when the layer is unconfigured or the
  * SDK fails to load. Never throws — memory is an enhancement, and the chat has
  * to work without it.
+ *
+ * **Failures are not cached.** Caching a null would turn any transient
+ * condition at first use — env not yet loaded, Qdrant still starting, a
+ * network blip — into a permanent outage that only a restart clears. Observed
+ * exactly that: the drain's first tick ran before the env file was read, and
+ * the layer stayed dead afterwards while /api/health cheerfully reported `ok`
+ * (health probes the config fresh, so the two disagreed). Only a built client
+ * is memoised; a null clears the slot so the next caller retries.
  */
 export function getMemoryClient(): Promise<Mem0Memory | null> {
-  store.client ??= buildClient();
+  store.client ??= buildClient().then((client) => {
+    if (!client) store.client = null;
+    return client;
+  });
   return store.client;
 }
 
