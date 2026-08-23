@@ -107,6 +107,28 @@ const config: Config = {
           "0%": { backgroundPosition: "0% 50%" },
           "100%": { backgroundPosition: "200% 50%" },
         },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-8px)" },
+        },
+        // Seamless loop: the track holds two copies of its content, so a
+        // -50% translate lands exactly on the second copy's start.
+        marquee: {
+          "0%": { transform: "translateX(0)" },
+          "100%": { transform: "translateX(-50%)" },
+        },
+        // Pulse dot traveling along a horizontal rail (pipeline/flow strips).
+        "travel-x": {
+          "0%": { left: "0%", opacity: "0" },
+          "12%": { opacity: "1" },
+          "88%": { opacity: "1" },
+          "100%": { left: "100%", opacity: "0" },
+        },
+        // HITL countdown bar draining left-to-right (landing live-case demo).
+        drain: {
+          from: { width: "100%" },
+          to: { width: "0%" },
+        },
       },
       animation: {
         shimmer: "shimmer 2s linear infinite",
@@ -119,6 +141,14 @@ const config: Config = {
         // Slow and linear: with a periodic gradient tile the loop is
         // seamless, and the drift reads as a soft glow rather than a sweep.
         "gradient-pan": "gradient-pan 10s linear infinite",
+        // Gentle vertical drift for the landing hero's floating chips.
+        float: "float 6s ease-in-out infinite",
+        marquee: "marquee 50s linear infinite",
+        // `both` so the reduced-motion kill-switch (which collapses the
+        // duration) parks on the keyframes' own opacity:0 end state instead
+        // of reverting to a static visible dot.
+        "travel-x": "travel-x 3.4s ease-in-out infinite both",
+        drain: "drain 4.2s linear forwards",
       },
     },
   },

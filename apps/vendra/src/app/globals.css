@@ -52,6 +52,10 @@
     /* Light-only app: keep native form controls/scrollbars on the light UA
        palette even when the OS prefers dark. */
     color-scheme: light;
+    /* Smooth anchor scrolling (landing-page section nav). Next 16 honors it
+       during navigations only with data-scroll-behavior="smooth" on <html>;
+       the prefers-reduced-motion block below resets it to auto. */
+    scroll-behavior: smooth;
   }
 
   body {
@@ -116,6 +120,21 @@
     background-clip: text;
     color: transparent;
   }
+}
+
+/* Landing "Pausar animación" toggle (WCAG 2.2.2): freezes every decorative
+   CSS loop under the flagged subtree without unloading it. */
+[data-motion-paused] *,
+[data-motion-paused] *::before,
+[data-motion-paused] *::after {
+  animation-play-state: paused !important;
+}
+
+/* Landing anchor targets receive programmatic focus (skip link / section
+   nav); the move is conveyed by scroll position — a ring around a whole
+   section is noise. */
+main [id][tabindex="-1"]:focus {
+  outline: none;
 }
 
 /* Collapse decorative motion for reduced-motion users. Spinners are exempt —

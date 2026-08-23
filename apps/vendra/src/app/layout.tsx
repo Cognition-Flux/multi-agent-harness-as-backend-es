@@ -16,7 +16,17 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="es">
+    <html lang="es" data-scroll-behavior="smooth">
+      <head>
+        {/* Scroll-reveal wrappers are server-rendered hidden and only revealed
+            by motion; without JS the landing below the hero would stay blank. */}
+        <noscript
+          dangerouslySetInnerHTML={{
+            __html:
+              "<style>[data-reveal],[data-reveal] *{opacity:1!important;transform:none!important}</style>",
+          }}
+        />
+      </head>
       <body>
         {/* Shared ambient ground: soft aurora washes behind every page so
             routes stop painting their own competing flat grounds. */}
