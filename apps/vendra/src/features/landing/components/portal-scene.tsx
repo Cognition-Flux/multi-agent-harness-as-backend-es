@@ -13,7 +13,9 @@ import { AnimatePresence, m } from "motion/react";
 import { Badge } from "@/components/ui/primitives";
 
 import { useSceneLoop } from "../motion";
-import { MiniProgress, MockFrame, MockSpinner } from "./mock-frame";
+import { cn } from "@/lib/utils";
+
+import { MiniProgress, MockFrame, MockSpinner, STACK } from "./mock-frame";
 
 /** Verbatim STAGE_MESSAGES entries (extracting, validating, mapping). */
 const STAGES = [
@@ -22,7 +24,7 @@ const STAGES = [
   { n: 8, msg: "Vinculando este documento con sus requisitos de cumplimiento..." },
 ] as const;
 
-const DURATIONS = [2200, 2200, 2200, 4800] as const;
+const DURATIONS = [1300, 1300, 1300, 2900] as const;
 const VERIFIED_STEP = DURATIONS.length - 1;
 
 export function PortalScene() {
@@ -80,14 +82,16 @@ export function PortalScene() {
                   </Badge>
                 )}
               </div>
-              <div className="mt-1.5 min-h-[1.75rem]">
-                <AnimatePresence mode="wait" initial={false}>
+              {/* Reserved to the tallest stage line (measured 30px — the longest
+                  message wraps to two lines in the wide column). */}
+              <div className={cn(STACK, "mt-1.5 min-h-[2rem]")}>
+                <AnimatePresence initial={false}>
                   <m.p
                     key={verified ? "ok" : stage.n}
                     initial={{ opacity: 0, y: 4 }}
                     animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -4, transition: { duration: 0.12 } }}
-                    transition={{ duration: 0.3 }}
+                    exit={{ opacity: 0, y: -4, transition: { duration: 0.09 } }}
+                    transition={{ duration: 0.2 }}
                     className={`text-[10px] italic ${verified ? "text-success" : "text-muted-foreground"}`}
                   >
                     {verified

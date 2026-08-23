@@ -13,6 +13,24 @@ import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
+/**
+ * Container for a cycling region: every direct child lands in the same grid
+ * cell, so an outgoing beat and its replacement overlap instead of stacking.
+ *
+ * Pair it with `AnimatePresence` in the **default sync mode**, never
+ * `mode="wait"`. Wait mode holds the incoming beat until the outgoing one
+ * reports its exit complete, and at this page's cadence that hand-off can
+ * outlast a whole beat — the skipped beat then never renders at all (measured:
+ * the hero's "Leyendo y extrayendo…" beat and three live-case beats vanished
+ * entirely once the durations came down). Overlapping the fades removes the
+ * dependency on that callback.
+ *
+ * `items-start` keeps each beat at its natural height instead of stretching it
+ * to the reserved `min-h-*`; children are stacked by the container, so a new
+ * beat needs no class of its own.
+ */
+export const STACK = "grid items-start [&>*]:col-start-1 [&>*]:row-start-1";
+
 export function MockFrame({
   title,
   badge,
@@ -46,7 +64,7 @@ export function MiniProgress({ pct, className }: { pct: number; className?: stri
     <div className="h-1 overflow-hidden rounded-full bg-muted">
       <div
         className={cn(
-          "h-full rounded-full bg-gradient-to-r from-agent to-[hsl(30_90%_45%)] transition-[width] duration-700 ease-out",
+          "h-full rounded-full bg-gradient-to-r from-agent to-[hsl(30_90%_45%)] transition-[width] duration-500 ease-out",
           className,
         )}
         style={{ width: `${pct}%` }}
@@ -66,6 +84,9 @@ export function MockShimmerText({ children, className }: { children: ReactNode; 
     <span
       className={cn(
         "text-muted-foreground",
+        // The shared `animate-shimmer` is 2s (product surfaces depend on it);
+        // the demos run at the landing's brisker cadence via a scoped override.
+        "supports-[background-clip:text]:[animation-duration:1.15s]",
         "supports-[background-clip:text]:animate-shimmer supports-[background-clip:text]:bg-gradient-to-r supports-[background-clip:text]:from-muted-foreground supports-[background-clip:text]:via-foreground supports-[background-clip:text]:to-muted-foreground supports-[background-clip:text]:bg-[length:200%_100%] supports-[background-clip:text]:bg-clip-text supports-[background-clip:text]:text-transparent",
         className,
       )}
@@ -79,7 +100,7 @@ export function MockSpinner({ className }: { className?: string }) {
   return (
     <span
       className={cn(
-        "inline-block h-3 w-3 shrink-0 rounded-full border border-agent border-t-transparent motion-safe:animate-spin",
+        "inline-block h-3 w-3 shrink-0 rounded-full border border-agent border-t-transparent motion-safe:animate-spin motion-safe:[animation-duration:0.7s]",
         className,
       )}
     />

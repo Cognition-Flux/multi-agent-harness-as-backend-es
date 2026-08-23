@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * "Casos en vivo": three self-running demos of the platform's hard cases —
- * umbrella-policy coverage stacking, automatic expiry + renewal restore, and
- * a human-in-the-loop confirmation with its draining countdown. Copy is
+ * "Casos en vivo": four self-running demos of the platform's hard cases —
+ * umbrella-policy coverage stacking, a scoped failure rescued by an officer
+ * waiver, automatic expiry + renewal restore, and a human-in-the-loop
+ * confirmation with its draining countdown. Copy is
  * verbatim from the real surfaces (coverage stage copy, transition audit
  * format, HITL footer). Each card loops on its own cadence; the last scene
  * of each is the settled state for reduced-motion visitors.
@@ -17,7 +18,7 @@ import { Badge } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
 import { Stagger, StaggerItem, useSceneLoop } from "../motion";
-import { MockShimmerText, MockSpinner } from "./mock-frame";
+import { MockShimmerText, MockSpinner, STACK } from "./mock-frame";
 import { SectionHeading } from "./section-heading";
 
 function CaseCard({
@@ -65,7 +66,7 @@ function CaseCard({
 
 // ── Caso 1 · Apilamiento de cobertura ───────────────────────────────────────
 
-const STACK_DURATIONS = [2400, 2600, 5200] as const;
+const STACK_DURATIONS = [1400, 1500, 3100] as const;
 
 function CoverageStackCase() {
   const step = useSceneLoop(STACK_DURATIONS);
@@ -88,14 +89,14 @@ function CoverageStackCase() {
       }
     >
       <div className="flex h-full flex-col justify-between gap-3">
-        <div className="min-h-8">
-          <AnimatePresence mode="wait" initial={false}>
+        <div className={cn(STACK, "min-h-8")}>
+          <AnimatePresence initial={false}>
             {done ? (
               <m.p
                 key="v"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="flex items-center gap-1.5 text-xs font-medium text-success"
               >
                 <CheckCircle2Icon className="h-3.5 w-3.5 shrink-0" />
@@ -106,7 +107,7 @@ function CoverageStackCase() {
                 key="p"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="text-xs italic text-muted-foreground"
               >
                 Verificando límites y acumulación de pólizas umbrella…
@@ -128,13 +129,13 @@ function CoverageStackCase() {
               className="h-full bg-agent"
               initial={false}
               animate={{ width: "50%" }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
             />
             <m.div
               className="h-full bg-[hsl(30_90%_45%)]"
               initial={false}
               animate={{ width: stacked ? "50%" : "0%" }}
-              transition={{ duration: 0.9, ease: "easeOut", delay: 0.2 }}
+              transition={{ duration: 0.55, ease: "easeOut", delay: 0.12 }}
             />
           </div>
           <div className="mt-1.5 space-y-1 text-[10px] text-muted-foreground">
@@ -144,7 +145,7 @@ function CoverageStackCase() {
               </span>
               <span className="tabular-nums">$1.000.000</span>
             </p>
-            <p className={cn("flex items-center justify-between transition-opacity duration-500", stacked ? "opacity-100" : "opacity-35")}>
+            <p className={cn("flex items-center justify-between transition-opacity duration-300", stacked ? "opacity-100" : "opacity-35")}>
               <span className="flex items-center gap-1.5">
                 <span className="h-2 w-2 rounded-full bg-[hsl(30_90%_45%)]" /> Umbrella (apilada)
               </span>
@@ -164,7 +165,7 @@ function CoverageStackCase() {
 
 // ── Caso 2 · Vencimiento y renovación ───────────────────────────────────────
 
-const EXPIRY_DURATIONS = [2600, 2800, 2400, 5200] as const;
+const EXPIRY_DURATIONS = [1500, 1600, 1400, 3100] as const;
 // 0: aprobado por vencer · 1: barrido → Vencido · 2: renovación procesando · 3: restaurado
 
 function ExpiryRenewalCase() {
@@ -177,12 +178,13 @@ function ExpiryRenewalCase() {
       type="Licencia comercial"
       footer="Cumplimiento continuo: aviso de renovación a 30 días, la expiración pasa APROBADO→VENCIDO sola y una renovación válida restaura la aprobación."
       pill={
-        <AnimatePresence mode="wait" initial={false}>
+        <span className={STACK}>
+        <AnimatePresence initial={false}>
           <m.span
             key={step}
             initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.12 } }}
+            exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.09 } }}
           >
             {step === 0 ? (
               <Badge variant="success" className="text-[10px]">Verificado</Badge>
@@ -201,18 +203,19 @@ function ExpiryRenewalCase() {
             )}
           </m.span>
         </AnimatePresence>
+        </span>
       }
     >
       <div className="flex h-full flex-col justify-between gap-3">
         {/* Reserved to the tallest step per breakpoint — see HitlCase note. */}
-        <div className="min-h-[4.25rem] md:min-h-[5.25rem] lg:min-h-[4.25rem] xl:min-h-[3.5rem]">
-          <AnimatePresence mode="wait" initial={false}>
+        <div className={cn(STACK, "min-h-[4.25rem] md:min-h-[5.25rem] lg:min-h-[4.25rem] xl:min-h-[3.5rem]")}>
+          <AnimatePresence initial={false}>
             {step === 0 ? (
               <m.div
                 key="banner"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="rounded-md border border-warning/30 bg-warning/10 px-2.5 py-2 text-[10px] leading-relaxed text-warning"
               >
                 Su credencial más próxima a vencer expira el 30 ago 2026 — suba una renovación antes
@@ -223,7 +226,7 @@ function ExpiryRenewalCase() {
                 key="swept"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="rounded-md border border-destructive/25 bg-destructive/5 px-2.5 py-2 text-[10px] leading-relaxed"
               >
                 <span className="font-medium text-destructive">El tiempo es un disparador:</span>{" "}
@@ -234,7 +237,7 @@ function ExpiryRenewalCase() {
                 key="renewing"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="flex items-center gap-2 rounded-md border border-agent/25 bg-agent/5 px-2.5 py-2 text-[10px]"
               >
                 <MockSpinner />
@@ -245,7 +248,7 @@ function ExpiryRenewalCase() {
                 key="restored"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="rounded-md border border-success/25 bg-success/10 px-2.5 py-2 text-[10px] leading-relaxed text-success"
               >
                 <CheckCircle2Icon className="mr-1 inline h-3 w-3" />
@@ -273,7 +276,9 @@ function ExpiryRenewalCase() {
 
 // ── Caso 3 · Humano en el circuito ──────────────────────────────────────────
 
-const HITL_DURATIONS = [2200, 4200, 1800, 5200] as const;
+const HITL_DURATIONS = [1300, 2600, 1100, 3100] as const;
+// The 2600ms question beat is mirrored by `animate-drain` in tailwind.config.ts
+// (2.6s) — the countdown bar must empty exactly as the beat ends.
 // 0: procesando · 1: pregunta + cuenta regresiva · 2: respuesta registrada · 3: verificado
 
 function HitlCase() {
@@ -299,14 +304,14 @@ function HitlCase() {
         {/* Reserved to the tallest step per breakpoint (measured 133px at 320w,
             147px in the md 3-col band, 133px at 1024w, 117px at ≥1280w). The
             card is h-full inside the grid, so any overflow resizes its row. */}
-        <div className="min-h-[9.5rem] md:min-h-[9.25rem] lg:min-h-[8.5rem] xl:min-h-[7.5rem]">
-          <AnimatePresence mode="wait" initial={false}>
+        <div className={cn(STACK, "min-h-[9.5rem] md:min-h-[9.25rem] lg:min-h-[8.5rem] xl:min-h-[7.5rem]")}>
+          <AnimatePresence initial={false}>
             {step === 0 ? (
               <m.div
                 key="proc"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="flex items-center gap-2 text-[10px]"
               >
                 <MockSpinner />
@@ -319,7 +324,7 @@ function HitlCase() {
                 key="ask"
                 initial={{ opacity: 0, scale: 0.97 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="rounded-md border border-warning/40 bg-warning/10 p-2.5"
               >
                 {/* Verbatim BLANKET_ENDORSEMENT_APPLIES question — one of the
@@ -350,7 +355,7 @@ function HitlCase() {
                 key="answered"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="rounded-md border border-success/25 bg-success/10 px-2.5 py-2 text-[10px] text-success"
               >
                 <CheckCircle2Icon className="mr-1 inline h-3 w-3" />
@@ -361,7 +366,7 @@ function HitlCase() {
                 key="done"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="space-y-1 text-[10px]"
               >
                 {/* The doc-card renders each rule's runtime message, not the
@@ -387,7 +392,7 @@ function HitlCase() {
 
 // ── Caso 4 · Falla acotada + exención del oficial ───────────────────────────
 
-const WAIVER_DURATIONS = [2200, 3400, 3000, 5200] as const;
+const WAIVER_DURATIONS = [1300, 2000, 1700, 3100] as const;
 // 0: procesando · 1: falla de nombre pero cuenta para cobertura · 2: diálogo de
 // exención del oficial · 3: eximido (asentado)
 
@@ -400,12 +405,13 @@ function ScopedWaiverCase() {
       type="Certificado de seguro (ACORD 25)"
       footer="Falla acotada: un certificado a nombre de la filial no acredita identidad, pero sus límites sí cuentan — y el oficial puede eximir solo lo que la falla bloquea."
       pill={
-        <AnimatePresence mode="wait" initial={false}>
+        <span className={STACK}>
+        <AnimatePresence initial={false}>
           <m.span
             key={step}
             initial={{ opacity: 0, scale: 0.92 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.12 } }}
+            exit={{ opacity: 0, scale: 0.92, transition: { duration: 0.09 } }}
           >
             {step === 0 ? (
               <Badge variant="agent" dot className="[&>span]:animate-pulse text-[10px]">
@@ -418,17 +424,18 @@ function ScopedWaiverCase() {
             )}
           </m.span>
         </AnimatePresence>
+        </span>
       }
     >
       <div className="flex h-full flex-col justify-between gap-3">
-        <div className="min-h-[7.5rem]">
-          <AnimatePresence mode="wait" initial={false}>
+        <div className={cn(STACK, "min-h-[7.5rem]")}>
+          <AnimatePresence initial={false}>
             {step === 0 ? (
               <m.div
                 key="proc"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="flex items-center gap-2 text-[10px]"
               >
                 <MockSpinner />
@@ -441,7 +448,7 @@ function ScopedWaiverCase() {
                 key="scoped"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="space-y-1.5"
               >
                 <p className="flex items-start gap-1.5 text-[10px] text-destructive">
@@ -459,7 +466,7 @@ function ScopedWaiverCase() {
                 key="waive"
                 initial={{ opacity: 0, scale: 0.97 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="rounded-md border border-border/60 bg-card p-2.5 shadow-soft"
               >
                 <p className="text-[11px] font-semibold">Eximir de la validación</p>
@@ -485,7 +492,7 @@ function ScopedWaiverCase() {
                 key="waived"
                 initial={{ opacity: 0, y: 4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.12 } }}
+                exit={{ opacity: 0, transition: { duration: 0.09 } }}
                 className="space-y-1.5"
               >
                 <p className="rounded-md border border-success/25 bg-success/10 px-2 py-1.5 text-[10px] text-success">
@@ -509,7 +516,7 @@ function ScopedWaiverCase() {
               step >= 1 ? "opacity-100" : "opacity-35",
             )}
           >
-            23 ago 2026 documento verificado con fallas
+            23 ago 2026 documento verificado
           </p>
           <p
             className={cn(
@@ -517,7 +524,7 @@ function ScopedWaiverCase() {
               step >= 3 ? "opacity-100" : "opacity-35",
             )}
           >
-            23 ago 2026 exención aplicada
+            23 ago 2026 documento eximido
           </p>
         </div>
       </div>

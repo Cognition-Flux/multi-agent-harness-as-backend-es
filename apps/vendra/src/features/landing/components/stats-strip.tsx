@@ -27,7 +27,7 @@ function CountUp({ value }: { value: number }) {
       (entries) => {
         if (!entries.some((e) => e.isIntersecting) || started.current) return;
         started.current = true;
-        const duration = 1100;
+        const duration = 700;
         const start = performance.now();
         const tick = (now: number) => {
           const t = Math.min(1, (now - start) / duration);

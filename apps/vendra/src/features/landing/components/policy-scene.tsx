@@ -19,9 +19,12 @@ import { AnimatePresence, m } from "motion/react";
 import { Badge } from "@/components/ui/primitives";
 
 import { useSceneLoop } from "../motion";
-import { MockFrame, MockSpinner } from "./mock-frame";
+import { cn } from "@/lib/utils";
 
-const DURATIONS = [2000, 1600, 2800, 2800, 5200] as const;
+import { MockFrame, MockSpinner, STACK } from "./mock-frame";
+
+const DURATIONS = [1200, 950, 1600, 1600, 3100] as const;
+
 // 0: draft dirty · 1: validando · 2: gate result · 3: activate dialog · 4: v4 activa
 
 export function PolicyScene() {
@@ -32,18 +35,20 @@ export function PolicyScene() {
     <MockFrame
       title="Plataforma · Acme Constructora SpA"
       badge={
-        <AnimatePresence mode="wait" initial={false}>
+        <span className={STACK}>
+        <AnimatePresence initial={false}>
           <m.span
             key={activated ? "v4" : "v3"}
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.12 } }}
+            exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.09 } }}
           >
             <Badge variant={activated ? "success" : "secondary"} className="text-[10px]">
               {activated ? "v4 activa" : "v3 activa"}
             </Badge>
           </m.span>
         </AnimatePresence>
+        </span>
       }
     >
       <div className="space-y-3">
@@ -87,14 +92,14 @@ export function PolicyScene() {
         {/* Action theater: sticky bar → gate → dialog → success banner.
             Reserved to the tallest step per breakpoint (measured: 165px at
             320w, 138px at ≥640w) so cycling never shifts the layout. */}
-        <div className="relative min-h-[11rem] sm:min-h-[9.5rem]">
-          <AnimatePresence mode="wait" initial={false}>
+        <div className={cn(STACK, "min-h-[11rem] sm:min-h-[9.5rem]")}>
+          <AnimatePresence initial={false}>
             {step <= 1 ? (
               <m.div
                 key="bar"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6, transition: { duration: 0.15 } }}
+                exit={{ opacity: 0, y: -6, transition: { duration: 0.1 } }}
                 className="space-y-2"
               >
                 <div className="flex items-center justify-between rounded-md border border-border/60 bg-card px-2.5 py-2">
@@ -126,7 +131,7 @@ export function PolicyScene() {
                 key="gate"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6, transition: { duration: 0.15 } }}
+                exit={{ opacity: 0, y: -6, transition: { duration: 0.1 } }}
                 className="rounded-md border border-success/25 bg-success/5 p-3"
               >
                 {/* Admissible-with-warnings: the real gate card keeps the
@@ -137,7 +142,7 @@ export function PolicyScene() {
                 <m.p
                   initial={{ opacity: 0, x: -6 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.25 }}
+                  transition={{ delay: 0.14, duration: 0.22 }}
                   className="mt-1.5 flex items-start gap-1.5 text-[10px] text-muted-foreground"
                 >
                   <AlertTriangleIcon className="mt-0.5 h-3 w-3 shrink-0 text-warning" />
@@ -147,11 +152,11 @@ export function PolicyScene() {
                 <m.p
                   initial={{ opacity: 0, x: -6 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.5 }}
+                  transition={{ delay: 0.28, duration: 0.22 }}
                   className="mt-1 flex items-start gap-1.5 text-[10px] text-muted-foreground"
                 >
                   <AlertTriangleIcon className="mt-0.5 h-3 w-3 shrink-0 text-warning" />
-                  Certificado de seguro (ACORD 25) ejecuta 3 de 5 validaciones disponibles.
+                  Certificado de seguro (ACORD 25) ejecuta 4 de 7 validaciones disponibles.
                 </m.p>
               </m.div>
             ) : null}
@@ -161,7 +166,7 @@ export function PolicyScene() {
                 key="dialog"
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
+                exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.1 } }}
                 className="rounded-md border border-border/60 bg-card p-3 shadow-lift"
               >
                 <p className="text-[11px] font-semibold">Activar la política v4</p>
@@ -191,7 +196,7 @@ export function PolicyScene() {
                 key="done"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6, transition: { duration: 0.15 } }}
+                exit={{ opacity: 0, y: -6, transition: { duration: 0.1 } }}
                 className="space-y-2"
               >
                 <div className="rounded-md border border-success/25 bg-success/10 px-3 py-2">

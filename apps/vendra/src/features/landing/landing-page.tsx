@@ -1,13 +1,18 @@
 "use client";
 
 import { onAnchorClick } from "./anchor";
+import { ASSISTANT_DEEP_DIVE, GOVERNANCE_SETUP, OFFICER_ACTIONS } from "./landing-data";
 import { LandingMotionProvider, LandingMotionState } from "./motion";
 import { Architecture } from "./components/architecture";
+import { AssistantTaskScene } from "./components/assistant-task-scene";
+import { DeepDiveSection } from "./components/deep-dive-section";
 import { FeatureBento } from "./components/feature-bento";
 import { FinalCta, LandingFooter } from "./components/final-cta";
+import { GovernanceSetupScene } from "./components/governance-setup-scene";
 import { Hero } from "./components/hero";
 import { LandingNav } from "./components/landing-nav";
 import { LiveCases } from "./components/live-cases";
+import { OfficerActionsScene } from "./components/officer-actions-scene";
 import { Pipeline } from "./components/pipeline";
 import { Showcase } from "./components/showcase";
 import { StatsStrip } from "./components/stats-strip";
@@ -42,6 +47,28 @@ export function LandingPage({ year }: { year: number }) {
           <Pipeline />
           <LiveCases />
           <Showcase />
+          {/* Three deep dives, one per role, alternating ground and mock side
+              after the showcase tabs (which put their mock on the left). */}
+          <DeepDiveSection
+            id="asistente"
+            copy={ASSISTANT_DEEP_DIVE}
+            mock={<AssistantTaskScene />}
+            mockSide="right"
+            tinted
+          />
+          <DeepDiveSection
+            id="adjudicacion"
+            copy={OFFICER_ACTIONS}
+            mock={<OfficerActionsScene />}
+            mockSide="left"
+          />
+          <DeepDiveSection
+            id="gobernanza"
+            copy={GOVERNANCE_SETUP}
+            mock={<GovernanceSetupScene />}
+            mockSide="right"
+            tinted
+          />
           <FeatureBento />
           <Architecture />
           <FinalCta />

@@ -38,7 +38,7 @@ export function Pipeline() {
               initial={{ scaleX: 0 }}
               whileInView={{ scaleX: 1 }}
               viewport={{ once: true, margin: "0px 0px -15% 0px" }}
-              transition={{ duration: 1.1, ease: "easeOut", delay: 0.2 }}
+              transition={{ duration: 0.7, ease: "easeOut", delay: 0.1 }}
             />
             <span className="animate-travel-x absolute top-1/2 h-1.5 w-1.5 -translate-y-1/2 rounded-full bg-agent shadow-glow" />
           </div>

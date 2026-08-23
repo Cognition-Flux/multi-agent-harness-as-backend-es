@@ -15,13 +15,14 @@ import { Badge } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
 import { useSceneLoop } from "../motion";
-import { MockFrame, MockSpinner } from "./mock-frame";
+import { MockFrame, MockSpinner, STACK } from "./mock-frame";
 
 /** Shared roster track template — header and rows must resolve identically. */
 const ROW_GRID =
   "grid grid-cols-[minmax(0,1fr)_6.5rem] items-center gap-2 px-2.5 sm:grid-cols-[minmax(0,1fr)_6.5rem_5rem_7.5rem]";
 
-const DURATIONS = [1800, 2400, 2800, 5000] as const;
+const DURATIONS = [1100, 1400, 1600, 3000] as const;
+
 // step 0: base roster · 1: referred copy · 2: grant dialog · 3: approved + audit
 
 export function OfficerScene() {
@@ -62,7 +63,7 @@ export function OfficerScene() {
               backgroundColor:
                 step === 1 || step === 2 ? "hsl(35 90% 30% / 0.06)" : "hsl(0 0% 100% / 0)",
             }}
-            transition={{ duration: 0.4 }}
+            transition={{ duration: 0.25 }}
             className={cn(ROW_GRID, "border-b border-border/40 bg-card py-2")}
           >
             <span className="truncate text-[11px] font-medium">Beta Logística Ltda.</span>
@@ -101,18 +102,20 @@ export function OfficerScene() {
         {/* Action theater: referred copy → grant dialog → audit trail.
             Reserved to the tallest step per breakpoint (measured: 187px at
             320w, 158px at ≥640w) so cycling never shifts the layout. */}
-        <div className="relative min-h-[12.5rem] sm:min-h-[10.5rem]">
-          <AnimatePresence mode="wait" initial={false}>
+        <div className={cn(STACK, "min-h-[12.5rem] sm:min-h-[10.5rem]")}>
+          <AnimatePresence initial={false}>
             {step === 0 ? (
               <m.div
                 key="toolkit"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6, transition: { duration: 0.15 } }}
+                exit={{ opacity: 0, y: -6, transition: { duration: 0.1 } }}
                 className="space-y-2"
               >
                 <div className="flex flex-wrap items-center gap-1.5">
-                  {["Eximir…", "Recategorizar…", "Otorgar manualmente…", "Revocar…", "Reintentar procesamiento"].map(
+                  {/* Verbatim DocRow action labels — "Revocar" carries no
+                      ellipsis in the product; the other four do. */}
+                  {["Eximir…", "Recategorizar…", "Otorgar manualmente…", "Revocar", "Reintentar procesamiento"].map(
                     (a) => (
                       <span
                         key={a}
@@ -135,7 +138,7 @@ export function OfficerScene() {
                 key="referred"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6, transition: { duration: 0.15 } }}
+                exit={{ opacity: 0, y: -6, transition: { duration: 0.1 } }}
                 className="rounded-md border border-warning/30 bg-warning/10 px-3 py-2.5"
               >
                 <p className="text-[10px] leading-relaxed text-warning">
@@ -151,7 +154,7 @@ export function OfficerScene() {
                 key="dialog"
                 initial={{ opacity: 0, scale: 0.96 }}
                 animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.15 } }}
+                exit={{ opacity: 0, scale: 0.97, transition: { duration: 0.1 } }}
                 className="rounded-md border border-border/60 bg-card p-3 shadow-lift"
               >
                 <p className="flex items-center gap-1.5 text-[11px] font-semibold">
@@ -182,20 +185,20 @@ export function OfficerScene() {
                 key="audit"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6, transition: { duration: 0.15 } }}
+                exit={{ opacity: 0, y: -6, transition: { duration: 0.1 } }}
                 className="space-y-1.5 rounded-md border border-border/60 bg-card p-3"
               >
                 <p className="text-[11px] font-semibold">Actividad</p>
                 <m.p
                   initial={{ opacity: 0, x: -6 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.25 }}
+                  transition={{ delay: 0.14, duration: 0.22 }}
                   className="flex items-center gap-1.5 text-[10px]"
                 >
                   <CheckIcon className="h-3 w-3 shrink-0 text-success" />
                   <span className="tabular-nums text-muted-foreground">23 ago 2026</span>
                   <span className="font-medium">requisito otorgado manualmente</span>
-                  <Badge variant="outline" className="text-[8px] uppercase">Concesión manual</Badge>
+                  <Badge variant="outline" className="text-[8px]">CONCESIÓN MANUAL</Badge>
                 </m.p>
                 {/* A grant recomputes coverage and closes the category; the
                     final APROBADO is a separate, explicit officer decision on
@@ -203,7 +206,7 @@ export function OfficerScene() {
                 <m.p
                   initial={{ opacity: 0, x: -6 }}
                   animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.55 }}
+                  transition={{ delay: 0.3, duration: 0.22 }}
                   className="text-[10px] text-muted-foreground"
                 >
                   11 de 11 categorías otorgadas — listo para finalizar el estado.

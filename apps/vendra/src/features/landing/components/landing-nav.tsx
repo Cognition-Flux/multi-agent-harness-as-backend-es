@@ -14,7 +14,7 @@ export function LandingNav() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { scrollYProgress } = useScroll();
-  const spring = useSpring(scrollYProgress, { stiffness: 140, damping: 28, mass: 0.4 });
+  const spring = useSpring(scrollYProgress, { stiffness: 260, damping: 34, mass: 0.25 });
   // MotionConfig reducedMotion covers gestures/animations but not useSpring;
   // bind the raw progress for reduced-motion users so the bar tracks the
   // scroll with no residual spring overshoot.
@@ -47,7 +47,7 @@ export function LandingNav() {
       >
         <nav
           aria-label="Principal"
-          className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6"
+          className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-2 px-4 sm:px-6 xl:gap-4"
         >
           <a
             href="#inicio"
@@ -68,7 +68,10 @@ export function LandingNav() {
                 key={link.href}
                 href={link.href}
                 onClick={onAnchorClick}
-                className="rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                // px-2, not the usual px-3: eight section links plus the
+                // CTA overflowed the 1009px bar at lg (measured 1036px of
+                // content). gap-1 keeps them visually separated.
+                className="whitespace-nowrap rounded-md px-2 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
                 {link.label}
               </a>
@@ -76,15 +79,18 @@ export function LandingNav() {
           </div>
 
           <div className="hidden items-center gap-2 lg:flex">
+            {/* Secondary CTA only from xl: eight section links plus both
+                buttons overflow the 1152px bar at lg (measured). The primary
+                CTA, the hero and the mobile menu all still reach /login. */}
             <Link
               href="/login"
-              className="rounded-md px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="hidden whitespace-nowrap rounded-md px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring xl:inline-flex"
             >
               Iniciar sesión
             </Link>
             <Link
               href="/register"
-              className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm shadow-primary/25 transition-all duration-200 hover:bg-primary/90 hover:shadow-md hover:shadow-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
+              className="inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-md bg-primary px-3 xl:px-4 text-sm font-medium text-primary-foreground shadow-sm shadow-primary/25 transition-all duration-200 hover:bg-primary/90 hover:shadow-md hover:shadow-primary/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 active:scale-[0.98]"
             >
               Registre su empresa
             </Link>
@@ -109,7 +115,7 @@ export function LandingNav() {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: "auto", opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.25, ease: "easeOut" }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
               className="glass overflow-hidden border-t border-border/60 lg:hidden"
             >
               {/* Scrolls internally on short landscape-phone viewports where

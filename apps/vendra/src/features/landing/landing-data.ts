@@ -22,9 +22,12 @@ import {
 
 export const NAV_LINKS = [
   { href: "#como-funciona", label: "Cómo funciona" },
-  { href: "#casos", label: "Casos en vivo" },
+  { href: "#casos", label: "Casos" },
   { href: "#paneles", label: "Paneles" },
-  { href: "#funcionalidades", label: "Funcionalidades" },
+  { href: "#asistente", label: "Asistente" },
+  { href: "#adjudicacion", label: "Oficial" },
+  { href: "#gobernanza", label: "Gobernanza" },
+  { href: "#funcionalidades", label: "Funciones" },
   { href: "#arquitectura", label: "Arquitectura" },
 ] as const;
 
@@ -154,6 +157,60 @@ export const SHOWCASE_PANELS: ShowcasePanel[] = [
     ],
   },
 ];
+
+/**
+ * The three deep-dive sections that follow the showcase tabs. The tabs answer
+ * "what is each surface"; these answer "watch one hard job get done end to
+ * end" — the assistant's multi-tool turn, the officer's rescue toolkit, and
+ * the platform console configuring roles and policies. Marketing prose lives
+ * here (not in the scene files) so the scene-copy recall check stays focused
+ * on strings that depict product UI.
+ */
+export interface DeepDive {
+  eyebrow: string;
+  title: string;
+  subtitle: string;
+  bullets: string[];
+}
+
+export const ASSISTANT_DEEP_DIVE: DeepDive = {
+  eyebrow: "Asistente con memoria",
+  title: "Una pregunta difícil, resuelta en un solo turno",
+  subtitle:
+    "El proveedor pregunta en español. El asistente lee el expediente real, abre el documento que falló, deja una nota para la próxima vez y redacta una propuesta de directiva que solo una persona puede aprobar.",
+  bullets: [
+    "Cuatro herramientas encadenadas en el mismo turno: consultar el expediente, revisar un documento, tomar nota y redactar una propuesta.",
+    "El razonamiento del modelo queda a la vista, plegado — se abre cuando usted quiere verlo, y el texto llega transmitido token a token.",
+    "Memoria semántica local: mem0 OSS, Qdrant y Ollama en contenedores propios, con la PII redactada antes de almacenar.",
+    "En el nivel «Delegado — puede proponer directivas» la propuesta aterriza en la consola de gobernanza y espera una decisión humana.",
+  ],
+};
+
+export const OFFICER_ACTIONS: DeepDive = {
+  eyebrow: "Panel del oficial",
+  title: "Cinco acciones de rescate, cada una con su rastro",
+  subtitle:
+    "Cuando el motor determinista se detiene, su oficial de cumplimiento tiene herramientas — y cada una escribe su propia línea en el registro de auditoría antes de tocar nada.",
+  bullets: [
+    "Eximir, recategorizar, otorgar, revocar y reintentar: el kit completo sobre el documento, sin salir del expediente del proveedor.",
+    "Toda acción exige una justificación escrita que queda en el registro de auditoría — no hay atajos silenciosos.",
+    "El servidor vuelve a acotar el alcance de cada exención: una falla nunca puede eximir más de lo que realmente bloquea.",
+    "El estado final es una decisión aparte y explícita: otorgar cierra una categoría, no aprueba al proveedor.",
+  ],
+};
+
+export const GOVERNANCE_SETUP: DeepDive = {
+  eyebrow: "Consola de plataforma",
+  title: "Roles y políticas, configurados a la vista",
+  subtitle:
+    "Cada empresa define quién revisa, qué puede hacer el asistente, qué documentos se aceptan y qué requisitos aprueba el sistema por su cuenta — todo antes de que un proveedor suba su primer archivo.",
+  bullets: [
+    "Cuentas de oficial creadas desde la consola, con alcance exacto a una empresa y a ninguna otra.",
+    "Dos niveles de privilegio para el asistente del proveedor: solo explicar, o proponer cambios que una persona aprueba.",
+    "Por tipo de documento: qué campos se extraen —con los estructurales bloqueados— y qué validaciones cuentan de verdad.",
+    "Poder de árbitro por categoría, y una puerta de admisibilidad OPA que revisa la configuración antes de dejar activarla.",
+  ],
+};
 
 export interface BentoTile {
   icon: LucideIcon;

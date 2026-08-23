@@ -24,6 +24,7 @@ import { Badge } from "@/components/ui/primitives";
 import { cn } from "@/lib/utils";
 
 import { useLandingMotion, useSceneLoop } from "../motion";
+import { STACK } from "./mock-frame";
 
 /**
  * The hero's centerpiece: a faithful miniature of the portal's live doc-card
@@ -55,7 +56,10 @@ const SCENES = [
   },
 ] as const;
 
-const DURATIONS = [2600, 2600, 2600, 2600, 4600] as const;
+// Brisk on purpose: four stage beats in ~5.6s, then the verified state holds
+// long enough to read. The whole page's claim is throughput — a languid demo
+// argues the opposite.
+const DURATIONS = [1400, 1400, 1400, 1400, 3000] as const;
 const VERIFIED_STEP = DURATIONS.length - 1;
 
 /** Fields acord25Schema actually extracts, formatted like formatUsd/formatDate. */
@@ -75,8 +79,10 @@ function HeroDocCard() {
     <div
       aria-hidden
       className={cn(
-        "glass relative w-full select-none rounded-lg p-4 text-left transition-shadow duration-700",
-        verified ? "shadow-lift" : "animate-glow-pulse",
+        "glass relative w-full select-none rounded-lg p-4 text-left transition-shadow duration-500",
+        // Scoped duration: the shared animate-glow-pulse (2.4s) also drives
+        // real "agent working" surfaces in the product — don't retune it there.
+        verified ? "shadow-lift" : "animate-glow-pulse [animation-duration:1.7s]",
       )}
     >
       <div className="flex items-center justify-between gap-3">
@@ -89,13 +95,14 @@ function HeroDocCard() {
             <p className="text-xs text-muted-foreground">Certificado de seguro (ACORD 25)</p>
           </div>
         </div>
-        <AnimatePresence mode="wait" initial={false}>
+        <span className={STACK}>
+        <AnimatePresence initial={false}>
           {verified ? (
             <m.div
               key="ok"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.12 } }}
+              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.09 } }}
             >
               <Badge variant="success">Verificado</Badge>
             </m.div>
@@ -104,7 +111,7 @@ function HeroDocCard() {
               key="run"
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.12 } }}
+              exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.09 } }}
             >
               <Badge variant="agent" dot className="[&>span]:animate-pulse">
                 Procesando
@@ -112,6 +119,7 @@ function HeroDocCard() {
             </m.div>
           )}
         </AnimatePresence>
+        </span>
       </div>
 
       <div className="mt-4">
@@ -130,7 +138,7 @@ function HeroDocCard() {
             // under "Etapa 2 de 8" until hydration animates it down.
             initial={false}
             animate={{ width: `${((verified ? 8 : current.stage) / 8) * 100}%` }}
-            transition={{ duration: 0.7, ease: "easeOut" }}
+            transition={{ duration: 0.45, ease: "easeOut" }}
           />
         </div>
       </div>
@@ -138,15 +146,15 @@ function HeroDocCard() {
       {/* Reserved to the tallest state per breakpoint (measured: 76px below
           640w, 60px at ≥640w — two SCENES messages wrap to two lines) so the
           cycling card never resizes and re-centers the hero column. */}
-      <div className="mt-3 min-h-[4.75rem] sm:min-h-[3.75rem]">
-        <AnimatePresence mode="wait" initial={false}>
+      <div className={cn(STACK, "mt-3 min-h-[4.75rem] sm:min-h-[3.75rem]")}>
+        <AnimatePresence initial={false}>
           {verified ? (
             <m.div
               key="fields"
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
-              transition={{ duration: 0.35 }}
+              exit={{ opacity: 0, y: -8, transition: { duration: 0.1 } }}
+              transition={{ duration: 0.22 }}
               className="grid grid-cols-2 gap-x-4 gap-y-1"
             >
               {EXTRACTED_ROWS.map(([k, v]) => (
@@ -161,8 +169,8 @@ function HeroDocCard() {
               key={current.message}
               initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8, transition: { duration: 0.15 } }}
-              transition={{ duration: 0.35 }}
+              exit={{ opacity: 0, y: -8, transition: { duration: 0.1 } }}
+              transition={{ duration: 0.22 }}
             >
               <p className="text-sm font-medium text-agent">{current.message}</p>
               <p className="mt-1 text-xs italic text-muted-foreground">{current.narration}</p>
@@ -172,14 +180,14 @@ function HeroDocCard() {
       </div>
 
       {/* Slot reserved even while empty — see the height note above. */}
-      <div className="mt-3 min-h-[3rem] sm:min-h-8">
+      <div className={cn(STACK, "mt-3 min-h-[3rem] sm:min-h-8")}>
         <AnimatePresence>
           {verified ? (
             <m.div
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 0.35, delay: 0.15 }}
+              transition={{ duration: 0.24, delay: 0.08 }}
               className="flex items-center gap-1.5 rounded-md border border-success/20 bg-success/10 px-2.5 py-1.5 text-xs font-medium text-success"
             >
               <CheckCircle2Icon className="h-3.5 w-3.5 shrink-0" />
@@ -230,7 +238,7 @@ export function Hero() {
   }
 
   return (
-    <section id="inicio" aria-labelledby="hero-title" className="relative overflow-hidden">
+    <section id="inicio" aria-labelledby="hero-title" className="relative scroll-mt-20 overflow-hidden">
       <div aria-hidden className="bg-dots absolute inset-0 -z-10 [mask-image:radial-gradient(70%_60%_at_50%_35%,black,transparent)]" />
       <div className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 pb-20 pt-28 sm:px-6 md:pb-28 md:pt-36 lg:grid-cols-[1.05fr_0.95fr]">
         <div className="text-center lg:text-left">
@@ -238,7 +246,7 @@ export function Hero() {
             data-reveal
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: "easeOut" }}
+            transition={{ duration: 0.4, ease: "easeOut" }}
             className="inline-flex"
           >
             <Badge variant="agent" dot className="[&>span]:animate-pulse px-3 py-1">
@@ -252,7 +260,7 @@ export function Hero() {
             aria-label={H1_TEXT}
             initial="hidden"
             animate="visible"
-            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.055, delayChildren: 0.1 } } }}
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.032, delayChildren: 0.06 } } }}
             className="mt-5 text-balance text-4xl font-bold leading-[1.08] tracking-tight sm:text-5xl md:text-6xl"
           >
             {/* Real space text nodes, not a trailing margin: a margin on an
@@ -265,7 +273,7 @@ export function Hero() {
                   aria-hidden
                   variants={{
                     hidden: { opacity: 0, y: 16 },
-                    visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
+                    visible: { opacity: 1, y: 0, transition: { duration: 0.34, ease: "easeOut" } },
                   }}
                   className={cn(
                     "inline-block",
@@ -282,7 +290,7 @@ export function Hero() {
             data-reveal
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, delay: 0.35, ease: "easeOut" }}
+            transition={{ duration: 0.42, delay: 0.2, ease: "easeOut" }}
             className="mx-auto mt-5 max-w-xl text-pretty text-base text-muted-foreground sm:text-lg lg:mx-0"
           >
             Cada documento recibe su propio agente de Claude, transmitido en vivo a su navegador.
@@ -294,7 +302,7 @@ export function Hero() {
             data-reveal
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.65, delay: 0.45, ease: "easeOut" }}
+            transition={{ duration: 0.42, delay: 0.27, ease: "easeOut" }}
             className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center lg:justify-start"
           >
             <Link
@@ -316,7 +324,7 @@ export function Hero() {
             data-reveal
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ duration: 0.6, delay: 0.6 }}
+            transition={{ duration: 0.4, delay: 0.35 }}
             className="mt-4 text-xs text-muted-foreground"
           >
             Sin tarjetas ni configuración: registre su empresa y suba su primer documento hoy.
@@ -327,7 +335,7 @@ export function Hero() {
           data-reveal
           initial={{ opacity: 0, y: 28, scale: 0.98 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ duration: 0.7, delay: 0.25, ease: "easeOut" }}
+          transition={{ duration: 0.45, delay: 0.14, ease: "easeOut" }}
           className="mx-auto flex w-full max-w-md flex-col items-center lg:items-end"
         >
           <m.div
@@ -363,7 +371,7 @@ export function Hero() {
             </div>
             <div
               aria-hidden
-              style={{ animationDelay: "1.6s" }}
+              style={{ animationDelay: "1.1s" }}
               className="animate-float absolute -bottom-7 -right-2 hidden select-none rounded-lg border border-success/25 bg-card px-3 py-2 shadow-soft lg:block xl:-right-8"
             >
               <div className="flex items-center gap-2 text-xs font-medium text-success">

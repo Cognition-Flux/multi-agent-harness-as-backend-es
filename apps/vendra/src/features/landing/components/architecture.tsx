@@ -44,7 +44,7 @@ export function Architecture() {
                 initial={{ opacity: 0, x: -8 }}
                 whileInView={{ opacity: 1, x: 0 }}
                 viewport={{ once: true }}
-                transition={{ delay: 0.15 + i * 0.15, duration: 0.45, ease: "easeOut" }}
+                transition={{ delay: 0.08 + i * 0.09, duration: 0.32, ease: "easeOut" }}
               >
                 <span className="flex items-center gap-1.5 rounded-md border border-agent/20 bg-agent/5 px-2.5 py-1.5 text-xs font-medium">
                   <node.icon className="h-3.5 w-3.5 text-agent" />

@@ -84,8 +84,8 @@ export function useTypewriter(
   text: string,
   active: boolean,
   done = false,
-  charsPerTick = 2,
-  tickMs = 30,
+  charsPerTick = 4,
+  tickMs = 16,
 ): string {
   const { paused } = useLandingMotion();
   const reduced = useReducedMotion();
@@ -117,7 +117,7 @@ export function Reveal({
   children,
   className,
   delay = 0,
-  y = 20,
+  y = 16,
 }: {
   children: ReactNode;
   className?: string;
@@ -133,21 +133,24 @@ export function Reveal({
       initial={{ opacity: 0, y }}
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "0px 0px -10% 0px" }}
-      transition={{ duration: 0.6, delay, ease: EASE_OUT_SOFT }}
+      transition={{ duration: 0.4, delay, ease: EASE_OUT_SOFT }}
     >
       {children}
     </m.div>
   );
 }
 
+// Entrance cadence is deliberately brisk: the page's whole argument is that
+// this pipeline is fast, so a leisurely reveal contradicts the copy. Keep new
+// entrances in the same band (≈0.35–0.45s, ≤0.05s between siblings).
 export const staggerParent = {
   hidden: {},
-  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.05 } },
+  visible: { transition: { staggerChildren: 0.05, delayChildren: 0.02 } },
 };
 
 export const staggerChild = {
-  hidden: { opacity: 0, y: 18 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: EASE_OUT_SOFT } },
+  hidden: { opacity: 0, y: 14 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.38, ease: EASE_OUT_SOFT } },
 };
 
 /** Parent that staggers its `StaggerItem` children when scrolled into view. */

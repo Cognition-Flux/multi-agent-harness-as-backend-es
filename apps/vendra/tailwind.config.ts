@@ -142,13 +142,14 @@ const config: Config = {
         // seamless, and the drift reads as a soft glow rather than a sweep.
         "gradient-pan": "gradient-pan 10s linear infinite",
         // Gentle vertical drift for the landing hero's floating chips.
-        float: "float 6s ease-in-out infinite",
-        marquee: "marquee 50s linear infinite",
+        float: "float 4.2s ease-in-out infinite",
+        marquee: "marquee 30s linear infinite",
         // `both` so the reduced-motion kill-switch (which collapses the
         // duration) parks on the keyframes' own opacity:0 end state instead
         // of reverting to a static visible dot.
-        "travel-x": "travel-x 3.4s ease-in-out infinite both",
-        drain: "drain 4.2s linear forwards",
+        "travel-x": "travel-x 2.1s ease-in-out infinite both",
+        // Matches HITL_DURATIONS[1] in live-cases.tsx — retune both together.
+        drain: "drain 2.6s linear forwards",
       },
     },
   },

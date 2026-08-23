@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 import { useSceneLoop, useTypewriter } from "../motion";
 import { Caret, MockFrame, MockShimmerText, ToolPill } from "./mock-frame";
 
-const DURATIONS = [900, 1500, 1700, 900, 3400, 1100, 1500, 5600] as const;
+const DURATIONS = [550, 850, 950, 550, 1900, 650, 850, 3200] as const;
 // 0: user msg · 1: Pensando… · 2: tool inflight · 3: tool done + razonamiento
 // 4: respuesta streaming · 5: memoria inflight · 6: memoria ok + directiva
 // 7: propuesta enviada (settled)
@@ -81,7 +81,7 @@ export function AssistantScene() {
                 key="thinking"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                exit={{ opacity: 0, transition: { duration: 0.1 } }}
                 className="flex items-center gap-1.5 text-[10px]"
               >
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-agent" />
@@ -163,7 +163,7 @@ export function AssistantScene() {
                 key="proposal"
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, transition: { duration: 0.15 } }}
+                exit={{ opacity: 0, transition: { duration: 0.1 } }}
                 className="max-w-[92%] rounded-lg border border-agent/25 bg-agent/5 px-3 py-2"
               >
                 <p className="flex items-center justify-between gap-2 text-[10px] font-semibold text-agent">

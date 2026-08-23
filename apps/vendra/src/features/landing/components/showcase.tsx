@@ -84,7 +84,7 @@ export function Showcase() {
                     <m.span
                       layoutId="showcase-tab-pill"
                       className="absolute inset-0 rounded-full bg-primary shadow-sm"
-                      transition={{ type: "spring", stiffness: 400, damping: 34 }}
+                      transition={{ type: "spring", stiffness: 620, damping: 38 }}
                     />
                   ) : null}
                   <span className="relative z-10">{p.tab}</span>
@@ -109,7 +109,7 @@ export function Showcase() {
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.35, ease: "easeOut" }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
               className="grid items-center gap-8 lg:grid-cols-[1.15fr_1fr] lg:gap-12"
             >
               <div aria-hidden className="order-last min-w-0 lg:order-first">
