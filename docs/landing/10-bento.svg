@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 478" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Las seis funcionalidades en retícula: políticas del agente gobernadas, documentos y extracción, memoria semántica local, humano en el circuito, auditoría inmutable y cumplimiento continuo">
+  <style>
+    text { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
+    .ink { fill: #1c1917; } .muted { fill: #696059; }
+    .card { fill: #ffffff; stroke: #e9e5e2; }
+    .hair { stroke: #e9e5e2; }
+    .brand { fill: #b04507; }
+
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+  </style>
+  <rect x="0.5" y="0.5" width="959" height="477" rx="12" fill="#fdfcfc" stroke="#e9e5e2" stroke-width="1"/>
+  <g transform="translate(0.0,0)"><rect class="card" width="635.3" height="150" rx="12" stroke-width="1"/><rect class="brand" x="18" y="18" width="26" height="26" rx="7" opacity="0.12"/><circle class="brand" cx="31" cy="31" r="5"/><text class="ink" x="18" y="70" font-size="15" font-weight="600">Políticas del agente, gobernadas</text>
+    <text class="muted" x="18" y="92" font-size="12.5">Un gate OPA/Rego compilado a Wasm admite cada política antes de activarla: documentos</text>
+    <text class="muted" x="18" y="109" font-size="12.5">aceptados, campos extraídos, validaciones que cuentan y qué categorías aprueba el sistema</text>
+    <text class="muted" x="18" y="126" font-size="12.5">solo.</text>
+  </g>
+  <g transform="translate(649.3,0)"><rect class="card" width="310.7" height="150" rx="12" stroke-width="1"/><rect class="brand" x="18" y="18" width="26" height="26" rx="7" opacity="0.12"/><circle class="brand" cx="31" cy="31" r="5"/><text class="ink" x="18" y="70" font-size="15" font-weight="600">Documentos y extracción</text>
+    <text class="muted" x="18" y="92" font-size="12.5">16 tipos de documento con campos</text>
+    <text class="muted" x="18" y="109" font-size="12.5">estructurales bloqueados, identificadores</text>
+    <text class="muted" x="18" y="126" font-size="12.5">fiscales siempre enmascarados y una</text>
+    <text class="muted" x="18" y="143" font-size="12.5">versión de extracción por cada revisión.</text>
+  </g>
+  <g transform="translate(0.0,164)"><rect class="card" width="310.7" height="150" rx="12" stroke-width="1"/><rect class="brand" x="18" y="18" width="26" height="26" rx="7" opacity="0.12"/><circle class="brand" cx="31" cy="31" r="5"/><text class="ink" x="18" y="70" font-size="15" font-weight="600">Memoria semántica local</text>
+    <text class="muted" x="18" y="92" font-size="12.5">El asistente recuerda hechos entre</text>
+    <text class="muted" x="18" y="109" font-size="12.5">sesiones con búsqueda semántica en</text>
+    <text class="muted" x="18" y="126" font-size="12.5">español — mem0 OSS, Qdrant y Ollama,</text>
+    <text class="muted" x="18" y="143" font-size="12.5">autoalojados.</text>
+  </g>
+  <g transform="translate(324.7,164)"><rect class="card" width="310.7" height="150" rx="12" stroke-width="1"/><rect class="brand" x="18" y="18" width="26" height="26" rx="7" opacity="0.12"/><circle class="brand" cx="31" cy="31" r="5"/><text class="ink" x="18" y="70" font-size="15" font-weight="600">Humano en el circuito</text>
+    <text class="muted" x="18" y="92" font-size="12.5">Confirmaciones con cuenta regresiva,</text>
+    <text class="muted" x="18" y="109" font-size="12.5">derivaciones por política de empresa y</text>
+    <text class="muted" x="18" y="126" font-size="12.5">propuestas de directivas que solo una</text>
+    <text class="muted" x="18" y="143" font-size="12.5">persona puede aprobar.</text>
+  </g>
+  <g transform="translate(649.3,164)"><rect class="card" width="310.7" height="150" rx="12" stroke-width="1"/><rect class="brand" x="18" y="18" width="26" height="26" rx="7" opacity="0.12"/><circle class="brand" cx="31" cy="31" r="5"/><text class="ink" x="18" y="70" font-size="15" font-weight="600">Auditoría inmutable</text>
+    <text class="muted" x="18" y="92" font-size="12.5">Libro de actividad transaccional y</text>
+    <text class="muted" x="18" y="109" font-size="12.5">trazabilidad por requisito: el artefacto</text>
+    <text class="muted" x="18" y="126" font-size="12.5">que se le entrega a un auditor, siempre</text>
+    <text class="muted" x="18" y="143" font-size="12.5">al día.</text>
+  </g>
+  <g transform="translate(0.0,328)"><rect class="card" width="635.3" height="150" rx="12" stroke-width="1"/><rect class="brand" x="18" y="18" width="26" height="26" rx="7" opacity="0.12"/><circle class="brand" cx="31" cy="31" r="5"/><text class="ink" x="18" y="70" font-size="15" font-weight="600">Cumplimiento continuo</text>
+    <text class="muted" x="18" y="92" font-size="12.5">El tiempo es un disparador de primera clase: expiración automática, aviso de renovación en</text>
+    <text class="muted" x="18" y="109" font-size="12.5">el portal a 30 días y restauración sin fricción al renovar.</text>
+  </g>
+</svg>

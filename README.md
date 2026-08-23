@@ -81,6 +81,8 @@ Un proveedor sube los documentos de cumplimiento que tenga (certificados de segu
 
 ## Índice
 
+- [**La página pública**](#la-página-pública) — la landing, sección por sección
+
 1. [¿Qué hace esta app? (explicación para principiantes)](#1-qué-hace-esta-app-explicación-para-principiantes)
 2. [Arranque rápido y cómo probar la app](#2-arranque-rápido-y-cómo-probar-la-app)
 3. [La idea central: *harness* como backend](#3-la-idea-central-harness-como-backend)
@@ -95,6 +97,368 @@ Un proveedor sube los documentos de cumplimiento que tenga (certificados de segu
 12. [Seguridad y privacidad](#12-seguridad-y-privacidad)
 13. [Desarrollo local sin Docker](#13-desarrollo-local-sin-docker)
 14. [Solución de problemas](#14-solución-de-problemas)
+
+---
+
+## La página pública
+
+La ruta `/` no es un folleto: es **el producto funcionando**. Cada texto que
+aparece en ella está citado, carácter por carácter, de los módulos reales del
+portal, del panel del oficial, de la consola de gobernanza y del asistente; y
+cada una de sus **doce demostraciones animadas** repite un compás real del
+sistema. Lo que sigue es esa página, sección por sección, con las animaciones
+capturadas del navegador y el resto reconstruido en vector.
+
+> Las capturas animadas duran exactamente un ciclo del demo original —
+> 8 600 ms el héroe, 8 100 ms el HITL, 11 200 ms el asistente — de modo que el
+> bucle cierra sin salto. Todas las piezas son archivos locales del
+> repositorio: la página no carga tipografías, iconos ni imágenes de terceros.
+
+### Recorrido
+
+La barra fija recorre ocho anclas y siempre deja a mano las dos acciones.
+
+| Ancla | Sección | Qué muestra |
+|---|---|---|
+| `#como-funciona` | Cómo funciona | los cuatro pasos, del archivo a la activación |
+| `#casos` | Casos | cuatro casos difíciles, animados |
+| `#paneles` | Paneles | las cuatro superficies de la plataforma |
+| `#asistente` | Asistente | el turno de cuatro herramientas |
+| `#adjudicacion` | Oficial | las cinco acciones de rescate |
+| `#gobernanza` | Gobernanza | políticas, versionado y la puerta OPA |
+| `#funcionalidades` | Funciones | las seis capas del producto |
+| `#arquitectura` | Arquitectura | dónde corre cada cosa |
+
+### El héroe
+
+<p align="center">
+  <a href="docs/landing/01-hero-documento.webp">
+    <img src="docs/landing/01-hero-documento.webp" width="100%"
+         alt="La tarjeta del héroe recorre las ocho etapas de revisión de un certificado ACORD 25: la barra avanza de «Etapa 2 de 8» a «Revisión completada», el agente narra cada etapa y al cerrar aparecen los campos extraídos —asegurado, límite por ocurrencia, asegurado adicional y fecha de vencimiento— junto al requisito que el documento acredita.">
+  </a>
+</p>
+
+<p align="center">
+  <sub>
+    <b>Cumplimiento de proveedores, revisado en vivo por agentes de IA.</b><br>
+    Cada documento recibe su propio agente de Claude, transmitido en vivo a su navegador. La validación,
+    la cobertura y la activación las decide código determinista — y su oficial de cumplimiento conserva la
+    última palabra. Las dos fichas flotantes son reales: la pregunta HITL con su cuenta regresiva, y la
+    cobertura efectiva de $2.000.000 una vez apiladas la póliza primaria y la umbrella. Abajo a la
+    izquierda, el control <i>Pausar animaciones</i> — un requisito WCAG 2.2.2, no un adorno.
+  </sub>
+</p>
+
+La insignia sobre el titular dice **Adjudicación por IA · gobernada por personas**,
+y es la tesis entera de la página en cinco palabras.
+
+### Las cifras
+
+<p align="center">
+  <img src="docs/landing/02-cifras.svg" width="100%"
+       alt="Cuatro contadores que suben desde cero hasta sus valores finales: 16 tipos de documento, 11 categorías de requisitos, 8 etapas de revisión en vivo y 7 estados de cumplimiento.">
+</p>
+
+<p align="center">
+  <sub>
+    Las cuatro cifras no están escritas a mano: se derivan del catálogo real.
+    <b>16 tipos de documento</b> (del W-9 al ACORD 25 y SOC 2), <b>11 categorías de requisitos</b>
+    (con trazabilidad documento a documento), <b>8 etapas de revisión en vivo</b>
+    (transmitidas a su navegador) y <b>7 estados de cumplimiento</b> (de «No iniciado» a «Aprobado»).
+  </sub>
+</p>
+
+### 16 tipos de documento
+
+<p align="center">
+  <img src="docs/landing/03-tipos-documento.svg" width="100%"
+       alt="Marquesina que desplaza los dieciséis tipos de documento aceptados, desde el Certificado de seguro (ACORD 25) hasta el Acuerdo de confidencialidad firmado.">
+</p>
+
+<details>
+<summary><b>Los dieciséis tipos, en texto</b></summary>
+
+Certificado de seguro (ACORD 25) · Página de declaraciones de la póliza de seguro ·
+Póliza umbrella / de exceso de responsabilidad · Formulario W-9 del IRS ·
+Formulario W-8BEN-E del IRS · Licencia comercial · Certificación de diversidad ·
+Carta de EMR (tasa de modificación por experiencia) · Resumen del Formulario 300A de OSHA ·
+Informe SOC 2 · Certificado ISO 27001 · Póliza de responsabilidad cibernética ·
+Carta de verificación bancaria · Cheque anulado · Contrato marco de servicios firmado ·
+Acuerdo de confidencialidad firmado
+
+</details>
+
+### Cómo funciona
+
+**Del documento a la activación, sin cajas negras.** Un flujo de cuatro pasos
+donde la IA trabaja a la vista y las decisiones son de código determinista y de
+personas.
+
+```mermaid
+flowchart LR
+  A["1 · Suba sus documentos"] --> B["2 · Un agente por documento"]
+  B --> C["3 · El motor determinista decide"]
+  C --> D["4 · Una persona adjudica"]
+```
+
+| Paso | Qué ocurre |
+|---|---|
+| **Suba sus documentos** | Arrastre COIs, W-9, licencias y pólizas — PNG, JPEG, WebP o PDF de hasta 10 MB, con carga múltiple y reintentos. |
+| **Un agente por documento** | Cada archivo recibe su propia sesión de Claude en una MicroVM aislada, transmitida en vivo: clasificación, extracción y razonamiento a la vista. |
+| **El motor determinista decide** | Validación, trazabilidad de requisitos y matemática de cobertura son código puro y reproducible — la IA nunca aprueba por sí sola. |
+| **Una persona adjudica** | Exenciones, otorgamientos, revocaciones y la decisión final quedan en manos de su oficial de cumplimiento, con auditoría inmutable. |
+
+### Casos en vivo
+
+**Los casos difíciles, manejados a la vista.** Pólizas que se apilan,
+certificados a nombre de la filial, credenciales que vencen y preguntas que
+merecen un humano.
+
+<table>
+  <tr>
+    <td width="50%" valign="top" align="center">
+      <a href="docs/landing/04-cobertura-apilada.webp">
+        <img src="docs/landing/04-cobertura-apilada.webp" width="100%"
+             alt="Una póliza umbrella se apila sobre la primaria: la barra crece del millón al segundo millón y la cobertura efectiva pasa de $1.000.000 a $2.000.000, alcanzando el límite exigido.">
+      </a>
+    </td>
+    <td width="50%" valign="top" align="center">
+      <a href="docs/landing/05-hitl-cuenta-regresiva.webp">
+        <img src="docs/landing/05-hitl-cuenta-regresiva.webp" width="100%"
+             alt="El agente detiene el procesamiento y pregunta si aplica un endoso general de asegurado adicional; la barra de cuenta regresiva se vacía mientras esperan los botones Sí y No.">
+      </a>
+    </td>
+  </tr>
+  <tr>
+    <td valign="top" align="center">
+      <sub>
+        <b>La cobertura se apila</b><br>
+        Apilamiento de cobertura: el host re-deriva cada cifra — un payload incoherente rebota al agente
+        antes de persistir.
+      </sub>
+    </td>
+    <td valign="top" align="center">
+      <sub>
+        <b>La duda se pregunta</b><br>
+        Humano en el circuito: ventanas de confirmación durables con cuenta regresiva — la duda genuina se
+        pregunta, no se adivina.
+      </sub>
+    </td>
+  </tr>
+</table>
+
+Los otros dos casos de la sección no se animan aquí, pero su texto es el mismo:
+
+- **Falla acotada:** un certificado a nombre de la filial no acredita identidad, pero sus límites sí cuentan — y el oficial puede eximir solo lo que la falla bloquea.
+- **Cumplimiento continuo:** aviso de renovación a 30 días, la expiración pasa APROBADO→VENCIDO sola y una renovación válida restaura la aprobación.
+
+### Cuatro superficies
+
+<p align="center">
+  <a href="docs/landing/06-paneles.webp">
+    <img src="docs/landing/06-paneles.webp" width="100%"
+         alt="Las cuatro pestañas de la plataforma con «Portal del proveedor» seleccionada: la zona de carga, tres documentos en distintos estados y la lista de requisitos marcando 9 de 11, junto al texto del panel.">
+  </a>
+</p>
+
+**Una plataforma, cuatro superficies.** Proveedores, oficiales de cumplimiento y
+administradores de plataforma trabajan sobre el mismo expediente — cada uno con
+su propio panel.
+
+<details>
+<summary><b>Portal del proveedor</b> — Incorporación con agentes a la vista</summary>
+
+El proveedor arrastra sus documentos y ve trabajar a cada agente en vivo, con la lista de requisitos y la puerta de activación siempre al lado.
+
+- Zona de carga con verificación en vivo: barra «Etapa X de 8», narración del agente y razonamiento visible.
+- Confirmaciones humano-en-el-circuito con cuenta regresiva cuando el agente duda de verdad.
+- Lista de 11 categorías con medidor de avance, descartes «No aplica» y aviso de renovación a 30 días.
+- Activación con compuerta determinista: el botón explica exactamente qué falta para habilitarse.
+
+</details>
+
+<details>
+<summary><b>Panel del oficial</b> — Adjudicación con herramientas de rescate</summary>
+
+Un directorio ordenado por próximo vencimiento y un expediente por proveedor con todo el kit: eximir, recategorizar, otorgar, revocar y reintentar.
+
+- Directorio con búsqueda, filtros por estado y auto-refresco — lo próximo a vencer, primero.
+- Trazabilidad de requisitos: qué documento otorga cada categoría, cuál falló y por qué regla.
+- Exenciones acotadas con vencimiento y justificación obligatoria que queda en el registro de auditoría.
+- Determinación de cobertura por línea de póliza: límites efectivos contra los exigidos, en vivo.
+
+</details>
+
+<details>
+<summary><b>Consola de gobernanza</b> — Administración de políticas del agente</summary>
+
+Cada empresa define qué documentos acepta, qué campos se extraen, qué validaciones cuentan y qué puede aprobar el sistema sin una persona.
+
+- Poder de árbitro por categoría: «El sistema decide» o «Un oficial debe aprobarla» — la frontera exacta de la IA.
+- Puerta de admisibilidad OPA compilada a Wasm y evaluada localmente antes de activar cualquier política.
+- Versionado borrador → activa → archivada, con anclaje por proveedor: a nadie se le cambian las reglas a mitad del proceso.
+- Propuestas del asistente delegado revisadas por humanos: nada se aplica sin aprobación explícita.
+
+</details>
+
+<details>
+<summary><b>Asistente con memoria</b> — Un asistente que conoce el expediente</summary>
+
+Chat en español con acceso al expediente de cumplimiento del proveedor y memoria semántica entre sesiones — todo autoalojado.
+
+- Responde sobre cobertura, requisitos y vencimientos leyendo el expediente real, no un resumen.
+- Memoria local y privada: mem0 OSS + Qdrant + Ollama en contenedores propios, con PII redactada antes de almacenar.
+- Dos niveles de privilegio: «Conversacional — solo explica» o «Delegado — puede proponer directivas».
+- Si el índice no responde, degrada a recencia: el asistente nunca se cae con su memoria.
+
+</details>
+
+### El asistente
+
+<p align="center">
+  <a href="docs/landing/07-asistente-herramientas.webp">
+    <img src="docs/landing/07-asistente-herramientas.webp" width="100%"
+         alt="El asistente responde «¿Qué falta para poder activar mi cuenta?» encadenando cuatro herramientas —consultar el expediente, revisar un documento, tomar nota y redactar una propuesta—, transmite la respuesta token a token y deja una propuesta de directiva pendiente en la consola de gobernanza.">
+  </a>
+</p>
+
+<p align="center">
+  <sub>
+    <b>Una pregunta difícil, resuelta en un solo turno.</b><br>
+    El proveedor pregunta en español. El asistente lee el expediente real, abre el documento que falló,
+    deja una nota para la próxima vez y redacta una propuesta de directiva que solo una persona puede
+    aprobar.
+  </sub>
+</p>
+
+- Cuatro herramientas encadenadas en el mismo turno: consultar el expediente, revisar un documento, tomar nota y redactar una propuesta.
+- El razonamiento del modelo queda a la vista, plegado — se abre cuando usted quiere verlo, y el texto llega transmitido token a token.
+- Memoria semántica local: mem0 OSS, Qdrant y Ollama en contenedores propios, con la PII redactada antes de almacenar.
+- En el nivel «Delegado — puede proponer directivas» la propuesta aterriza en la consola de gobernanza y espera una decisión humana.
+
+### El oficial
+
+<p align="center">
+  <a href="docs/landing/08-acciones-oficial.webp">
+    <img src="docs/landing/08-acciones-oficial.webp" width="100%"
+         alt="El expediente de Beta Logística Ltda. en la pestaña Documentos, con las cinco acciones de rescate —eximir, recategorizar, otorgar manualmente, revocar y reintentar procesamiento—, el bloque para finalizar el estado y un registro de actividad con las cinco líneas que esas acciones escribieron.">
+  </a>
+</p>
+
+<p align="center">
+  <sub>
+    <b>Cinco acciones de rescate, cada una con su rastro.</b><br>
+    Cuando el motor determinista se detiene, su oficial de cumplimiento tiene herramientas — y cada una
+    escribe su propia línea en el registro de auditoría antes de tocar nada.
+  </sub>
+</p>
+
+- Eximir, recategorizar, otorgar, revocar y reintentar: el kit completo sobre el documento, sin salir del expediente del proveedor.
+- Toda acción exige una justificación escrita que queda en el registro de auditoría — no hay atajos silenciosos.
+- El servidor vuelve a acotar el alcance de cada exención: una falla nunca puede eximir más de lo que realmente bloquea.
+- El estado final es una decisión aparte y explícita: otorgar cierra una categoría, no aprueba al proveedor.
+
+### La gobernanza
+
+<p align="center">
+  <a href="docs/landing/09-gobernanza.webp">
+    <img src="docs/landing/09-gobernanza.webp" width="100%"
+         alt="La consola de plataforma de Acme Constructora SpA con los cuatro pasos de configuración resueltos —oficiales, privilegios del asistente, documentos aceptados y aprobación automática— y el veredicto de la puerta de admisibilidad OPA listando sus dos advertencias antes de permitir activar la política.">
+  </a>
+</p>
+
+<p align="center">
+  <sub>
+    <b>Roles y políticas, configurados a la vista.</b><br>
+    Cada empresa define quién revisa, qué puede hacer el asistente, qué documentos se aceptan y qué
+    requisitos aprueba el sistema por su cuenta — todo antes de que un proveedor suba su primer archivo.
+  </sub>
+</p>
+
+- Cuentas de oficial creadas desde la consola, con alcance exacto a una empresa y a ninguna otra.
+- Dos niveles de privilegio para el asistente del proveedor: solo explicar, o proponer cambios que una persona aprueba.
+- Por tipo de documento: qué campos se extraen —con los estructurales bloqueados— y qué validaciones cuentan de verdad.
+- Poder de árbitro por categoría, y una puerta de admisibilidad OPA que revisa la configuración antes de dejar activarla.
+
+### Funcionalidades
+
+**Capas que se gobiernan entre sí.** Agentes que trabajan, reglas que deciden,
+personas que aprueban — y todo queda registrado.
+
+<p align="center">
+  <img src="docs/landing/10-bento.svg" width="100%"
+       alt="Las seis funcionalidades en retícula: políticas del agente gobernadas por un gate OPA, documentos y extracción, memoria semántica local, humano en el circuito, auditoría inmutable y cumplimiento continuo.">
+</p>
+
+<details>
+<summary><b>Las seis fichas, en texto</b></summary>
+
+| Ficha | Qué cubre |
+|---|---|
+| **Políticas del agente, gobernadas** | Un gate OPA/Rego compilado a Wasm admite cada política antes de activarla: documentos aceptados, campos extraídos, validaciones que cuentan y qué categorías aprueba el sistema solo. |
+| **Documentos y extracción** | 16 tipos de documento con campos estructurales bloqueados, identificadores fiscales siempre enmascarados y una versión de extracción por cada revisión. |
+| **Memoria semántica local** | El asistente recuerda hechos entre sesiones con búsqueda semántica en español — mem0 OSS, Qdrant y Ollama, autoalojados. |
+| **Humano en el circuito** | Confirmaciones con cuenta regresiva, derivaciones por política de empresa y propuestas de directivas que solo una persona puede aprobar. |
+| **Auditoría inmutable** | Libro de actividad transaccional y trazabilidad por requisito: el artefacto que se le entrega a un auditor, siempre al día. |
+| **Cumplimiento continuo** | El tiempo es un disparador de primera clase: expiración automática, aviso de renovación en el portal a 30 días y restauración sin fricción al renovar. |
+
+</details>
+
+### Arquitectura
+
+**Confianza por diseño, no por promesa.** La inteligencia corre aislada, las
+decisiones son reproducibles y sus datos nunca salen de sus propios
+contenedores.
+
+```mermaid
+flowchart LR
+  D["Documento"] --> A["Agente Claude · MicroVM"]
+  A --> M["Motor determinista"]
+  M --> O["🧑‍⚖️ Oficial de cumplimiento"]
+```
+
+| Garantía | Cómo se sostiene |
+|---|---|
+| **La IA nunca decide sola** | El agente solo clasifica y extrae. Validación, mapeo de requisitos, apilamiento de coberturas y compuertas de activación son código determinista: cada veredicto es reproducible. |
+| **Agentes aislados y visibles** | Cada documento corre en su propia sesión de Claude Code dentro de una MicroVM (Vercel Sandbox), transmitida en vivo al navegador — sin cajas negras. |
+| **Sus datos, en sus contenedores** | Postgres, MinIO, Qdrant y Ollama autoalojados. Las únicas salidas a internet son la API de Anthropic y Vercel Sandbox — nada más. |
+| **Acceso local y auditable** | Autenticación de correo y contraseña resuelta en el servidor, roles separados para proveedor, oficial y plataforma, y límites de tasa siempre activos. |
+
+### El cierre
+
+La página termina donde empieza el trabajo: **Empiece con su primer documento
+hoy mismo.** Registre su empresa, arrastre un certificado y vea a su primer
+agente trabajar en vivo — la activación queda a un expediente de distancia. Las
+dos acciones son **Registre su empresa** y *Ya tengo cuenta — iniciar sesión*.
+
+### El pie
+
+El pie repite las ocho anclas bajo *Producto*, las dos entradas bajo *Acceso*, y
+cierra con una sola línea que resume la postura del proyecto:
+*sus datos viven en sus propios contenedores.*
+
+### La estética
+
+Un solo tema, claro, sin tipografías web: toda la letra es la pila del sistema y
+todo el arte es CSS. El naranja quemado es actividad de IA en vivo, nunca
+decoración — y los botones son grafito, no naranja.
+
+<p align="center">
+  <img src="docs/landing/11-tokens.svg" width="100%"
+       alt="La paleta de la plataforma: cada token con su muestra de color, su valor hexadecimal y su función, del naranja de marca al grafito de los botones y los cuatro colores de estado.">
+</p>
+
+<p align="center">
+  <img src="docs/landing/12-badges.svg" width="100%"
+       alt="Las variantes de insignia con sus colores semánticos: verificado y aprobado en verde, procesando y delegado en naranja, vencido y requiere revisión en ámbar, rechazado en rojo y no aplica en gris.">
+</p>
+
+<p align="center">
+  <sub>
+    Los colores de estado no son decorativos: <b>vencido</b> es ámbar y nunca rojo, porque una credencial
+    que caducó no es un rechazo; <b>procesando</b> lleva el punto que late mientras el agente trabaja.
+  </sub>
+</p>
 
 ---
 

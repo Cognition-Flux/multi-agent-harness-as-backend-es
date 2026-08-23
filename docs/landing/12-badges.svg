@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 78" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Las variantes de insignia con sus colores semánticos: verificado y aprobado en verde, procesando y delegado en naranja, vencido y requiere revisión en ámbar, rechazado en rojo">
+  <style>
+    text { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
+    .ink { fill: #1c1917; } .muted { fill: #696059; }
+    .card { fill: #ffffff; stroke: #e9e5e2; }
+    .hair { stroke: #e9e5e2; }
+    .brand { fill: #b04507; }
+
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+  </style>
+  <rect x="0.5" y="0.5" width="959" height="77" rx="12" fill="#fdfcfc" stroke="#e9e5e2" stroke-width="1"/>
+  <g transform="translate(0.0,0)"><rect width="112.9" height="30" rx="15" fill="#186d45" fill-opacity="0.10" stroke="#186d45" stroke-opacity="0.30" stroke-width="1"/><circle cx="17" cy="15" r="3.4" fill="#186d45"/><text x="28" y="19.5" font-size="13" font-weight="500" fill="#186d45">Verificado</text></g>
+  <g transform="translate(124.9,0)"><rect width="112.9" height="30" rx="15" fill="#b04507" fill-opacity="0.10" stroke="#b04507" stroke-opacity="0.30" stroke-width="1"/><circle cx="17" cy="15" r="3.4" fill="#b04507"/><text x="28" y="19.5" font-size="13" font-weight="500" fill="#b04507">Procesando</text></g>
+  <g transform="translate(249.8,0)"><rect width="92.2" height="30" rx="15" fill="#915808" fill-opacity="0.10" stroke="#915808" stroke-opacity="0.30" stroke-width="1"/><circle cx="17" cy="15" r="3.4" fill="#915808"/><text x="28" y="19.5" font-size="13" font-weight="500" fill="#915808">Vencido</text></g>
+  <g transform="translate(354.0,0)"><rect width="106.0" height="30" rx="15" fill="#c52020" fill-opacity="0.10" stroke="#c52020" stroke-opacity="0.30" stroke-width="1"/><circle cx="17" cy="15" r="3.4" fill="#c52020"/><text x="28" y="19.5" font-size="13" font-weight="500" fill="#c52020">Rechazado</text></g>
+  <g transform="translate(472.0,0)"><rect width="119.8" height="30" rx="15" fill="#096ca5" fill-opacity="0.10" stroke="#096ca5" stroke-opacity="0.30" stroke-width="1"/><circle cx="17" cy="15" r="3.4" fill="#096ca5"/><text x="28" y="19.5" font-size="13" font-weight="500" fill="#096ca5">En progreso</text></g>
+  <g transform="translate(603.8,0)"><rect width="161.1" height="30" rx="15" fill="#915808" fill-opacity="0.10" stroke="#915808" stroke-opacity="0.30" stroke-width="1"/><circle cx="17" cy="15" r="3.4" fill="#915808"/><text x="28" y="19.5" font-size="13" font-weight="500" fill="#915808">Requiere revisión</text></g>
+  <g transform="translate(777.0,0)"><rect width="99.1" height="30" rx="15" fill="#186d45" fill-opacity="0.10" stroke="#186d45" stroke-opacity="0.30" stroke-width="1"/><circle cx="17" cy="15" r="3.4" fill="#186d45"/><text x="28" y="19.5" font-size="13" font-weight="500" fill="#186d45">Aprobado</text></g>
+  <g transform="translate(0.0,44)"><rect width="106.0" height="30" rx="15" fill="#696059" fill-opacity="0.10" stroke="#696059" stroke-opacity="0.30" stroke-width="1"/><circle cx="17" cy="15" r="3.4" fill="#696059"/><text x="28" y="19.5" font-size="13" font-weight="500" fill="#696059">No aplica</text></g>
+  <g transform="translate(118.0,44)"><rect width="99.1" height="30" rx="15" fill="#b04507" fill-opacity="0.10" stroke="#b04507" stroke-opacity="0.30" stroke-width="1"/><circle cx="17" cy="15" r="3.4" fill="#b04507"/><text x="28" y="19.5" font-size="13" font-weight="500" fill="#b04507">Delegado</text></g>
+</svg>

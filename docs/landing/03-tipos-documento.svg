@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 38" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Marquesina con los 16 tipos de documento aceptados, del Certificado de seguro ACORD 25 al Acuerdo de confidencialidad firmado">
+  <style>
+    text { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
+    .ink { fill: #1c1917; } .muted { fill: #696059; }
+    .card { fill: #ffffff; stroke: #e9e5e2; }
+    .hair { stroke: #e9e5e2; }
+    .brand { fill: #b04507; }
+
+    .track { animation: pan 46s linear infinite; }
+    @keyframes pan { from{transform:translateX(0)} to{transform:translateX(-3974.0px)} }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+  </style>
+  <rect x="0.5" y="0.5" width="959" height="37" rx="12" fill="#fdfcfc" stroke="#e9e5e2" stroke-width="1"/>
+  <defs><linearGradient id="fade" x1="0" x2="1"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="0.05" stop-color="#fff" stop-opacity="1"/><stop offset="0.95" stop-color="#fff" stop-opacity="1"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient><mask id="m"><rect width="960" height="38" fill="url(#fade)"/></mask></defs>
+  <g mask="url(#m)"><g transform="translate(0,4)"><g class="track">
+    <g transform="translate(0.0,0)"><rect class="card" x="0" y="0" width="247.5" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Certificado de seguro (ACORD 25)</text></g>
+    <g transform="translate(257.5,0)"><rect class="card" x="0" y="0" width="336.6" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Página de declaraciones de la póliza de seguro</text></g>
+    <g transform="translate(604.1,0)"><rect class="card" x="0" y="0" width="336.6" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Póliza umbrella / de exceso de responsabilidad</text></g>
+    <g transform="translate(950.6,0)"><rect class="card" x="0" y="0" width="183.9" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Formulario W-9 del IRS</text></g>
+    <g transform="translate(1144.6,0)"><rect class="card" x="0" y="0" width="215.7" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Formulario W-8BEN-E del IRS</text></g>
+    <g transform="translate(1370.3,0)"><rect class="card" x="0" y="0" width="158.5" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Licencia comercial</text></g>
+    <g transform="translate(1538.8,0)"><rect class="card" x="0" y="0" width="215.7" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Certificación de diversidad</text></g>
+    <g transform="translate(1764.5,0)"><rect class="card" x="0" y="0" width="368.4" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Carta de EMR (tasa de modificación por experiencia)</text></g>
+    <g transform="translate(2142.8,0)"><rect class="card" x="0" y="0" width="266.6" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Resumen del Formulario 300A de OSHA</text></g>
+    <g transform="translate(2419.4,0)"><rect class="card" x="0" y="0" width="126.7" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Informe SOC 2</text></g>
+    <g transform="translate(2556.1,0)"><rect class="card" x="0" y="0" width="177.6" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Certificado ISO 27001</text></g>
+    <g transform="translate(2743.7,0)"><rect class="card" x="0" y="0" width="279.3" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Póliza de responsabilidad cibernética</text></g>
+    <g transform="translate(3033.0,0)"><rect class="card" x="0" y="0" width="234.8" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Carta de verificación bancaria</text></g>
+    <g transform="translate(3277.8,0)"><rect class="card" x="0" y="0" width="133.0" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Cheque anulado</text></g>
+    <g transform="translate(3420.8,0)"><rect class="card" x="0" y="0" width="266.6" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Contrato marco de servicios firmado</text></g>
+    <g transform="translate(3697.4,0)"><rect class="card" x="0" y="0" width="266.6" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Acuerdo de confidencialidad firmado</text></g>
+    <g transform="translate(3974.0,0)"><rect class="card" x="0" y="0" width="247.5" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Certificado de seguro (ACORD 25)</text></g>
+    <g transform="translate(4231.6,0)"><rect class="card" x="0" y="0" width="336.6" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Página de declaraciones de la póliza de seguro</text></g>
+    <g transform="translate(4578.1,0)"><rect class="card" x="0" y="0" width="336.6" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Póliza umbrella / de exceso de responsabilidad</text></g>
+    <g transform="translate(4924.7,0)"><rect class="card" x="0" y="0" width="183.9" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Formulario W-9 del IRS</text></g>
+    <g transform="translate(5118.6,0)"><rect class="card" x="0" y="0" width="215.7" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Formulario W-8BEN-E del IRS</text></g>
+    <g transform="translate(5344.3,0)"><rect class="card" x="0" y="0" width="158.5" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Licencia comercial</text></g>
+    <g transform="translate(5512.8,0)"><rect class="card" x="0" y="0" width="215.7" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Certificación de diversidad</text></g>
+    <g transform="translate(5738.5,0)"><rect class="card" x="0" y="0" width="368.4" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Carta de EMR (tasa de modificación por experiencia)</text></g>
+    <g transform="translate(6116.9,0)"><rect class="card" x="0" y="0" width="266.6" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Resumen del Formulario 300A de OSHA</text></g>
+    <g transform="translate(6393.5,0)"><rect class="card" x="0" y="0" width="126.7" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Informe SOC 2</text></g>
+    <g transform="translate(6530.2,0)"><rect class="card" x="0" y="0" width="177.6" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Certificado ISO 27001</text></g>
+    <g transform="translate(6717.7,0)"><rect class="card" x="0" y="0" width="279.3" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Póliza de responsabilidad cibernética</text></g>
+    <g transform="translate(7007.0,0)"><rect class="card" x="0" y="0" width="234.8" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Carta de verificación bancaria</text></g>
+    <g transform="translate(7251.8,0)"><rect class="card" x="0" y="0" width="133.0" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Cheque anulado</text></g>
+    <g transform="translate(7394.9,0)"><rect class="card" x="0" y="0" width="266.6" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Contrato marco de servicios firmado</text></g>
+    <g transform="translate(7671.5,0)"><rect class="card" x="0" y="0" width="266.6" height="30" rx="15" stroke-width="1"/><circle class="brand" cx="14" cy="15.0" r="3.2"/><text class="ink" x="25" y="19.2" font-size="12">Acuerdo de confidencialidad firmado</text></g>
+  </g></g></g>
+</svg>
