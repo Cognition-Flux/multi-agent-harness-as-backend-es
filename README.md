@@ -21,17 +21,21 @@
 
 ## La página pública
 
-La ruta `/` no es un folleto: es **el producto funcionando**. Cada texto que
-aparece en ella está citado, carácter por carácter, de los módulos reales del
-portal, del panel del oficial, de la consola de gobernanza y del asistente; y
-cada una de sus **doce demostraciones animadas** repite un compás real del
-sistema. Lo que sigue es esa página, sección por sección, con las animaciones
-capturadas del navegador y el resto reconstruido en vector.
+La ruta `/` no es un folleto: es **el producto funcionando**. Su prosa de
+portada —titulares, subtítulos, propuestas de valor— está escrita para la
+página; pero toda cadena que **describe el comportamiento del producto** —los
+mensajes de etapa, los títulos de diálogo, las etiquetas de herramienta, los
+estados— está citada carácter por carácter de los módulos reales del portal,
+del panel del oficial, de la consola de gobernanza y del asistente. Y cada una
+de sus **doce demostraciones animadas** repite un compás real del sistema. Lo
+que sigue es esa página, sección por sección, con las animaciones capturadas
+del navegador y el resto reconstruido en vector.
 
 > Las capturas animadas duran exactamente un ciclo del demo original —
-> 8 600 ms el héroe, 8 100 ms el HITL, 11 200 ms el asistente — de modo que el
-> bucle cierra sin salto. Todas las piezas son archivos locales del
-> repositorio: la página no carga tipografías, iconos ni imágenes de terceros.
+> 8 600 ms el héroe, 6 000 ms la cobertura apilada, 8 100 ms el HITL y
+> 11 200 ms el asistente — de modo que el bucle cierra sin salto. Todas las
+> piezas son archivos locales del repositorio: la página no carga tipografías,
+> iconos ni imágenes de terceros.
 
 ### Recorrido
 
@@ -62,14 +66,15 @@ La barra fija recorre ocho anclas y siempre deja a mano las dos acciones.
     <b>Cumplimiento de proveedores, revisado en vivo por agentes de IA.</b><br>
     Cada documento recibe su propio agente de Claude, transmitido en vivo a su navegador. La validación,
     la cobertura y la activación las decide código determinista — y su oficial de cumplimiento conserva la
-    última palabra. Las dos fichas flotantes son reales: la pregunta HITL con su cuenta regresiva, y la
-    cobertura efectiva de $2.000.000 una vez apiladas la póliza primaria y la umbrella. Abajo a la
+    última palabra. Las dos fichas flotantes recogen los dos momentos que la página
+    promete: la pregunta HITL con su cuenta regresiva, y la cobertura efectiva de $2.000.000 una vez
+    apiladas la póliza primaria y la umbrella. Abajo a la
     izquierda, el control <i>Pausar animaciones</i> — un requisito WCAG 2.2.2, no un adorno.
   </sub>
 </p>
 
 La insignia sobre el titular dice **Adjudicación por IA · gobernada por personas**,
-y es la tesis entera de la página en cinco palabras.
+y es la tesis entera de la página en seis palabras.
 
 ### Las cifras
 
@@ -131,7 +136,7 @@ flowchart LR
 
 **Los casos difíciles, manejados a la vista.** Pólizas que se apilan,
 certificados a nombre de la filial, credenciales que vencen y preguntas que
-merecen un humano.
+merecen un humano — así se ven en Vendra, mientras suceden.
 
 <table>
   <tr>
@@ -369,13 +374,15 @@ decoración — y los botones son grafito, no naranja.
 
 <p align="center">
   <img src="docs/landing/12-badges.svg" width="100%"
-       alt="Las variantes de insignia con sus colores semánticos: verificado y aprobado en verde, procesando y delegado en naranja, vencido y requiere revisión en ámbar, rechazado en rojo y no aplica en gris.">
+       alt="Las nueve variantes de insignia con sus colores semánticos: verificado y aprobado en verde, procesando y delegado en naranja, vencido y requiere revisión en ámbar, en progreso en azul, rechazado en rojo y no aplica en gris.">
 </p>
 
 <p align="center">
   <sub>
     Los colores de estado no son decorativos: <b>vencido</b> es ámbar y nunca rojo, porque una credencial
-    que caducó no es un rechazo; <b>procesando</b> lleva el punto que late mientras el agente trabaja.
+    que caducó no es un rechazo; <b>rechazado</b> es el único rojo de la paleta; y el naranja queda
+    reservado para la actividad del agente. En la página, los estados en vivo llevan además un punto que
+    late — aquí, en una imagen estática, el punto no puede latir.
   </sub>
 </p>
 
