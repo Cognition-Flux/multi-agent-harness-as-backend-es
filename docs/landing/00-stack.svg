@@ -42,10 +42,15 @@
     .glow { animation-name: glow; }
     @keyframes glow { 0%, 100% { opacity: 1 } 50% { opacity: 0.55 } }
 
-    /* the header rail: ONE stepped playhead that ticks at the crossfades, so it
-       never spends motion budget inside an act's hold */
+    /* the header rail: ONE stepped playhead, and it LEADS the stage — the tab
+       ticks before its act lands, because an indicator that arrives after the
+       content has already changed reads as a lag, not as a beat. steps(4) jumps at
+       internal 8/16/24/32 s; -1.3 s puts each tick at 6.7/14.7/22.7/30.7 s, ~0.34 s
+       before the incoming act starts fading in at 22 %. Measured: the rail moves,
+       and only then does the stage. The lead is also the mismatch window, which is
+       why it is a third of a second and not a whole one. */
     .rail { transform: translateX(0px); animation-name: rail;
-             animation-timing-function: steps(4, end); animation-delay: 0.4s; }
+             animation-timing-function: steps(4, end); animation-delay: -1.3s; }
     @keyframes rail { from { transform: translateX(0) } to { transform: translateX(408px) } }
 
     /* ACT 1 — (1) the stage reel and its bar: one idea, two mechanically locked parts.
@@ -133,13 +138,13 @@
   <circle class="amb2 pulse" cx="322" cy="24" r="3.4" fill="#b04507"/>
   <text class="brand" x="332" y="29" font-size="10" font-weight="600">en vivo</text>
   <rect x="534" y="16" width="92" height="5" rx="2.5" fill="#e9e5e2"/>
-  <text class="muted" x="534" y="36" font-size="10">el harness</text>
+  <text class="muted" x="534" y="36" font-size="10">Harness</text>
   <rect x="636" y="16" width="92" height="5" rx="2.5" fill="#e9e5e2"/>
-  <text class="muted" x="636" y="36" font-size="10">el asistente</text>
+  <text class="muted" x="636" y="36" font-size="10">Asistente</text>
   <rect x="738" y="16" width="92" height="5" rx="2.5" fill="#e9e5e2"/>
-  <text class="muted" x="738" y="36" font-size="10">el oficial</text>
+  <text class="muted" x="738" y="36" font-size="10">Oficial</text>
   <rect x="840" y="16" width="92" height="5" rx="2.5" fill="#e9e5e2"/>
-  <text class="muted" x="840" y="36" font-size="10">la gobernanza</text>
+  <text class="muted" x="840" y="36" font-size="10">Gobernanza</text>
   <g class="rail"><rect x="534" y="16" width="92" height="5" rx="2.5" fill="url(#railg)"/></g>
   <line class="hair" x1="28" y1="46" x2="932" y2="46" stroke-width="1"/>
   <g class="act a1">
