@@ -16,8 +16,7 @@ decidió qué, cuándo y con qué justificación.
 
 El sistema son **cuatro capas**, las mismas cuatro del diagrama de arriba. Cada
 una resuelve un problema por su cuenta y trae su propio stack; los nombres de
-terceros van `en monoespaciada`, igual que en el diagrama, para que se distingan
-de un vistazo de lo que está escrito aquí.
+terceros van `en monoespaciada`.
 
 ### 1 · Harness de documentos — *suba el archivo y vea cómo se lee*
 
