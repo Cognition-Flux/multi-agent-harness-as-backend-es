@@ -5,13 +5,41 @@
        alt="Película en cuatro actos sobre el stack. Acto 1: un documento entra y recibe su propia sesión de Claude Code en una MicroVM, la barra avanza de «Etapa 1 de 8» a «Etapa 8 de 8», aparecen los campos extraídos y una confirmación humana espera con su ventana de 5 minutos. Acto 2: el asistente encadena sus herramientas y su memoria recorre la tubería mem0 → embeddings locales bge-m3 en Ollama → índice Qdrant, con Postgres como sistema de registro y toda escritura pasando por Drizzle. Acto 3: el oficial de cumplimiento enciende sus cinco acciones de rescate una a una y el registro de auditoría gana una línea por cada una, con la firma del estado final aparte. Acto 4: una política Rego compilada a Wasm admite la configuración de la empresa y los dos carriles de agente —el harness de documentos y el chat del asistente— quedan redibujados como hijos de esa misma puerta.">
 </p>
 
-El stack, en cuatro actos: el **harness** que procesa cada documento, el
-**asistente** con memoria semántica, la **compuerta humana** del oficial y la
-**gobernanza** que acota lo que la máquina puede decidir por su cuenta. Dentro de
-la película, cada pieza de terceros sobre la que corre esto —Claude Code, Vercel
-Sandbox, el AI SDK, mem0, bge-m3, Ollama, Qdrant, Postgres, Drizzle, Open Policy
-Agent, Rego, Wasm— aparece en **monoespaciada violeta**, para distinguirla de los
-módulos escritos aquí. El mismo recorrido, en texto, está aquí abajo.
+Antes de trabajar con un proveedor hay que revisar sus papeles: el seguro
+vigente, el formulario tributario, las licencias del rubro. Normalmente eso son
+semanas de correos, planillas y carpetas compartidas. En Vendra el proveedor sube
+sus documentos y **cada uno es leído por su propio agente de IA**, que reconoce
+qué documento es, saca los datos que importan y los compara con lo que su empresa
+exige. La app **no aprueba a nadie**: arma el caso, dice exactamente qué falta y
+lo pone sobre la mesa de la persona que decide — y deja constancia de quién
+decidió qué, cuándo y con qué justificación.
+
+Eso ocurre en cuatro capas, las mismas cuatro de la película de arriba:
+
+- **Harness — la lectura.** Cada archivo que se sube recibe su propio agente, y
+  usted lo ve trabajar en vivo, paso a paso, con la frase de lo que está haciendo
+  en ese momento. Cuando un dato queda genuinamente ambiguo, el agente no
+  adivina: abre una pregunta y espera su respuesta.
+- **Asistente — el acompañamiento.** Un chat que ya conoce el expediente del
+  proveedor y recuerda lo conversado antes. A «¿Qué falta para poder activar mi
+  cuenta?» responde con lo que de verdad falta, no con un manual. Según lo que
+  cada empresa permita, solo explica o además redacta propuestas para que una
+  persona las apruebe.
+- **Oficial — la decisión humana.** Nada queda resuelto por la máquina sola. El
+  oficial de cumplimiento revisa, recategoriza, exime, otorga o rechaza; las
+  acciones que cambian el veredicto exigen una justificación escrita, y todas
+  dejan su línea en el registro. La firma final es un acto aparte y deliberado.
+- **Gobernanza — las reglas de la casa.** Cada empresa declara qué documentos
+  acepta, qué datos se extraen, qué revisiones cuentan y hasta dónde puede
+  decidir la IA por su cuenta. Esas reglas se escriben una vez, se revisan al
+  activarlas y se aplican igual en todas partes: el mismo límite vale para el
+  agente que lee documentos y para el chat del asistente.
+
+En la película, cada pieza de terceros sobre la que corre esto —Claude Code,
+Vercel Sandbox, el AI SDK, mem0, bge-m3, Ollama, Qdrant, Postgres, Drizzle, Open
+Policy Agent, Rego, Wasm— aparece en **monoespaciada violeta**, para distinguirla
+de los módulos escritos aquí. La versión técnica de los cuatro actos está aquí
+abajo.
 
 <details>
 <summary><b>Los cuatro actos, en texto</b></summary>
