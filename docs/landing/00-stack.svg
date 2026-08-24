@@ -8,17 +8,35 @@
 
     /* every animation shares the master clock */
     .act, .rail, .mv { animation-duration: 32s; animation-iteration-count: infinite; }
-    .act { animation-timing-function: linear; }
+    .act { animation-timing-function: ease-out; }
 
     /* acts: base opacity == the settled frame (act 1 is the film's cover) */
     .a1 { opacity: 1; animation-name: act1; }
     .a2 { opacity: 0; animation-name: act2; }
     .a3 { opacity: 0; animation-name: act3; }
     .a4 { opacity: 0; animation-name: act4; }
-    @keyframes act1 { 0%{opacity:1} 23%{opacity:1} 25%{opacity:0} 98%{opacity:0} 100%{opacity:1} }
-    @keyframes act2 { 0%{opacity:0} 23%{opacity:0} 25%{opacity:1} 48%{opacity:1} 50%{opacity:0} 100%{opacity:0} }
-    @keyframes act3 { 0%{opacity:0} 48%{opacity:0} 50%{opacity:1} 73%{opacity:1} 75%{opacity:0} 100%{opacity:0} }
-    @keyframes act4 { 0%{opacity:0} 73%{opacity:0} 75%{opacity:1} 98%{opacity:1} 100%{opacity:0} }
+    @keyframes act1 { 0%{opacity:1;transform:translateY(0)} 23%{opacity:1;transform:translateY(0)} 25%{opacity:0;transform:translateY(0)} 97%{opacity:0;transform:translateY(9px)} 100%{opacity:1;transform:translateY(0)} }
+    @keyframes act2 { 0%{opacity:0;transform:translateY(9px)} 22%{opacity:0;transform:translateY(9px)} 25%{opacity:1;transform:translateY(0)} 48%{opacity:1;transform:translateY(0)} 50%{opacity:0;transform:translateY(0)} 100%{opacity:0;transform:translateY(9px)} }
+    @keyframes act3 { 0%{opacity:0;transform:translateY(9px)} 47%{opacity:0;transform:translateY(9px)} 50%{opacity:1;transform:translateY(0)} 73%{opacity:1;transform:translateY(0)} 75%{opacity:0;transform:translateY(0)} 100%{opacity:0;transform:translateY(9px)} }
+    @keyframes act4 { 0%{opacity:0;transform:translateY(9px)} 72%{opacity:0;transform:translateY(9px)} 75%{opacity:1;transform:translateY(0)} 97%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(0)} }
+
+
+    /* Ambient motion. 2 s and 4 s divide 32 s exactly (16 and 8 cycles), so these
+       stay phase-locked to the master clock instead of drifting against the acts. */
+    .amb2 { animation-duration: 2s;  animation-iteration-count: infinite; animation-timing-function: ease-in-out; }
+    .amb4 { animation-duration: 4s;  animation-iteration-count: infinite; animation-timing-function: linear; }
+    .pulse { animation-name: pulse; }
+    @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.4 } }
+    .sh420 { animation-name: sh420; }
+    @keyframes sh420 { 0% { transform: translateX(0) } 100% { transform: translateX(420px) } }
+    .sh540 { animation-name: sh540; }
+    @keyframes sh540 { 0% { transform: translateX(0) } 100% { transform: translateX(540px) } }
+    .sh560 { animation-name: sh560; }
+    @keyframes sh560 { 0% { transform: translateX(0) } 100% { transform: translateX(560px) } }
+    .sh636 { animation-name: sh636; }
+    @keyframes sh636 { 0% { transform: translateX(0) } 100% { transform: translateX(636px) } }
+    .glow { animation-name: glow; }
+    @keyframes glow { 0%, 100% { opacity: 1 } 50% { opacity: 0.55 } }
 
     /* the header rail: ONE stepped playhead that ticks at the crossfades, so it
        never spends motion budget inside an act's hold */
@@ -32,9 +50,55 @@
     @keyframes m1reel { 0%, 9% { transform: translateY(0) } 20%, 100% { transform: translateY(-140px) } }
     .m1bar { transform: translateX(0px); animation-name: m1bar; animation-timing-function: steps(7, end); }
     @keyframes m1bar { 0%, 9% { transform: translateX(-234.5px) } 20%, 100% { transform: translateX(0) } }
-    /* ACT 1 — (2) the dot crossing the lane strip */
-    .m1dot { transform: translateX(728px); animation-name: m1dot; animation-timing-function: ease-in-out; }
-    @keyframes m1dot { 0%, 5% { transform: translateX(0) } 21%, 100% { transform: translateX(728px) } }
+    /* ACT 1 — the narration rides the SAME reel as the counter, and a cursor walks
+       the five host tools: three parts, one idea (the stage advancing) */
+    .m1narr { transform: translateY(-126px); animation-name: m1narr; animation-timing-function: steps(7, end); }
+    @keyframes m1narr { 0%, 9% { transform: translateY(0) } 20%, 100% { transform: translateY(-126px) } }
+    .m1cur { transform: translateY(60px); animation-name: m1cur; animation-timing-function: steps(4, end); }
+    @keyframes m1cur { 0%, 9% { transform: translateY(0) } 20%, 100% { transform: translateY(60px) } }
+    /* ACT 1 — (2) a short train of dots crossing the lane strip */
+    .m1dot0, .m1dot1, .m1dot2 { transform: translateX(728px); animation-timing-function: ease-in-out; }
+    .m1dot0 { animation-name: m1dot0; } .m1dot1 { animation-name: m1dot1; } .m1dot2 { animation-name: m1dot2; }
+    @keyframes m1dot0 { 0%, 5%   { transform: translateX(0) } 20%, 100% { transform: translateX(728px) } }
+    @keyframes m1dot1 { 0%, 7.2% { transform: translateX(0) } 22%, 100% { transform: translateX(728px) } }
+    @keyframes m1dot2 { 0%, 9.4% { transform: translateX(0) } 24%, 100% { transform: translateX(728px) } }
+    /* ACT 1 — the confirmation window draining while it waits */
+    .m1drain { transform: translateX(-156px); animation-name: m1drain; animation-timing-function: linear; }
+    @keyframes m1drain { 0%, 10% { transform: translateX(0) } 23%, 100% { transform: translateX(-156px) } }
+
+    /* ACT 2 — the thinking beat that precedes the first pill */
+    .m2think { opacity: 0; animation-name: m2think; animation-timing-function: ease-in-out; }
+    @keyframes m2think { 0%, 25% { opacity: 0 } 27% { opacity: 1 } 30% { opacity: 1 } 32%, 100% { opacity: 0 } }
+    /* ACT 2 — (2) a train of three dots crossing the memory pipeline */
+    .m2dot0, .m2dot1, .m2dot2 { transform: translateX(408px); animation-timing-function: ease-in-out; }
+    .m2dot0 { animation-name: m2dot0; } .m2dot1 { animation-name: m2dot1; } .m2dot2 { animation-name: m2dot2; }
+    @keyframes m2dot0 { 0%, 30%   { transform: translateX(0) } 45%, 100% { transform: translateX(408px) } }
+    @keyframes m2dot1 { 0%, 32.2% { transform: translateX(0) } 47%, 100% { transform: translateX(408px) } }
+    @keyframes m2dot2 { 0%, 34.4% { transform: translateX(0) } 49%, 100% { transform: translateX(408px) } }
+
+    /* ACT 3 — a flash rides each audit line as it lands */
+    .m3flash { transform: translateY(96px); animation-name: m3flash; animation-timing-function: steps(4, end); }
+    @keyframes m3flash { 0%, 53% { transform: translateY(0) } 70%, 100% { transform: translateY(96px) } }
+    /* ACT 3 — the four final states arrive staggered, not all at once */
+    .m3fin0, .m3fin1, .m3fin2, .m3fin3 { opacity: 1; animation-timing-function: ease-out; }
+    .m3fin0 { animation-name: m3fin0; } .m3fin1 { animation-name: m3fin1; }
+    .m3fin2 { animation-name: m3fin2; } .m3fin3 { animation-name: m3fin3; }
+    @keyframes m3fin0 { 0%, 64% { opacity: 0 } 66%, 100% { opacity: 1 } }
+    @keyframes m3fin1 { 0%, 65% { opacity: 0 } 67%, 100% { opacity: 1 } }
+    @keyframes m3fin2 { 0%, 66% { opacity: 0 } 68%, 100% { opacity: 1 } }
+    @keyframes m3fin3 { 0%, 67% { opacity: 0 } 69%, 100% { opacity: 1 } }
+
+    /* ACT 4 — a dot descends each arrow, and the policy knobs wipe in line by line */
+    .m4d1, .m4d2 { opacity: 0; animation-timing-function: ease-in; }
+    .m4d1 { animation-name: m4d1; } .m4d2 { animation-name: m4d2; }
+    @keyframes m4d1 { 0%, 78% { transform: translateY(0); opacity: 0 } 79% { opacity: 1 }
+                       82% { transform: translateY(24px); opacity: 0 } 100% { opacity: 0 } }
+    @keyframes m4d2 { 0%, 80% { transform: translateY(0); opacity: 0 } 81% { opacity: 1 }
+                       84% { transform: translateY(24px); opacity: 0 } 100% { opacity: 0 } }
+    .m4k0, .m4k1 { transform: translateX(0px); animation-timing-function: ease-out; }
+    .m4k0 { animation-name: m4k0; } .m4k1 { animation-name: m4k1; }
+    @keyframes m4k0 { 0%, 76% { transform: translateX(-880px) } 80%, 100% { transform: translateX(0) } }
+    @keyframes m4k1 { 0%, 77% { transform: translateX(-880px) } 81%, 100% { transform: translateX(0) } }
 
     /* ACT 2 — (1) the tool pills arriving one by one (4 pills => steps(4-1)) */
     .m2pills { transform: translateY(0px); animation-name: m2pills; animation-timing-function: steps(3, end); }
@@ -59,8 +123,11 @@
 
     @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
   </style>
+  <defs><linearGradient id="sheen" x1="0" x2="1"><stop offset="0" stop-color="#b04507" stop-opacity="0"/><stop offset="0.5" stop-color="#b04507" stop-opacity="0.085"/><stop offset="1" stop-color="#b04507" stop-opacity="0"/></linearGradient><linearGradient id="railg" x1="0" x2="1"><stop offset="0" stop-color="#b04507"/><stop offset="0.5" stop-color="#da730b"/><stop offset="1" stop-color="#b04507"/></linearGradient></defs>
   <rect x="0.5" y="0.5" width="959" height="419" rx="12" fill="#fdfcfc" stroke="#e9e5e2" stroke-width="1"/>
   <text class="ink" x="28" y="29" font-size="15" font-weight="600">El stack de Vendra, en cuatro actos</text>
+  <circle class="amb2 pulse" cx="322" cy="24" r="3.4" fill="#b04507"/>
+  <text class="brand" x="332" y="29" font-size="10" font-weight="600">en vivo</text>
   <rect x="534" y="16" width="92" height="5" rx="2.5" fill="#e9e5e2"/>
   <text class="muted" x="534" y="36" font-size="10">el harness</text>
   <rect x="636" y="16" width="92" height="5" rx="2.5" fill="#e9e5e2"/>
@@ -69,13 +136,14 @@
   <text class="muted" x="738" y="36" font-size="10">el oficial</text>
   <rect x="840" y="16" width="92" height="5" rx="2.5" fill="#e9e5e2"/>
   <text class="muted" x="840" y="36" font-size="10">la gobernanza</text>
-  <g class="rail"><rect x="534" y="16" width="92" height="5" rx="2.5" fill="#b04507"/></g>
+  <g class="rail"><rect x="534" y="16" width="92" height="5" rx="2.5" fill="url(#railg)"/></g>
   <line class="hair" x1="28" y1="46" x2="932" y2="46" stroke-width="1"/>
   <g class="act a1">
   <rect x="1" y="47" width="958" height="344" fill="#fdfcfc"/>
   <text class="ink" x="28" y="72" font-size="13.5" font-weight="600">1 · Un documento, un agente, una MicroVM</text>
   <text class="muted" x="28" y="90" font-size="11">El harness de Claude Code es el backend: trae su propio ciclo de razonamiento, su manejo de contexto y su historial nativo — aquí nadie escribe el loop a mano.</text>
   <rect x="28" y="104" width="300" height="178" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
+  <clipPath id="c1sheen"><rect x="28" y="104" width="300" height="178" rx="12"/></clipPath><g clip-path="url(#c1sheen)"><rect class="amb4 sh420" x="-92" y="104" width="120" height="178" fill="url(#sheen)"/></g>
   <circle cx="46" cy="126" r="3.2" fill="#b04507"/>
   <text class="ink" x="58" y="130" font-size="12" font-weight="600">coi-acord25.pdf</text>
   <clipPath id="c1reel"><rect x="44" y="140" width="180" height="20"/></clipPath>
@@ -91,7 +159,17 @@
   </g></g>
   <rect x="44" y="166" width="268" height="6" rx="3" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
   <clipPath id="c1bar"><rect x="44" y="166" width="268" height="6" rx="3"/></clipPath><g clip-path="url(#c1bar)"><rect class="mv m1bar" x="44" y="166" width="268" height="6" rx="3" fill="#b04507"/></g>
-  <text class="muted" x="44" y="192" font-size="10.5">Completando el procesamiento y actualizando…</text>
+  <clipPath id="c1narr"><rect x="44" y="182" width="268" height="18"/></clipPath>
+  <g clip-path="url(#c1narr)"><g class="mv m1narr" transform="translate(0,-126)">
+  <text class="muted" x="44" y="195" font-size="10.5">Subiendo y preparando su documento...</text>
+  <text class="muted" x="44" y="213" font-size="10.5">Analizando el contenido y la estructura…</text>
+  <text class="muted" x="44" y="231" font-size="10.5">Identificando el tipo de documento...</text>
+  <text class="muted" x="44" y="249" font-size="10.5">Leyendo y extrayendo la información clave...</text>
+  <text class="muted" x="44" y="267" font-size="10.5">Guardando los datos extraídos...</text>
+  <text class="muted" x="44" y="285" font-size="10.5">Verificando que toda la información requerida…</text>
+  <text class="muted" x="44" y="303" font-size="10.5">Vinculando este documento con sus requisitos…</text>
+  <text class="muted" x="44" y="321" font-size="10.5">Completando el procesamiento y actualizando…</text>
+  </g></g>
   <line class="hair" x1="44" y1="204" x2="312" y2="204" stroke-width="1"/>
   <text class="muted" x="44" y="220" font-size="10" font-weight="600">CAMPOS EXTRAÍDOS</text>
   <text class="ink" x="44" y="238" font-size="10.5">asegurado · límite por ocurrencia</text>
@@ -102,18 +180,33 @@
   <text class="muted" x="360" y="146" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">runtime node24 · puertos bridge 4000–4003</text>
   <rect x="360" y="156" width="268" height="30" rx="12" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
   <text class="ink" x="372" y="175" font-size="11" font-weight="600">CLI de Claude Code</text>
-  <text class="muted" x="360" y="204" font-size="10" font-weight="600">ACTIVETOOLS</text>
-  <text class="ink" x="360" y="220" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">read · saveClassification · saveExtraction</text>
-  <text class="ink" x="360" y="235" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">finalizeDocument · failDocument</text>
-  <text class="muted" x="360" y="254" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">permissionMode: "allow-reads"</text>
-  <rect x="360" y="262" width="213" height="17" rx="8.5" fill="#096ca5" fill-opacity="0.10" stroke="#096ca5" stroke-opacity="0.30" stroke-width="1"/><text x="368" y="274.2" font-size="10" font-weight="500" fill="#096ca5">egreso: api.anthropic.com · *.npmjs.org</text>
+  <text class="muted" x="360" y="202" font-size="10" font-weight="600">ACTIVETOOLS</text>
+  <clipPath id="c1cur"><rect x="356" y="208" width="132" height="75"/></clipPath>
+  <g clip-path="url(#c1cur)"><g class="mv m1cur" transform="translate(0,60)"><rect x="356" y="208" width="128" height="15" rx="4" fill="#b04507" fill-opacity="0.10"/></g></g>
+  <circle cx="363" cy="216" r="1.9" fill="#b04507"/>
+  <text class="ink" x="371" y="219" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">read</text>
+  <circle cx="363" cy="231" r="1.9" fill="#b04507"/>
+  <text class="ink" x="371" y="234" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">saveClassification</text>
+  <circle cx="363" cy="246" r="1.9" fill="#b04507"/>
+  <text class="ink" x="371" y="249" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">saveExtraction</text>
+  <circle cx="363" cy="261" r="1.9" fill="#b04507"/>
+  <text class="ink" x="371" y="264" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">finalizeDocument</text>
+  <circle cx="363" cy="276" r="1.9" fill="#696059"/>
+  <text class="ink" x="371" y="279" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">failDocument</text>
+  <line class="hair" x1="500" y1="208" x2="500" y2="208" stroke-width="1"/>
+  <line class="hair" x1="500" y1="206" x2="500" y2="278" stroke-width="1"/>
+  <text class="muted" x="516" y="220" font-size="10" font-weight="600">1 built-in activo</text>
+  <text class="brand" x="516" y="236" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">read</text>
+  <text class="muted" x="516" y="258" font-size="10" font-weight="600">4 del host</text>
+  <text class="muted" x="516" y="274" font-size="9.5">deciden en el host</text>
   <rect x="660" y="104" width="272" height="178" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
-  <circle cx="678" cy="126" r="3.2" fill="#915808"/>
+  <circle class="amb2 pulse" cx="678" cy="126" r="3.4" fill="#915808"/>
   <text class="ink" x="690" y="130" font-size="12" font-weight="600">Confirmación del proveedor</text>
   <text class="ink" x="676" y="152" font-size="10.5">«El certificado no indica la condición</text>
   <text class="ink" x="676" y="167" font-size="10.5">de asegurado adicional…»</text>
   <rect x="676" y="192" width="240" height="6" rx="3" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
-  <rect x="676" y="192" width="86" height="6" rx="3" fill="#915808"/>
+  <clipPath id="c1drain"><rect x="676" y="192" width="240" height="6" rx="3"/></clipPath>
+  <g clip-path="url(#c1drain)"><rect class="mv m1drain" x="676" y="192" width="240" height="6" rx="3" fill="#915808"/></g>
   <text class="muted" x="676" y="216" font-size="10">ventana durable de 5 min · fail-open</text>
   <rect x="676" y="226" width="44" height="22" rx="11" fill="#2a2623" stroke="#2a2623" stroke-width="1"/>
   <text x="698" y="241" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Sí</text>
@@ -133,8 +226,9 @@
   <circle cx="248" cy="323" r="2.4" fill="#e9e5e2"/>
   <circle cx="498" cy="323" r="2.4" fill="#e9e5e2"/>
   <circle cx="772" cy="323" r="2.4" fill="#e9e5e2"/>
-  <g class="mv m1dot" transform="translate(728,0)"><circle cx="44" cy="323" r="4" fill="#b04507"/></g>
-  <text class="muted" x="28" y="366" font-size="10.5">El progreso llega al navegador con createUIMessageStream + toUIMessageStream y se pinta con los AI Elements vendorizados: Tool · Reasoning · Task.</text>
+  <g class="mv m1dot0"><circle cx="44" cy="323" r="4.0" fill="#b04507" opacity="1.00"/></g><g class="mv m1dot1"><circle cx="44" cy="323" r="3.4" fill="#b04507" opacity="0.72"/></g><g class="mv m1dot2"><circle cx="44" cy="323" r="2.8" fill="#b04507" opacity="0.44"/></g>
+  <text class="muted" x="28" y="364" font-size="10.5">El progreso llega al navegador con createUIMessageStream + toUIMessageStream y se pinta con los AI Elements vendorizados: Tool · Reasoning · Task.</text>
+  <text class="muted" x="28" y="381" font-size="10.5">permissionMode: "allow-reads" · egreso permitido solo a api.anthropic.com y *.npmjs.org — sin shell, sin escritura, sin web.</text>
   </g>
   <g class="act a2">
   <rect x="1" y="47" width="958" height="344" fill="#fdfcfc"/>
@@ -143,6 +237,10 @@
   <rect x="28" y="104" width="372" height="178" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <rect x="44" y="118" width="340" height="30" rx="12" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
   <text class="ink" x="56" y="137" font-size="11">¿Qué falta para poder activar mi cuenta?</text>
+  <g class="mv m2think">
+  <circle class="amb2 pulse" cx="52" cy="152" r="2.6" fill="#b04507"/>
+  <text class="brand" x="62" y="155" font-size="10" font-weight="600">Pensando…</text>
+  </g>
   <clipPath id="c2p"><rect x="44" y="156" width="340" height="88"/></clipPath>
   <g clip-path="url(#c2p)"><g class="mv m2pills">
   <rect x="44" y="158" width="230" height="18" rx="9.0" fill="#b04507" fill-opacity="0.10" stroke="#b04507" stroke-opacity="0.30" stroke-width="1"/><circle cx="56.4" cy="167.0" r="3.4" fill="#b04507"/><text x="68" y="170.7" font-size="10" font-weight="500" fill="#b04507">Se consultó su registro de cumplimiento</text>
@@ -153,6 +251,7 @@
   <text class="muted" x="44" y="262" font-size="10">Cuatro herramientas encadenadas en un solo turno.</text>
   <text class="muted" x="44" y="276" font-size="10">El razonamiento queda a la vista, plegado.</text>
   <rect x="416" y="104" width="516" height="178" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
+  <clipPath id="c2sheen"><rect x="416" y="104" width="516" height="178" rx="12"/></clipPath><g clip-path="url(#c2sheen)"><rect class="amb4 sh636" x="296" y="104" width="120" height="178" fill="url(#sheen)" style="animation-delay:1s"/></g>
   <text class="ink" x="432" y="130" font-size="12" font-weight="600">Memoria: mem0 OSS, autoalojada</text>
   <rect x="432" y="148" width="90" height="30" rx="12" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
   <text class="ink" x="477.0" y="167" font-size="10" font-weight="600" text-anchor="middle">turno</text>
@@ -174,7 +273,7 @@
   <circle cx="681.0" cy="188" r="2.4" fill="#e9e5e2"/>
   <circle cx="783.0" cy="188" r="2.4" fill="#e9e5e2"/>
   <circle cx="885.0" cy="188" r="2.4" fill="#e9e5e2"/>
-  <g class="mv m2dot" transform="translate(408,0)"><circle cx="477.0" cy="188" r="3.6" fill="#b04507"/></g>
+  <g class="mv m2dot0"><circle cx="477.0" cy="188" r="3.6" fill="#b04507" opacity="1.00"/></g><g class="mv m2dot1"><circle cx="477.0" cy="188" r="3.0" fill="#b04507" opacity="0.72"/></g><g class="mv m2dot2"><circle cx="477.0" cy="188" r="2.4" fill="#b04507" opacity="0.44"/></g>
   <line class="hair" x1="432" y1="200" x2="916" y2="200" stroke-width="1"/>
   <text class="muted" x="432" y="218" font-size="10">Postgres es el sistema de registro; el índice de Qdrant se puede tirar y reconstruir.</text>
   <text class="muted" x="432" y="234" font-size="10">Recall en cada turno: 30 candidatos por ámbito → 20 hechos / 2.000 caracteres, en dos ámbitos.</text>
@@ -185,6 +284,7 @@
   <text class="muted" x="44" y="336" font-size="10">3 herramientas: consultar el expediente, revisar un documento, tomar nota.</text>
   <rect x="492" y="300" width="440" height="46" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1" stroke-opacity="0.45"/>
   <rect x="492" y="300" width="440" height="46" rx="12" fill="#b04507" fill-opacity="0.06"/>
+  <g class="amb2 glow"><circle cx="500" cy="316" r="3.0" fill="#b04507"/></g>
   <text class="brand" x="508" y="320" font-size="11" font-weight="600">Delegado — puede proponer directivas</text>
   <text class="muted" x="508" y="336" font-size="10">+2: redactar una propuesta y consultar su estado. Solo una persona la aplica.</text>
   <text class="muted" x="28" y="366" font-size="10.5">El nivel lo fija la política de la empresa y se aplica como lista blanca activeTools, recalculada en cada turno — nunca como una instrucción en el prompt.</text>
@@ -194,6 +294,7 @@
   <text class="ink" x="28" y="72" font-size="13.5" font-weight="600">3 · La compuerta humana</text>
   <text class="muted" x="28" y="90" font-size="11">Cuando el motor determinista se detiene, el oficial de cumplimiento tiene herramientas — y cada una deja su rastro antes de tocar nada.</text>
   <rect x="28" y="104" width="420" height="178" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
+  <clipPath id="c3sheen"><rect x="28" y="104" width="420" height="178" rx="12"/></clipPath><g clip-path="url(#c3sheen)"><rect class="amb4 sh540" x="-92" y="104" width="120" height="178" fill="url(#sheen)" style="animation-delay:2s"/></g>
   <text class="muted" x="44" y="126" font-size="10" font-weight="600">KIT DE RESCATE</text>
   <clipPath id="c3hl"><rect x="40" y="132" width="396" height="130"/></clipPath>
   <g clip-path="url(#c3hl)"><g class="mv m3act"><rect x="40" y="236" width="396" height="22" rx="8" fill="#b04507" fill-opacity="0.08" stroke="#b04507" stroke-opacity="0.35" stroke-width="1"/></g></g>
@@ -211,6 +312,7 @@
   <rect x="472" y="104" width="460" height="178" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <text class="muted" x="488" y="126" font-size="10" font-weight="600">ACTIVIDAD</text>
   <clipPath id="c3led"><rect x="488" y="134" width="428" height="120"/></clipPath>
+  <g clip-path="url(#c3led)"><g class="mv m3flash"><rect x="488" y="134" width="428" height="22" rx="6" fill="#b04507" fill-opacity="0.11"/></g></g>
   <g clip-path="url(#c3led)"><g class="mv m3led">
   <text class="muted" x="488" y="150" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">hoy 14:01</text>
   <text class="ink" x="560" y="150" font-size="10.5">documento eximido</text>
@@ -231,10 +333,10 @@
   <text class="muted" x="488" y="276" font-size="10">actor, hora y el largo de la justificación — el texto va a la base, no al log</text>
   <rect x="28" y="300" width="904" height="46" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <text class="ink" x="44" y="320" font-size="11" font-weight="600">Finalizar estado de cumplimiento</text>
-  <rect x="44" y="326" width="164" height="17" rx="8.5" fill="#2a2623" fill-opacity="0.10" stroke="#2a2623" stroke-opacity="0.30" stroke-width="1"/><text x="53" y="338.2" font-size="10" font-weight="500" fill="#2a2623">Probablemente en cumplimiento</text>
-  <rect x="216.45" y="326" width="104" height="17" rx="8.5" fill="#915808" fill-opacity="0.10" stroke="#915808" stroke-opacity="0.30" stroke-width="1"/><text x="225.45" y="338.2" font-size="10" font-weight="500" fill="#915808">Requiere revisión</text>
-  <rect x="328.29999999999995" y="326" width="58" height="17" rx="8.5" fill="#186d45" fill-opacity="0.10" stroke="#186d45" stroke-opacity="0.30" stroke-width="1"/><text x="337.29999999999995" y="338.2" font-size="10" font-weight="500" fill="#186d45">Aprobado</text>
-  <rect x="394.69999999999993" y="326" width="63" height="17" rx="8.5" fill="#c52020" fill-opacity="0.10" stroke="#c52020" stroke-opacity="0.30" stroke-width="1"/><text x="403.69999999999993" y="338.2" font-size="10" font-weight="500" fill="#c52020">Rechazado</text>
+  <g class="mv m3fin0"><rect x="44" y="326" width="164" height="17" rx="8.5" fill="#2a2623" fill-opacity="0.10" stroke="#2a2623" stroke-opacity="0.30" stroke-width="1"/><text x="53" y="338.2" font-size="10" font-weight="500" fill="#2a2623">Probablemente en cumplimiento</text></g>
+  <g class="mv m3fin1"><rect x="216.45" y="326" width="104" height="17" rx="8.5" fill="#915808" fill-opacity="0.10" stroke="#915808" stroke-opacity="0.30" stroke-width="1"/><text x="225.45" y="338.2" font-size="10" font-weight="500" fill="#915808">Requiere revisión</text></g>
+  <g class="mv m3fin2"><rect x="328.29999999999995" y="326" width="58" height="17" rx="8.5" fill="#186d45" fill-opacity="0.10" stroke="#186d45" stroke-opacity="0.30" stroke-width="1"/><text x="337.29999999999995" y="338.2" font-size="10" font-weight="500" fill="#186d45">Aprobado</text></g>
+  <g class="mv m3fin3"><rect x="394.69999999999993" y="326" width="63" height="17" rx="8.5" fill="#c52020" fill-opacity="0.10" stroke="#c52020" stroke-opacity="0.30" stroke-width="1"/><text x="403.69999999999993" y="338.2" font-size="10" font-weight="500" fill="#c52020">Rechazado</text></g>
   <text class="muted" x="474.1499999999999" y="338" font-size="9.5">otorgar una categoría nunca aprueba a un proveedor</text>
   <text class="muted" x="28" y="366" font-size="10.5">El servidor recorta el alcance de cada exención: un desajuste de nombre jamás puede eximir la identidad fiscal.</text>
   </g>
@@ -245,18 +347,28 @@
   <rect x="28" y="102" width="904" height="70" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <circle cx="48" cy="124" r="3.4" fill="#b04507"/>
   <text class="ink" x="60" y="128" font-size="12" font-weight="600">Política de la empresa · v7 activa</text>
+  <clipPath id="c4k0"><rect x="44" y="137" width="872" height="15"/></clipPath>
+  <g clip-path="url(#c4k0)"><g class="mv m4k0">
   <text class="muted" x="44" y="148" font-size="10">documentos aceptados · campos extraídos (los estructurales, bloqueados) · validaciones que cuentan</text>
+  </g></g>
+  <clipPath id="c4k1"><rect x="44" y="152" width="872" height="15"/></clipPath>
+  <g clip-path="url(#c4k1)"><g class="mv m4k1">
   <text class="muted" x="44" y="163" font-size="10">aprobación automática por categoría · privilegio del asistente · anclada a la versión que juzga a cada proveedor</text>
+  </g></g>
   <line x1="248" y1="172" x2="248" y2="197" stroke="#b04507" stroke-width="1"/><path d="M245 197 L248 202 L251 197" fill="none" stroke="#b04507" stroke-width="1"/>
   <text class="brand" x="256" y="192" font-size="10" font-weight="600">admite</text>
+  <g class="mv m4d1"><circle cx="248" cy="176" r="3.2" fill="#b04507"/></g>
   <line x1="712" y1="172" x2="712" y2="197" stroke="#e9e5e2" stroke-width="1"/><path d="M709 197 L712 202 L715 197" fill="none" stroke="#e9e5e2" stroke-width="1"/>
   <text class="muted" x="720" y="192" font-size="10" font-weight="600">aplica</text>
+  <g class="mv m4d2"><circle cx="712" cy="176" r="3.2" fill="#696059"/></g>
   <rect x="28" y="202" width="440" height="68" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
+  <clipPath id="c4sheen"><rect x="28" y="202" width="440" height="68" rx="12"/></clipPath><g clip-path="url(#c4sheen)"><rect class="amb4 sh560" x="-92" y="202" width="120" height="68" fill="url(#sheen)" style="animation-delay:3s"/></g>
   <text class="ink" x="44" y="224" font-size="11.5" font-weight="600">OPA / Rego → Wasm</text>
   <text class="muted" x="44" y="242" font-size="10">en proceso · SHA-256 verificado · falla cerrado</text>
   <text class="muted" x="44" y="256" font-size="10">13 rechazos + 2 advertencias · solo al activar</text>
   <clipPath id="c4seal"><rect x="366" y="212" width="78" height="22" rx="11"/></clipPath>
-  <g clip-path="url(#c4seal)"><g class="mv m4seal"><rect x="366" y="214" width="78" height="18" rx="9" fill="#186d45" fill-opacity="0.10" stroke="#186d45" stroke-opacity="0.35" stroke-width="1"/><text x="405" y="227" font-size="9.5" font-weight="600" fill="#186d45" text-anchor="middle">admisible</text></g></g>
+  <g clip-path="url(#c4seal)"><g class="mv m4seal"><rect x="366" y="214" width="78" height="18" rx="9" fill="#186d45" fill-opacity="0.10" stroke="#186d45" stroke-opacity="0.35" stroke-width="1"/><text x="405" y="227" font-size="10" font-weight="600" fill="#186d45" text-anchor="middle">admisible</text></g></g>
+  <g class="amb2 glow"><circle cx="376" cy="223" r="2.6" fill="#186d45"/></g>
   <rect x="492" y="202" width="440" height="68" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <text class="ink" x="508" y="224" font-size="11.5" font-weight="600">Motores deterministas</text>
   <text class="muted" x="508" y="242" font-size="10">@vendra/workflow · sin IA, sin IO</text>
