@@ -11,7 +11,7 @@ semanas de correos, planillas y carpetas compartidas. En Vendra el proveedor sub
 sus documentos y **cada uno es leído por su propio agente de IA**, que reconoce
 qué documento es, saca los datos que importan y los compara con lo que su empresa
 exige. La app **no aprueba a nadie**: arma el caso, dice exactamente qué falta y
-lo pone sobre la mesa de la persona que decide — y deja constancia de quién
+lo pone sobre la mesa de la persona que decide — dejando constancia de quién
 decidió qué, cuándo y con qué justificación.
 
 El sistema son **cuatro capas**, las mismas cuatro del diagrama de arriba. Cada
