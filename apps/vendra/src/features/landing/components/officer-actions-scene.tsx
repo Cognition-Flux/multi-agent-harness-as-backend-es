@@ -225,8 +225,8 @@ export function OfficerActionsScene() {
                 <p className="text-[11px] font-semibold">Trazabilidad de requisitos</p>
                 <p className="mt-1 text-[10px] leading-relaxed text-muted-foreground">
                   Cada categoría muestra qué documento la otorga y por qué regla. Cuando el motor
-                  determinista se detiene, estas cinco acciones lo destraban — y ninguna se ejecuta
-                  sin justificación escrita.
+                  determinista se detiene, estas cinco acciones lo destraban — y las cuatro que
+                  cambian el veredicto exigen justificación escrita.
                 </p>
               </m.div>
             ) : null}

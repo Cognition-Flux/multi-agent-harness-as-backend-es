@@ -113,7 +113,7 @@ export const SHOWCASE_PANELS: ShowcasePanel[] = [
     bullets: [
       "Zona de carga con verificación en vivo: barra «Etapa X de 8», narración del agente y razonamiento visible.",
       "Confirmaciones humano-en-el-circuito con cuenta regresiva cuando el agente duda de verdad.",
-      "Lista de 11 categorías con medidor de avance, descartes «No aplica» y aviso de renovación a 30 días.",
+      "Lista de requisitos del perfil del proveedor con medidor de avance, descartes «No aplica» y aviso de renovación a 30 días.",
       "Activación con compuerta determinista: el botón explica exactamente qué falta para habilitarse.",
     ],
   },
@@ -193,7 +193,7 @@ export const OFFICER_ACTIONS: DeepDive = {
     "Cuando el motor determinista se detiene, su oficial de cumplimiento tiene herramientas — y cada una escribe su propia línea en el registro de auditoría antes de tocar nada.",
   bullets: [
     "Eximir, recategorizar, otorgar, revocar y reintentar: el kit completo sobre el documento, sin salir del expediente del proveedor.",
-    "Toda acción exige una justificación escrita que queda en el registro de auditoría — no hay atajos silenciosos.",
+    "Las cuatro acciones que cambian el veredicto exigen una justificación escrita; las cinco dejan su línea en el registro de auditoría — no hay atajos silenciosos.",
     "El servidor vuelve a acotar el alcance de cada exención: una falla nunca puede eximir más de lo que realmente bloquea.",
     "El estado final es una decisión aparte y explícita: otorgar cierra una categoría, no aprueba al proveedor.",
   ],
