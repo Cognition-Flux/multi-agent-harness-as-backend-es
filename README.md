@@ -2,7 +2,7 @@
 
 <p align="center">
   <img src="docs/landing/00-stack.svg" width="100%"
-       alt="Película en cuatro actos sobre el stack. Acto 1: un documento entra y recibe su propia sesión de Claude Code en una MicroVM, la barra avanza de «Etapa 1 de 8» a «Etapa 8 de 8», aparecen los campos extraídos y una confirmación humana espera con su ventana de 5 minutos. Acto 2: el asistente encadena sus herramientas y su memoria recorre la tubería mem0 → embeddings locales bge-m3 en Ollama → índice Qdrant, con Postgres como sistema de registro y toda escritura pasando por Drizzle. Acto 3: el oficial de cumplimiento enciende sus cinco acciones de rescate una a una y el registro de auditoría gana una línea por cada una, con la firma del estado final aparte. Acto 4: una política Rego compilada a Wasm admite la configuración de la empresa y los dos carriles de agente —el harness de documentos y el chat del asistente— quedan redibujados como hijos de esa misma puerta.">
+       alt="Diagrama animado del stack, cuatro capas encadenadas. Capa 1 — harness de documentos: un documento entra y recibe su propia sesión de Claude Code en una MicroVM, la barra avanza de «Etapa 1 de 8» a «Etapa 8 de 8», aparecen los campos extraídos y una confirmación humana espera con su ventana de 5 minutos. Capa 2 — asistente del proveedor: el asistente encadena sus herramientas y su memoria recorre la tubería mem0 → embeddings locales bge-m3 en Ollama → índice Qdrant, con Postgres como sistema de registro y toda escritura pasando por Drizzle. Capa 3 — adjudicación del oficial: el oficial de cumplimiento enciende sus cinco acciones de rescate una a una y el registro de auditoría gana una línea por cada una, con la firma del estado final aparte. Capa 4 — gobernanza de plataforma: una política Rego compilada a Wasm admite la configuración de la empresa y los dos carriles de agente —el harness de documentos y el chat del asistente— quedan redibujados como hijos de esa misma puerta.">
 </p>
 
 Antes de trabajar con un proveedor hay que revisar sus papeles: el seguro
@@ -14,35 +14,75 @@ exige. La app **no aprueba a nadie**: arma el caso, dice exactamente qué falta 
 lo pone sobre la mesa de la persona que decide — y deja constancia de quién
 decidió qué, cuándo y con qué justificación.
 
-Eso ocurre en cuatro capas, las mismas cuatro de la película de arriba:
+El sistema son **cuatro capas**, las mismas cuatro del diagrama de arriba. Cada
+una resuelve un problema por su cuenta y trae su propio stack; los nombres de
+terceros van `en monoespaciada`, igual que en el diagrama, para que se distingan
+de un vistazo de lo que está escrito aquí.
 
-- **Harness — la lectura.** Cada archivo que se sube recibe su propio agente, y
-  usted lo ve trabajar en vivo, paso a paso, con la frase de lo que está haciendo
-  en ese momento. Cuando un dato queda genuinamente ambiguo, el agente no
-  adivina: abre una pregunta y espera su respuesta.
-- **Asistente — el acompañamiento.** Un chat que ya conoce el expediente del
-  proveedor y recuerda lo conversado antes. A «¿Qué falta para poder activar mi
-  cuenta?» responde con lo que de verdad falta, no con un manual. Según lo que
-  cada empresa permita, solo explica o además redacta propuestas para que una
-  persona las apruebe.
-- **Oficial — la decisión humana.** Nada queda resuelto por la máquina sola. El
-  oficial de cumplimiento revisa, recategoriza, exime, otorga o rechaza; las
-  acciones que cambian el veredicto exigen una justificación escrita, y todas
-  dejan su línea en el registro. La firma final es un acto aparte y deliberado.
-- **Gobernanza — las reglas de la casa.** Cada empresa declara qué documentos
-  acepta, qué datos se extraen, qué revisiones cuentan y hasta dónde puede
-  decidir la IA por su cuenta. Esas reglas se escriben una vez, se revisan al
-  activarlas y se aplican igual en todas partes: el mismo límite vale para el
-  agente que lee documentos y para el chat del asistente.
+### 1 · Harness de documentos — *suba el archivo y vea cómo se lee*
 
-En la película, cada pieza de terceros sobre la que corre esto —Claude Code,
-Vercel Sandbox, el AI SDK, mem0, bge-m3, Ollama, Qdrant, Postgres, Drizzle, Open
-Policy Agent, Rego, Wasm— aparece en **monoespaciada violeta**, para distinguirla
-de los módulos escritos aquí. La versión técnica de los cuatro actos está aquí
-abajo.
+Cada documento que entra recibe **su propia sesión de agente**, aislada de las
+demás, y usted la ve trabajar en vivo: en qué etapa va, qué está haciendo en esta
+frase, qué herramienta acaba de llamar y qué datos ya extrajo. Si un dato queda
+ambiguo, el agente **pregunta en lugar de adivinar** y la respuesta queda guardada
+con el expediente. No hay un bucle de herramientas escrito a mano: el harness trae
+el suyo, con su propio manejo de contexto y su historial de sesión.
+
+> **Stack:** `@ai-sdk/harness` + `@ai-sdk/harness-claude-code` — el CLI de
+> `Claude Code` como backend del agente · `@ai-sdk/sandbox-vercel` +
+> `@vercel/sandbox` — una MicroVM por proveedor, con salida a internet en lista
+> blanca · `ai` 7 (`createUIMessageStream`) y `@ai-sdk/react` (`useChat`) para el
+> stream tipado · AI Elements vendorizados para pintarlo.
+
+### 2 · Asistente del proveedor — *pregunte en lenguaje natural, no busque en el manual*
+
+Un chat que **consulta el expediente real antes de responder** y recuerda lo
+conversado en turnos anteriores, así que nadie tiene que repetir su caso. A «¿Qué
+falta para poder activar mi cuenta?» contesta con lo que falta de verdad. Según lo
+que cada empresa habilite, solo explica o además redacta propuestas de cambio para
+que una persona las apruebe. Si el índice de memoria no responde, el chat sigue
+funcionando con lo más reciente.
+
+> **Stack:** `mem0ai/oss` para extraer y recuperar hechos (con `claude-haiku-4-5`
+> haciendo la extracción) · `ollama` con `bge-m3` de 1024 dimensiones para los
+> *embeddings*, en un contenedor propio · `@qdrant/js-client-rest` para el índice
+> vectorial · `drizzle-orm` sobre Postgres 16 como sistema de registro — el índice
+> es desechable y se reconstruye.
+
+### 3 · Adjudicación del oficial — *la máquina prepara, la persona decide*
+
+Ningún proveedor queda aprobado por el sistema solo. El oficial de cumplimiento
+recibe el expediente ya armado y tiene cinco herramientas para destrabarlo —eximir
+una validación, recategorizar, otorgar un requisito a mano, revocar y reintentar—;
+las cuatro que **cambian el veredicto exigen una justificación escrita**, y las
+cinco dejan su línea en el registro de auditoría con actor y hora. La firma del
+estado final es una decisión aparte y deliberada: otorgar una categoría nunca
+aprueba a un proveedor.
+
+> **Stack:** `@vendra/workflow` — motores deterministas, sin IA y sin IO, que
+> calculan validación, trazabilidad, cobertura y la compuerta de activación ·
+> `drizzle-orm` + Postgres para que cada adjudicación sea atómica y el registro
+> durable · `better-auth` para que toda acción quede firmada por un rol real y
+> acotada a su empresa.
+
+### 4 · Gobernanza de plataforma — *una sola regla, aplicada en todas partes*
+
+Cada empresa declara **de antemano** qué documentos acepta, qué datos se extraen,
+qué revisiones cuentan y hasta dónde puede decidir la máquina por su cuenta. Esa
+declaración se revisa una vez, al activarla, y desde ahí se aplica igual en todos
+lados: el mismo límite rige al agente que lee documentos y al chat del asistente,
+y ninguno puede ampliárselo a sí mismo. Cambiar la regla es un cambio de versión,
+no un parche.
+
+> **Stack:** `Open Policy Agent` — políticas en `Rego` compiladas a `Wasm` y
+> evaluadas **en proceso** con `@open-policy-agent/opa-wasm`, con el artefacto
+> verificado por SHA-256 y fallando cerrado: si la puerta no puede decidir, no
+> admite.
+
+La versión técnica de las cuatro capas está aquí abajo.
 
 <details>
-<summary><b>Los cuatro actos, en texto</b></summary>
+<summary><b>Las cuatro capas, en detalle técnico</b></summary>
 
 **1 · Un documento, un agente, una MicroVM.** El harness de Claude Code es el
 backend: trae su propio ciclo de razonamiento, su manejo de contexto y su
@@ -116,11 +156,11 @@ De un vistazo:
 |---|---|
 | **Roles** | contacto del proveedor · oficial de cumplimiento · administrador de plataforma |
 | **Superficies** | portal del proveedor · panel del oficial · consola de plataforma · asistente con memoria (y la página pública en `/`) |
-| **Carriles de agente** | uno por documento · uno de cobertura por proveedor · el chat del asistente — los tres sobre una sola MicroVM |
+| **Carriles de agente** | uno por documento · uno de cobertura por proveedor · el chat del asistente — los tres sobre una sola MicroVM de `@vercel/sandbox` |
 | **Puntos donde decide un humano** | confirmación del proveedor · adjudicación del oficial · derivación por política · propuesta de directiva |
-| **Motores deterministas** | 16 tipos de documento, 11 categorías de requisitos, 11 validadores, cobertura apilada, compuerta de activación — sin IA y sin IO |
-| **Gobernanza** | política por empresa versionada, admitida por una puerta OPA/Rego compilada a Wasm y evaluada en proceso |
-| **Dependencias externas** | exactamente dos: la API de Anthropic y Vercel Sandbox. Todo lo demás corre en contenedores de este repositorio |
+| **Motores deterministas** | `@vendra/workflow`: 16 tipos de documento, 11 categorías de requisitos, 11 validadores, cobertura apilada, compuerta de activación — sin IA y sin IO |
+| **Gobernanza** | política por empresa versionada, admitida por una puerta de `Open Policy Agent` (`Rego` → `Wasm`) evaluada en proceso con `@open-policy-agent/opa-wasm` |
+| **Dependencias externas** | exactamente dos: la API de `Anthropic` y `Vercel Sandbox`. El resto —Postgres, MinIO, `Qdrant`, `Ollama`— corre en contenedores de este repositorio |
 
 ## Índice
 
