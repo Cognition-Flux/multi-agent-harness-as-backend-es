@@ -9,9 +9,9 @@ El stack, en cuatro actos: el **harness** que procesa cada documento, el
 **asistente** con memoria semántica, la **compuerta humana** del oficial y la
 **gobernanza** que acota lo que la máquina puede decidir por su cuenta. Dentro de
 la película, cada pieza de terceros sobre la que corre esto —Claude Code, Vercel
-Sandbox, el AI SDK, mem0, bge-m3, Ollama, Qdrant, Postgres, Drizzle, OPA, Rego,
-Wasm— aparece en **monoespaciada violeta**, para distinguirla de los módulos
-escritos aquí. El mismo recorrido, en texto, está aquí abajo.
+Sandbox, el AI SDK, mem0, bge-m3, Ollama, Qdrant, Postgres, Drizzle, Open Policy
+Agent, Rego, Wasm— aparece en **monoespaciada violeta**, para distinguirla de los
+módulos escritos aquí. El mismo recorrido, en texto, está aquí abajo.
 
 <details>
 <summary><b>Los cuatro actos, en texto</b></summary>
