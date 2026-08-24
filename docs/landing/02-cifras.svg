@@ -19,7 +19,7 @@
   <rect x="0.5" y="0.5" width="959" height="149" rx="12" fill="#fdfcfc" stroke="#e9e5e2" stroke-width="1"/>
   <g>
   <clipPath id="clip0"><rect x="30.0" y="18" width="180" height="62"/></clipPath>
-  <g clip-path="url(#clip0)"><g class="reel r0">
+  <g clip-path="url(#clip0)"><g class="reel r0" transform="translate(0,-992)">
     <text class="brand" x="120.0" y="62" text-anchor="middle" font-size="46" font-weight="700">0</text>
     <text class="brand" x="120.0" y="124" text-anchor="middle" font-size="46" font-weight="700">1</text>
     <text class="brand" x="120.0" y="186" text-anchor="middle" font-size="46" font-weight="700">2</text>
@@ -41,7 +41,7 @@
   <text class="ink" x="120.0" y="102" text-anchor="middle" font-size="14" font-weight="600">tipos de documento</text>
   <text class="muted" x="120.0" y="122" text-anchor="middle" font-size="12">del W-9 al ACORD 25 y SOC 2</text>
   <clipPath id="clip1"><rect x="270.0" y="18" width="180" height="62"/></clipPath>
-  <g clip-path="url(#clip1)"><g class="reel r1">
+  <g clip-path="url(#clip1)"><g class="reel r1" transform="translate(0,-682)">
     <text class="brand" x="360.0" y="62" text-anchor="middle" font-size="46" font-weight="700">0</text>
     <text class="brand" x="360.0" y="124" text-anchor="middle" font-size="46" font-weight="700">1</text>
     <text class="brand" x="360.0" y="186" text-anchor="middle" font-size="46" font-weight="700">2</text>
@@ -58,7 +58,7 @@
   <text class="ink" x="360.0" y="102" text-anchor="middle" font-size="14" font-weight="600">categorías de requisitos</text>
   <text class="muted" x="360.0" y="122" text-anchor="middle" font-size="12">con trazabilidad documento a documento</text>
   <clipPath id="clip2"><rect x="510.0" y="18" width="180" height="62"/></clipPath>
-  <g clip-path="url(#clip2)"><g class="reel r2">
+  <g clip-path="url(#clip2)"><g class="reel r2" transform="translate(0,-496)">
     <text class="brand" x="600.0" y="62" text-anchor="middle" font-size="46" font-weight="700">0</text>
     <text class="brand" x="600.0" y="124" text-anchor="middle" font-size="46" font-weight="700">1</text>
     <text class="brand" x="600.0" y="186" text-anchor="middle" font-size="46" font-weight="700">2</text>
@@ -72,7 +72,7 @@
   <text class="ink" x="600.0" y="102" text-anchor="middle" font-size="14" font-weight="600">etapas de revisión en vivo</text>
   <text class="muted" x="600.0" y="122" text-anchor="middle" font-size="12">transmitidas a su navegador</text>
   <clipPath id="clip3"><rect x="750.0" y="18" width="180" height="62"/></clipPath>
-  <g clip-path="url(#clip3)"><g class="reel r3">
+  <g clip-path="url(#clip3)"><g class="reel r3" transform="translate(0,-434)">
     <text class="brand" x="840.0" y="62" text-anchor="middle" font-size="46" font-weight="700">0</text>
     <text class="brand" x="840.0" y="124" text-anchor="middle" font-size="46" font-weight="700">1</text>
     <text class="brand" x="840.0" y="186" text-anchor="middle" font-size="46" font-weight="700">2</text>
