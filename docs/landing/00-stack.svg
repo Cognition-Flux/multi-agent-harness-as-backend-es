@@ -1,10 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" preserveAspectRatio="xMidYMid meet" role="img" aria-label="El stack de Vendra en cuatro actos: primero un documento se procesa en su propia sesión de Claude Code dentro de una MicroVM, con la barra de etapa avanzando de 1 a 8, las cuatro herramientas del host a la vista y una ventana de confirmación humana esperando respuesta; después el asistente del proveedor encadena sus herramientas y su memoria recorre la tubería mem0, embeddings locales bge-m3 en Ollama y el índice Qdrant, con Postgres como sistema de registro; luego el oficial de cumplimiento enciende sus cinco acciones de rescate y el registro de auditoría gana una línea por cada una, con la firma del estado final aparte; y al final la gobernanza: la política de la empresa se sella como admisible en una puerta OPA/Rego compilada a Wasm, y de ahí bajan los dos carriles agénticos —el harness de documentos y el chat del asistente— redibujados como hijos de esa misma puerta.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 420" preserveAspectRatio="xMidYMid meet" role="img" aria-label="El stack de Vendra en cuatro actos: primero un documento se procesa en su propia sesión de Claude Code dentro de una MicroVM, con la barra de etapa avanzando de 1 a 8, las cuatro herramientas del host a la vista y una ventana de confirmación humana esperando respuesta; después el asistente del proveedor encadena sus herramientas y su memoria recorre la tubería mem0, embeddings locales bge-m3 en Ollama y el índice Qdrant, con Postgres como sistema de registro; luego el oficial de cumplimiento enciende sus cinco acciones de rescate y el registro de auditoría gana una línea por cada una, con la firma del estado final aparte; y al final la gobernanza: la política de la empresa se sella como admisible en una puerta OPA/Rego compilada a Wasm, y de ahí bajan los dos carriles agénticos —el harness de documentos y el chat del asistente— redibujados como hijos de esa misma puerta. Los nombres de terceros sobre los que corre el stack —Claude Code, Vercel Sandbox, el AI SDK, mem0, bge-m3, Ollama, Qdrant, Postgres, Drizzle, OPA, Rego y Wasm— aparecen destacados en monoespaciada violeta, para distinguirlos de los módulos escritos en esta casa.">
   <style>
     text { font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
     .ink { fill: #1c1917; } .muted { fill: #696059; } .brand { fill: #b04507; }
     .card { fill: #ffffff; stroke: #e9e5e2; }
     .hair { stroke: #e9e5e2; }
     .ok { fill: #186d45; } .warn { fill: #915808; }
+    /* third-party names: mono + 600 + violet, so a reader can see at a glance
+       what this stack stands on and what it wrote itself */
+    .lib { fill: #5b3ba6; font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 600; letter-spacing: -0.2px; }
+    .libi { fill: #5b3ba6; font-weight: 600; }
 
     /* every animation shares the master clock */
     .act, .rail, .mv { animation-duration: 32s; animation-iteration-count: infinite; }
@@ -141,7 +145,7 @@
   <g class="act a1">
   <rect x="1" y="47" width="958" height="344" fill="#fdfcfc"/>
   <text class="ink" x="28" y="72" font-size="13.5" font-weight="600">1 · Un documento, un agente, una MicroVM</text>
-  <text class="muted" x="28" y="90" font-size="11">El harness de Claude Code es el backend: trae su propio ciclo de razonamiento, su manejo de contexto y su historial nativo — aquí nadie escribe el loop a mano.</text>
+  <text class="muted" x="28" y="90" font-size="11">El harness de <tspan class="lib">Claude Code</tspan> es el backend: trae su propio ciclo de razonamiento, su manejo de contexto y su historial nativo — aquí nadie escribe el loop a mano.</text>
   <rect x="28" y="104" width="300" height="178" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <clipPath id="c1sheen"><rect x="28" y="104" width="300" height="178" rx="12"/></clipPath><g clip-path="url(#c1sheen)"><rect class="amb4 sh420" x="-92" y="104" width="120" height="178" fill="url(#sheen)"/></g>
   <circle cx="46" cy="126" r="3.2" fill="#b04507"/>
@@ -176,10 +180,10 @@
   <text class="ink" x="44" y="254" font-size="10.5">asegurado adicional · vence el</text>
   <text class="brand" x="44" y="272" font-size="10">el agente clasifica y extrae; nada más</text>
   <rect x="344" y="104" width="300" height="178" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
-  <text class="ink" x="360" y="130" font-size="12" font-weight="600">MicroVM · Vercel Sandbox</text>
-  <text class="muted" x="360" y="146" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">runtime node24 · puertos bridge 4000–4003</text>
+  <text class="ink" x="360" y="130" font-size="12" font-weight="600">MicroVM · <tspan class="lib">Vercel Sandbox</tspan></text>
+  <text class="muted" x="360" y="146" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">runtime <tspan class="libi">node24</tspan> · puertos bridge 4000–4003</text>
   <rect x="360" y="156" width="268" height="30" rx="12" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
-  <text class="ink" x="372" y="175" font-size="11" font-weight="600">CLI de Claude Code</text>
+  <text class="ink" x="372" y="175" font-size="11" font-weight="600">CLI de <tspan class="lib">Claude Code</tspan></text>
   <text class="muted" x="360" y="202" font-size="10" font-weight="600">ACTIVETOOLS</text>
   <clipPath id="c1cur"><rect x="356" y="208" width="132" height="75"/></clipPath>
   <g clip-path="url(#c1cur)"><g class="mv m1cur" transform="translate(0,60)"><rect x="356" y="208" width="128" height="15" rx="4" fill="#b04507" fill-opacity="0.10"/></g></g>
@@ -198,7 +202,7 @@
   <text class="muted" x="516" y="220" font-size="10" font-weight="600">1 built-in activo</text>
   <text class="brand" x="516" y="236" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">read</text>
   <text class="muted" x="516" y="258" font-size="10" font-weight="600">4 del host</text>
-  <text class="muted" x="516" y="274" font-size="9.5">deciden en el host</text>
+  <text class="muted" x="516" y="274" font-size="10">deciden en el host</text>
   <rect x="660" y="104" width="272" height="178" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <circle class="amb2 pulse" cx="678" cy="126" r="3.4" fill="#915808"/>
   <text class="ink" x="690" y="130" font-size="12" font-weight="600">Confirmación del proveedor</text>
@@ -206,14 +210,14 @@
   <text class="ink" x="676" y="167" font-size="10.5">de asegurado adicional…»</text>
   <rect x="676" y="192" width="240" height="6" rx="3" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
   <clipPath id="c1drain"><rect x="676" y="192" width="240" height="6" rx="3"/></clipPath>
-  <g clip-path="url(#c1drain)"><rect class="mv m1drain" x="676" y="192" width="240" height="6" rx="3" fill="#915808"/></g>
+  <g clip-path="url(#c1drain)"><g class="mv m1drain" transform="translate(-156,0)"><rect x="676" y="192" width="240" height="6" rx="3" fill="#915808"/></g></g>
   <text class="muted" x="676" y="216" font-size="10">ventana durable de 5 min · fail-open</text>
   <rect x="676" y="226" width="44" height="22" rx="11" fill="#2a2623" stroke="#2a2623" stroke-width="1"/>
   <text x="698" y="241" font-size="10.5" font-weight="600" fill="#ffffff" text-anchor="middle">Sí</text>
   <rect x="728" y="226" width="44" height="22" rx="11" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <text class="ink" x="750" y="241" font-size="10.5" font-weight="600" text-anchor="middle">No</text>
-  <text class="muted" x="676" y="264" font-size="10">No es el toolApproval del SDK: vive en la</text>
-  <text class="muted" x="676" y="278" font-size="10">base y sobrevive a una recarga.</text>
+  <text class="muted" x="676" y="264" font-size="10">No es el <tspan class="lib">toolApproval</tspan> del <tspan class="lib">AI SDK</tspan>: vive</text>
+  <text class="muted" x="676" y="278" font-size="10">en la base y sobrevive a una recarga.</text>
   <rect x="28" y="300" width="904" height="46" rx="12" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
   <text class="ink" x="52" y="327" font-size="11" font-weight="600">documento</text>
   <text class="ink" x="262" y="327" font-size="11" font-weight="600">sesión del agente</text>
@@ -226,14 +230,14 @@
   <circle cx="248" cy="323" r="2.4" fill="#e9e5e2"/>
   <circle cx="498" cy="323" r="2.4" fill="#e9e5e2"/>
   <circle cx="772" cy="323" r="2.4" fill="#e9e5e2"/>
-  <g class="mv m1dot0"><circle cx="44" cy="323" r="4.0" fill="#b04507" opacity="1.00"/></g><g class="mv m1dot1"><circle cx="44" cy="323" r="3.4" fill="#b04507" opacity="0.72"/></g><g class="mv m1dot2"><circle cx="44" cy="323" r="2.8" fill="#b04507" opacity="0.44"/></g>
-  <text class="muted" x="28" y="364" font-size="10.5">El progreso llega al navegador con createUIMessageStream + toUIMessageStream y se pinta con los AI Elements vendorizados: Tool · Reasoning · Task.</text>
-  <text class="muted" x="28" y="381" font-size="10.5">permissionMode: "allow-reads" · egreso permitido solo a api.anthropic.com y *.npmjs.org — sin shell, sin escritura, sin web.</text>
+  <g class="mv m1dot0" transform="translate(728,0)"><circle cx="44" cy="323" r="4.0" fill="#b04507" opacity="1.00"/></g><g class="mv m1dot1" transform="translate(728,0)"><circle cx="44" cy="323" r="3.4" fill="#b04507" opacity="0.72"/></g><g class="mv m1dot2" transform="translate(728,0)"><circle cx="44" cy="323" r="2.8" fill="#b04507" opacity="0.44"/></g>
+  <text class="muted" x="28" y="364" font-size="10.5">El progreso llega al navegador con <tspan class="lib">createUIMessageStream</tspan> + <tspan class="lib">toUIMessageStream</tspan> y se pinta con los <tspan class="lib">AI Elements</tspan> vendorizados: Tool · Reasoning · Task.</text>
+  <text class="muted" x="28" y="381" font-size="10.5"><tspan class="lib">permissionMode</tspan>: "allow-reads" · egreso permitido solo a <tspan class="lib">api.anthropic.com</tspan> y <tspan class="lib">*.npmjs.org</tspan> — sin shell, sin escritura, sin web.</text>
   </g>
   <g class="act a2">
   <rect x="1" y="47" width="958" height="344" fill="#fdfcfc"/>
   <text class="ink" x="28" y="72" font-size="13.5" font-weight="600">2 · El asistente que conoce el expediente</text>
-  <text class="muted" x="28" y="90" font-size="11">Una sesión estacionada por hilo —session.stop(), nunca detach()— y una memoria semántica que corre entera en contenedores propios.</text>
+  <text class="muted" x="28" y="90" font-size="11">Una sesión estacionada por hilo —<tspan class="lib">session.stop()</tspan>, nunca <tspan class="lib">detach()</tspan>— y una memoria semántica que corre entera en contenedores propios.</text>
   <rect x="28" y="104" width="372" height="178" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <rect x="44" y="118" width="340" height="30" rx="12" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
   <text class="ink" x="56" y="137" font-size="11">¿Qué falta para poder activar mi cuenta?</text>
@@ -243,29 +247,29 @@
   </g>
   <clipPath id="c2p"><rect x="44" y="156" width="340" height="88"/></clipPath>
   <g clip-path="url(#c2p)"><g class="mv m2pills">
-  <rect x="44" y="158" width="230" height="18" rx="9.0" fill="#b04507" fill-opacity="0.10" stroke="#b04507" stroke-opacity="0.30" stroke-width="1"/><circle cx="56.4" cy="167.0" r="3.4" fill="#b04507"/><text x="68" y="170.7" font-size="10" font-weight="500" fill="#b04507">Se consultó su registro de cumplimiento</text>
-  <rect x="44" y="180" width="144" height="18" rx="9.0" fill="#b04507" fill-opacity="0.10" stroke="#b04507" stroke-opacity="0.30" stroke-width="1"/><circle cx="56.4" cy="189.0" r="3.4" fill="#b04507"/><text x="68" y="192.7" font-size="10" font-weight="500" fill="#b04507">Se revisó un documento</text>
-  <rect x="44" y="202" width="169" height="18" rx="9.0" fill="#b04507" fill-opacity="0.10" stroke="#b04507" stroke-opacity="0.30" stroke-width="1"/><circle cx="56.4" cy="211.0" r="3.4" fill="#b04507"/><text x="68" y="214.7" font-size="10" font-weight="500" fill="#b04507">Anotado para la próxima vez</text>
-  <rect x="44" y="224" width="174" height="18" rx="9.0" fill="#b04507" fill-opacity="0.10" stroke="#b04507" stroke-opacity="0.30" stroke-width="1"/><circle cx="56.4" cy="233.0" r="3.4" fill="#b04507"/><text x="68" y="236.7" font-size="10" font-weight="500" fill="#b04507">Propuesta enviada a revisión</text>
+  <rect x="44" y="158" width="246" height="18" rx="9.0" fill="#b04507" fill-opacity="0.10" stroke="#b04507" stroke-opacity="0.30" stroke-width="1"/><circle cx="56.4" cy="167.0" r="3.4" fill="#b04507"/><text x="68" y="170.7" font-size="10" font-weight="500" fill="#b04507">Se consultó su registro de cumplimiento</text>
+  <rect x="44" y="180" width="153" height="18" rx="9.0" fill="#b04507" fill-opacity="0.10" stroke="#b04507" stroke-opacity="0.30" stroke-width="1"/><circle cx="56.4" cy="189.0" r="3.4" fill="#b04507"/><text x="68" y="192.7" font-size="10" font-weight="500" fill="#b04507">Se revisó un documento</text>
+  <rect x="44" y="202" width="180" height="18" rx="9.0" fill="#b04507" fill-opacity="0.10" stroke="#b04507" stroke-opacity="0.30" stroke-width="1"/><circle cx="56.4" cy="211.0" r="3.4" fill="#b04507"/><text x="68" y="214.7" font-size="10" font-weight="500" fill="#b04507">Anotado para la próxima vez</text>
+  <rect x="44" y="224" width="186" height="18" rx="9.0" fill="#b04507" fill-opacity="0.10" stroke="#b04507" stroke-opacity="0.30" stroke-width="1"/><circle cx="56.4" cy="233.0" r="3.4" fill="#b04507"/><text x="68" y="236.7" font-size="10" font-weight="500" fill="#b04507">Propuesta enviada a revisión</text>
   </g></g>
   <text class="muted" x="44" y="262" font-size="10">Cuatro herramientas encadenadas en un solo turno.</text>
   <text class="muted" x="44" y="276" font-size="10">El razonamiento queda a la vista, plegado.</text>
   <rect x="416" y="104" width="516" height="178" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <clipPath id="c2sheen"><rect x="416" y="104" width="516" height="178" rx="12"/></clipPath><g clip-path="url(#c2sheen)"><rect class="amb4 sh636" x="296" y="104" width="120" height="178" fill="url(#sheen)" style="animation-delay:1s"/></g>
-  <text class="ink" x="432" y="130" font-size="12" font-weight="600">Memoria: mem0 OSS, autoalojada</text>
+  <text class="ink" x="432" y="130" font-size="12" font-weight="600">Memoria: <tspan class="lib">mem0</tspan> OSS, autoalojada</text>
   <rect x="432" y="148" width="90" height="30" rx="12" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
   <text class="ink" x="477.0" y="167" font-size="10" font-weight="600" text-anchor="middle">turno</text>
   <rect x="534" y="148" width="90" height="30" rx="12" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
   <text class="ink" x="579.0" y="167" font-size="10" font-weight="600" text-anchor="middle">cola · 20 s</text>
   <line x1="523" y1="163" x2="527" y2="163" stroke="#e9e5e2" stroke-width="1"/><path d="M527 160 L532 163 L527 166" fill="none" stroke="#e9e5e2" stroke-width="1"/>
   <rect x="636" y="148" width="90" height="30" rx="12" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
-  <text class="ink" x="681.0" y="167" font-size="10" font-weight="600" text-anchor="middle">mem0 + Haiku</text>
+  <text class="ink" x="647.9355" y="167" font-size="10" font-weight="600"><tspan class="lib">mem0</tspan> + <tspan class="lib">Haiku</tspan></text>
   <line x1="625" y1="163" x2="629" y2="163" stroke="#e9e5e2" stroke-width="1"/><path d="M629 160 L634 163 L629 166" fill="none" stroke="#e9e5e2" stroke-width="1"/>
   <rect x="738" y="148" width="90" height="30" rx="12" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
-  <text class="ink" x="783.0" y="167" font-size="10" font-weight="600" text-anchor="middle">bge-m3 1024 d</text>
+  <text class="ink" x="766.08" y="167" font-size="10" font-weight="600"><tspan class="lib">bge-m3</tspan></text>
   <line x1="727" y1="163" x2="731" y2="163" stroke="#e9e5e2" stroke-width="1"/><path d="M731 160 L736 163 L731 166" fill="none" stroke="#e9e5e2" stroke-width="1"/>
   <rect x="840" y="148" width="90" height="30" rx="12" fill="#f6f5f3" stroke="#e9e5e2" stroke-width="1"/>
-  <text class="ink" x="885.0" y="167" font-size="10" font-weight="600" text-anchor="middle">Qdrant</text>
+  <text class="ink" x="868.08" y="167" font-size="10" font-weight="600"><tspan class="lib">Qdrant</tspan></text>
   <line x1="829" y1="163" x2="833" y2="163" stroke="#e9e5e2" stroke-width="1"/><path d="M833 160 L838 163 L833 166" fill="none" stroke="#e9e5e2" stroke-width="1"/>
   <line class="hair" x1="477.0" y1="188" x2="885.0" y2="188" stroke-width="1"/>
   <circle cx="477.0" cy="188" r="2.4" fill="#e9e5e2"/>
@@ -273,10 +277,10 @@
   <circle cx="681.0" cy="188" r="2.4" fill="#e9e5e2"/>
   <circle cx="783.0" cy="188" r="2.4" fill="#e9e5e2"/>
   <circle cx="885.0" cy="188" r="2.4" fill="#e9e5e2"/>
-  <g class="mv m2dot0"><circle cx="477.0" cy="188" r="3.6" fill="#b04507" opacity="1.00"/></g><g class="mv m2dot1"><circle cx="477.0" cy="188" r="3.0" fill="#b04507" opacity="0.72"/></g><g class="mv m2dot2"><circle cx="477.0" cy="188" r="2.4" fill="#b04507" opacity="0.44"/></g>
+  <g class="mv m2dot0" transform="translate(408,0)"><circle cx="477.0" cy="188" r="3.6" fill="#b04507" opacity="1.00"/></g><g class="mv m2dot1" transform="translate(408,0)"><circle cx="477.0" cy="188" r="3.0" fill="#b04507" opacity="0.72"/></g><g class="mv m2dot2" transform="translate(408,0)"><circle cx="477.0" cy="188" r="2.4" fill="#b04507" opacity="0.44"/></g>
   <line class="hair" x1="432" y1="200" x2="916" y2="200" stroke-width="1"/>
-  <text class="muted" x="432" y="218" font-size="10">Postgres es el sistema de registro; el índice de Qdrant se puede tirar y reconstruir.</text>
-  <text class="muted" x="432" y="234" font-size="10">Recall en cada turno: 30 candidatos por ámbito → 20 hechos / 2.000 caracteres, en dos ámbitos.</text>
+  <text class="muted" x="432" y="218" font-size="10"><tspan class="lib">Postgres</tspan> es el registro; todo se escribe con <tspan class="lib">Drizzle</tspan>. El índice <tspan class="lib">Qdrant</tspan> se reconstruye.</text>
+  <text class="muted" x="432" y="234" font-size="10">Embeddings <tspan class="lib">bge-m3</tspan> de 1024 d en <tspan class="lib">Ollama</tspan> · recall: 30 candidatos por ámbito → 20 hechos.</text>
   <text class="muted" x="432" y="250" font-size="10">Si el índice no responde, degrada a recencia — el chat nunca se cae con su memoria.</text>
   <text class="brand" x="432" y="272" font-size="10">PII redactada al entrar y al volver del índice</text>
   <rect x="28" y="300" width="440" height="46" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
@@ -287,7 +291,7 @@
   <g class="amb2 glow"><circle cx="500" cy="316" r="3.0" fill="#b04507"/></g>
   <text class="brand" x="508" y="320" font-size="11" font-weight="600">Delegado — puede proponer directivas</text>
   <text class="muted" x="508" y="336" font-size="10">+2: redactar una propuesta y consultar su estado. Solo una persona la aplica.</text>
-  <text class="muted" x="28" y="366" font-size="10.5">El nivel lo fija la política de la empresa y se aplica como lista blanca activeTools, recalculada en cada turno — nunca como una instrucción en el prompt.</text>
+  <text class="muted" x="28" y="366" font-size="10.5">El nivel lo fija la política de la empresa y se aplica como lista blanca <tspan class="lib">activeTools</tspan>, recalculada en cada turno — nunca como una instrucción en el prompt.</text>
   </g>
   <g class="act a3">
   <rect x="1" y="47" width="958" height="344" fill="#fdfcfc"/>
@@ -312,7 +316,7 @@
   <rect x="472" y="104" width="460" height="178" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <text class="muted" x="488" y="126" font-size="10" font-weight="600">ACTIVIDAD</text>
   <clipPath id="c3led"><rect x="488" y="134" width="428" height="120"/></clipPath>
-  <g clip-path="url(#c3led)"><g class="mv m3flash"><rect x="488" y="134" width="428" height="22" rx="6" fill="#b04507" fill-opacity="0.11"/></g></g>
+  <g clip-path="url(#c3led)"><g class="mv m3flash" transform="translate(0,96)"><rect x="488" y="134" width="428" height="22" rx="6" fill="#b04507" fill-opacity="0.11"/></g></g>
   <g clip-path="url(#c3led)"><g class="mv m3led">
   <text class="muted" x="488" y="150" font-size="10" font-family="ui-monospace, Menlo, Consolas, monospace">hoy 14:01</text>
   <text class="ink" x="560" y="150" font-size="10.5">documento eximido</text>
@@ -330,20 +334,20 @@
   <text class="ink" x="560" y="246" font-size="10.5">reintento solicitado</text>
   <line class="hair" x1="488" y1="254" x2="916" y2="254" stroke-width="1"/>
   </g></g>
-  <text class="muted" x="488" y="276" font-size="10">actor, hora y el largo de la justificación — el texto va a la base, no al log</text>
+  <text class="muted" x="488" y="276" font-size="10">actor, hora y largo · el texto va a la base, no al log — escrito con <tspan class="lib">Drizzle</tspan></text>
   <rect x="28" y="300" width="904" height="46" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <text class="ink" x="44" y="320" font-size="11" font-weight="600">Finalizar estado de cumplimiento</text>
-  <g class="mv m3fin0"><rect x="44" y="326" width="164" height="17" rx="8.5" fill="#2a2623" fill-opacity="0.10" stroke="#2a2623" stroke-opacity="0.30" stroke-width="1"/><text x="53" y="338.2" font-size="10" font-weight="500" fill="#2a2623">Probablemente en cumplimiento</text></g>
-  <g class="mv m3fin1"><rect x="216.45" y="326" width="104" height="17" rx="8.5" fill="#915808" fill-opacity="0.10" stroke="#915808" stroke-opacity="0.30" stroke-width="1"/><text x="225.45" y="338.2" font-size="10" font-weight="500" fill="#915808">Requiere revisión</text></g>
-  <g class="mv m3fin2"><rect x="328.29999999999995" y="326" width="58" height="17" rx="8.5" fill="#186d45" fill-opacity="0.10" stroke="#186d45" stroke-opacity="0.30" stroke-width="1"/><text x="337.29999999999995" y="338.2" font-size="10" font-weight="500" fill="#186d45">Aprobado</text></g>
-  <g class="mv m3fin3"><rect x="394.69999999999993" y="326" width="63" height="17" rx="8.5" fill="#c52020" fill-opacity="0.10" stroke="#c52020" stroke-opacity="0.30" stroke-width="1"/><text x="403.69999999999993" y="338.2" font-size="10" font-weight="500" fill="#c52020">Rechazado</text></g>
-  <text class="muted" x="474.1499999999999" y="338" font-size="9.5">otorgar una categoría nunca aprueba a un proveedor</text>
+  <g class="mv m3fin0"><rect x="44" y="326" width="176" height="17" rx="8.5" fill="#2a2623" fill-opacity="0.10" stroke="#2a2623" stroke-opacity="0.30" stroke-width="1"/><text x="53" y="338.2" font-size="10" font-weight="500" fill="#2a2623">Probablemente en cumplimiento</text></g>
+  <g class="mv m3fin1"><rect x="228.05" y="326" width="111" height="17" rx="8.5" fill="#915808" fill-opacity="0.10" stroke="#915808" stroke-opacity="0.30" stroke-width="1"/><text x="237.05" y="338.2" font-size="10" font-weight="500" fill="#915808">Requiere revisión</text></g>
+  <g class="mv m3fin2"><rect x="346.70000000000005" y="326" width="62" height="17" rx="8.5" fill="#186d45" fill-opacity="0.10" stroke="#186d45" stroke-opacity="0.30" stroke-width="1"/><text x="355.70000000000005" y="338.2" font-size="10" font-weight="500" fill="#186d45">Aprobado</text></g>
+  <g class="mv m3fin3"><rect x="416.30000000000007" y="326" width="67" height="17" rx="8.5" fill="#c52020" fill-opacity="0.10" stroke="#c52020" stroke-opacity="0.30" stroke-width="1"/><text x="425.30000000000007" y="338.2" font-size="10" font-weight="500" fill="#c52020">Rechazado</text></g>
+  <text class="muted" x="499.3500000000001" y="338" font-size="10">otorgar una categoría nunca aprueba a un proveedor</text>
   <text class="muted" x="28" y="366" font-size="10.5">El servidor recorta el alcance de cada exención: un desajuste de nombre jamás puede eximir la identidad fiscal.</text>
   </g>
   <g class="act a4">
   <rect x="1" y="47" width="958" height="344" fill="#fdfcfc"/>
   <text class="ink" x="28" y="72" font-size="13.5" font-weight="600">4 · Una sola puerta para todo lo agéntico</text>
-  <text class="muted" x="28" y="90" font-size="11">Cada empresa declara qué puede decidir la máquina. Una política Rego la admite; los motores deterministas la aplican en cada documento y en cada turno.</text>
+  <text class="muted" x="28" y="90" font-size="11">Cada empresa declara qué puede decidir la máquina. Una política <tspan class="lib">Rego</tspan> la admite; los motores deterministas la aplican en cada documento y en cada turno.</text>
   <rect x="28" y="102" width="904" height="70" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <circle cx="48" cy="124" r="3.4" fill="#b04507"/>
   <text class="ink" x="60" y="128" font-size="12" font-weight="600">Política de la empresa · v7 activa</text>
@@ -363,7 +367,7 @@
   <g class="mv m4d2"><circle cx="712" cy="176" r="3.2" fill="#696059"/></g>
   <rect x="28" y="202" width="440" height="68" rx="12" fill="#ffffff" stroke="#e9e5e2" stroke-width="1"/>
   <clipPath id="c4sheen"><rect x="28" y="202" width="440" height="68" rx="12"/></clipPath><g clip-path="url(#c4sheen)"><rect class="amb4 sh560" x="-92" y="202" width="120" height="68" fill="url(#sheen)" style="animation-delay:3s"/></g>
-  <text class="ink" x="44" y="224" font-size="11.5" font-weight="600">OPA / Rego → Wasm</text>
+  <text class="ink" x="44" y="224" font-size="11.5" font-weight="600"><tspan class="lib">OPA</tspan> / <tspan class="lib">Rego</tspan> → <tspan class="lib">Wasm</tspan></text>
   <text class="muted" x="44" y="242" font-size="10">en proceso · SHA-256 verificado · falla cerrado</text>
   <text class="muted" x="44" y="256" font-size="10">13 rechazos + 2 advertencias · solo al activar</text>
   <clipPath id="c4seal"><rect x="366" y="212" width="78" height="22" rx="11"/></clipPath>
@@ -385,11 +389,12 @@
   <clipPath id="c4l1"><rect x="492" y="292" width="4" height="62"/></clipPath>
   <g clip-path="url(#c4l1)"><rect class="mv m4bars" x="492" y="292" width="4" height="62" fill="#b04507"/></g>
   <text class="ink" x="512" y="314" font-size="11.5" font-weight="600">Chat del asistente</text>
-  <text class="muted" x="512" y="332" font-size="10">activeTools = 3 o 5, recalculado en cada turno</text>
+  <text class="muted" x="512" y="332" font-size="10"><tspan class="lib">activeTools</tspan> = 3 o 5, recalculado en cada turno</text>
   <text class="brand" x="512" y="347" font-size="10" font-weight="600">gobernado por la misma política</text>
   <text class="muted" x="28" y="378" font-size="10">El carril de cobertura no se configura por política — y su veredicto tampoco puede otorgar saltándose al árbitro.</text>
   </g>
   <line class="hair" x1="28" y1="392" x2="932" y2="392" stroke-width="1"/>
   <text class="ink" x="28" y="410" font-size="10.5" font-weight="600">Adjudicación por IA · gobernada por personas</text>
-  <text class="muted" x="932" y="410" font-size="10.5" text-anchor="end">dos dependencias externas: la API de Anthropic y Vercel Sandbox</text>
+  <text class="muted" x="300" y="410" font-size="10">en <tspan class="lib">mono violeta</tspan>, las piezas de terceros</text>
+  <text class="muted" x="596.4200000000001" y="410" font-size="10.5">dos dependencias externas: la API de <tspan class="lib">Anthropic</tspan> y <tspan class="lib">Vercel Sandbox</tspan></text>
 </svg>

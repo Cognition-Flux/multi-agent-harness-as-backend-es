@@ -2,13 +2,16 @@
 
 <p align="center">
   <img src="docs/landing/00-stack.svg" width="100%"
-       alt="Película en cuatro actos sobre el stack. Acto 1: un documento entra y recibe su propia sesión de Claude Code en una MicroVM, la barra avanza de «Etapa 1 de 8» a «Etapa 8 de 8», aparecen los campos extraídos y una confirmación humana espera con su ventana de 5 minutos. Acto 2: el asistente encadena sus herramientas y su memoria recorre la tubería mem0 → embeddings locales bge-m3 en Ollama → índice Qdrant, con Postgres como sistema de registro. Acto 3: el oficial de cumplimiento enciende sus cinco acciones de rescate una a una y el registro de auditoría gana una línea por cada una, con la firma del estado final aparte. Acto 4: una política Rego compilada a Wasm admite la configuración de la empresa y los dos carriles de agente —el harness de documentos y el chat del asistente— quedan redibujados como hijos de esa misma puerta.">
+       alt="Película en cuatro actos sobre el stack. Acto 1: un documento entra y recibe su propia sesión de Claude Code en una MicroVM, la barra avanza de «Etapa 1 de 8» a «Etapa 8 de 8», aparecen los campos extraídos y una confirmación humana espera con su ventana de 5 minutos. Acto 2: el asistente encadena sus herramientas y su memoria recorre la tubería mem0 → embeddings locales bge-m3 en Ollama → índice Qdrant, con Postgres como sistema de registro y toda escritura pasando por Drizzle. Acto 3: el oficial de cumplimiento enciende sus cinco acciones de rescate una a una y el registro de auditoría gana una línea por cada una, con la firma del estado final aparte. Acto 4: una política Rego compilada a Wasm admite la configuración de la empresa y los dos carriles de agente —el harness de documentos y el chat del asistente— quedan redibujados como hijos de esa misma puerta.">
 </p>
 
 El stack, en cuatro actos: el **harness** que procesa cada documento, el
 **asistente** con memoria semántica, la **compuerta humana** del oficial y la
-**gobernanza** que acota lo que la máquina puede decidir por su cuenta. El mismo
-recorrido, en texto, está aquí abajo.
+**gobernanza** que acota lo que la máquina puede decidir por su cuenta. Dentro de
+la película, cada pieza de terceros sobre la que corre esto —Claude Code, Vercel
+Sandbox, el AI SDK, mem0, bge-m3, Ollama, Qdrant, Postgres, Drizzle, OPA, Rego,
+Wasm— aparece en **monoespaciada violeta**, para distinguirla de los módulos
+escritos aquí. El mismo recorrido, en texto, está aquí abajo.
 
 <details>
 <summary><b>Los cuatro actos, en texto</b></summary>
@@ -37,7 +40,8 @@ tres o cinco: `activeTools` se recalcula en cada arriendo. La memoria corre
 entera en contenedores propios: mem0 OSS extrae hechos con
 `claude-haiku-4-5-20251001`, los *embeddings* son `bge-m3` de 1024 dimensiones en
 Ollama y el índice es la colección Qdrant `vendra_assistant_memory`; Postgres es
-el sistema de registro, así que el índice se puede tirar y reconstruir. Un
+el sistema de registro —y toda escritura pasa por Drizzle—, así que el índice se
+puede tirar y reconstruir. Un
 drenaje cada 20 s hace el trabajo pesado para que ningún turno espere a un LLM, y
 el recuerdo corre en cada turno: 30 candidatos por ámbito → 20 hechos / 2.000
 caracteres. Si el índice no responde, degrada a recencia.
